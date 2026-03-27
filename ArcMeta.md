@@ -135,7 +135,9 @@ using FileIndex = std::unordered_map<DWORDLONG, FileEntry>;
 ### MFT 读取（MftReader）
 
 - 使用 CreateFileW 打开卷句柄，路径格式如 \\.\C:
-- 需要管理员权限，无权限时降级为递归目录遍历
+- 需要管理员权限，无权限时执行以下降级方案：
+  1. 索引层：切换为标准递归目录遍历（std::filesystem::recursive_directory_iterator）
+  2. 监听层：切换为 QFileSystemWatcher 或 ReadDirectoryChangesW 监控活动目录
 - 使用 DeviceIoControl + FSCTL_ENUM_USN_DATA 批量枚举 MFT 记录
 - 缓冲区大小：64KB，循环读取直至枚举完毕
 - index.reserve(1,000,000) 预分配，避免频繁 rehash
@@ -174,14 +176,14 @@ using FileIndex = std::unordered_map<DWORDLONG, FileEntry>;
   → 从 category_items 表删除对应 item_path 记录
 
   USN_REASON_RENAME_OLD_NAME
-  → 从 FileIndex 删除旧 FRN
-  → 从数据库删除旧路径的所有相关记录（同上级联清理）
-  → 旧路径的标签、星级、颜色等元数据随旧路径一起丢弃，不迁移
-  → 路径即身份，路径变了就是新的对象
+  → 标记旧路径失效
+  → 利用 FRN 在 FileIndex 中追踪新路径
+  → 自动将旧路径关联的元数据（标签、星级等）迁移至新路径对应的 .am_meta.json
+  → 路径是表现，FRN 是唯一身份标识
 
   USN_REASON_RENAME_NEW_NAME
   → 插入新 FileEntry 到 FileIndex
-  → 不自动创建新的 .am_meta.json，等用户下次操作时再生成
+  → 触发元数据原子迁移逻辑，确保资产不丢失
 
 - 轮询间隔：200ms
 - 使用 std::mutex 保护 FileIndex 的读写
@@ -217,7 +219,8 @@ using FileIndex = std::unordered_map<DWORDLONG, FileEntry>;
       "encrypted": false,
       "encrypt_salt": "",
       "encrypt_verify_hash": "",
-      "original_name": ""
+      "original_name": "",
+      "frn": 0
     }
   }
 }
@@ -298,8 +301,9 @@ CREATE TABLE IF NOT EXISTS folders (
 
 -- 文件与子文件夹元数据表
 CREATE TABLE IF NOT EXISTS items (
-    path               TEXT PRIMARY KEY,
-    type               TEXT,            -- 'file' | 'folder'
+    path               TEXT,
+    frn                INTEGER PRIMARY KEY,  -- FRN 作为主键实现跨路径追踪
+    type               TEXT,                 -- 'file' | 'folder'
     rating             INTEGER DEFAULT 0,
     color              TEXT    DEFAULT '',
     tags               TEXT    DEFAULT '',  -- JSON 数组字符串
@@ -362,6 +366,7 @@ CREATE TABLE IF NOT EXISTS sync_state (
 
 ### 索引
 
+CREATE INDEX IF NOT EXISTS idx_items_path     ON items(path);
 CREATE INDEX IF NOT EXISTS idx_items_parent   ON items(parent_path);
 CREATE INDEX IF NOT EXISTS idx_items_rating   ON items(rating);
 CREATE INDEX IF NOT EXISTS idx_items_color    ON items(color);
@@ -413,6 +418,12 @@ CREATE INDEX IF NOT EXISTS idx_cat_items_path ON category_items(item_path);
 3. 删除 items 表中 parent_path = 目标路径 的所有子记录
 4. 删除 category_items 表中 item_path = 目标路径 的记录
 5. 触发一次标签聚合表重新计数
+
+### 元数据迁移事务机制 (Metadata Transaction)
+在进行批量重命名、移动或跨目录操作时，必须遵循“两阶段提交”原则：
+1. **预变更阶段**：在内存中构建 `OldFRN -> NewData` 的映射，并预读所有受影响的 `.am_meta.json`。
+2. **原子执行阶段**：先执行物理文件操作，若成功则立即批量更新 JSON 持久化层。
+3. **回滚处理**：若物理操作中途失败，利用内存映射表撤回已完成的物理动作。
 
 ---
 
@@ -544,15 +555,15 @@ CREATE INDEX IF NOT EXISTS idx_cat_items_path ON category_items(item_path);
 
 各面板之间使用 QSplitter 分隔。
 QSplitter 分隔条宽度：3px（全局统一，不得使用其他值）
-所有面板最小宽度：230px（全局统一，不得为任何面板单独设定不同的最小宽度）
+所有面板最小宽度：200px（全局统一，以确保在 1280px 最小宽度下逻辑自洽）
 
 ### 六个面板默认宽度分配（合计 1600px）
 
 分类面板：230px
-导航面板：200px（不足最小宽度时自动扩展到 230px）
-收藏面板：200px（不足最小宽度时自动扩展到 230px）
+导航面板：200px
+收藏面板：200px
 内容面板：弹性伸缩，占据剩余空间
-  （1600 - 230 - 230 - 230 - 240 - 230 - 5个分隔条×3px = 425px 起始值）
+  （1600 - 230 - 200 - 200 - 240 - 230 - 5个分隔条×3px = 485px 起始值）
 元数据面板：240px
 筛选面板：230px
 
@@ -731,6 +742,8 @@ name | size | ctime | mtime | type | rating | color | custom
 - ────────────────
 - 置顶 / 取消置顶
 - 加密保护 / 解除加密 / 修改密码
+- ────────────────
+- 批量重命名 (Ctrl+M)
 - ────────────────
 - 重命名
 - 复制
@@ -916,6 +929,71 @@ name | size | ctime | mtime | type | rating | color | custom
 - 加密保护（EncryptionManager）
 - 高级筛选面板
 - 置顶功能
+
+---
+
+## 模块六：批量重命名引擎 (BatchRenameEngine)
+
+支持工业级的“组件化”重命名方案，通过管道模式依次处理文件名。
+
+### 文件名构建组件 (Component types)
+- **文本组件**：插入固定字符
+- **序列数字**：支持起始序号、步长、位阶补零（如 001, 002）
+- **日期组件**：支持多种格式定义（yyyyMMdd 等）
+- **元数据变量**：支持注入 ArcMeta 标签、星级、或物理属性（如图片长宽）
+
+### 操作逻辑
+1. **预检阶段**：使用 QtConcurrent 异步计算所有新文件名。
+2. **冲突预警**：检测到重名冲突时在 UI 高亮红色并锁定执行按钮。
+3. **元数据迁移**：重命名成功后，必须同步更新对应的 `.am_meta.json` 键值并重算数据库。
+
+---
+
+## 模块七：跨目录暂存篮 (Scratchpad)
+
+主界面底部或侧边提供可收起的“暂存篮”面板。
+
+- **逻辑**：仅存储文件路径引用（FRN），不涉及物理移动。
+- **批量动作**：支持对来自不同文件夹的“大杂烩”文件进行统一打标、批量加密或一键归类到某一分类。
+
+---
+
+## 模块八：专业缩略图与快速预览 (QuickLook)
+
+### 缩略图增强
+- 驱动：优先调用 Windows Shell (IShellItemImageFactory)。
+- 格式：支持 PSD、AI、EPS 等专业素材缩略图。
+- 性能：后台线程池异步生成，配合内存 LRU 缓存 (QCache)。
+
+### 空格键快速预览
+- **触发**：内容面板选中项按下 Space 键弹出。
+- **渲染策略**：
+  - 图片/PSD：QGraphicsView 硬件加速。
+  - 文本/MD：内存映射 (QFile::map) 秒开，仅加载前 128KB。
+- **交互**：预览状态下支持直接按 `1-5` 设置星级或标签，实现“一边确认一边筛选”。
+
+## 快捷键矩阵 (Hotkeys)
+
+### 文件操作
+- **Enter**：打开文件 / 进入目录
+- **F2**：快速重命名
+- **Delete**：移至回收站 / **Shift+Delete**：彻底删除
+- **Ctrl+C / X / V**：复制、剪切、粘贴
+- **Ctrl+Shift+C**：复制选中项完整物理路径
+
+### 快速打标
+- **Space**：触发 QuickLook 预览
+- **1 - 5**：设置星级 / **0**：清除星级
+- **Alt + 1~9**：应用对应的颜色标记
+- **Ctrl+T**：聚焦标签编辑框
+
+### 导航与视图
+- **Ctrl+L / Alt+D**：聚焦路径输入框
+- **Ctrl+F**：聚焦搜索过滤框
+- **Backspace**：返回上级目录
+- **Ctrl+[ / ]**：路径历史后退 / 前进
+- **Ctrl+\**：切换网格 / 列表视图
+- **Alt+Q**：切换窗口置顶
 
 ---
 
