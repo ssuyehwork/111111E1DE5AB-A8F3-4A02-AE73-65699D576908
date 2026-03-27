@@ -470,6 +470,43 @@ CREATE INDEX IF NOT EXISTS idx_cat_items_path ON category_items(item_path);
 
 ---
 
+## UI 模块：自定义标题栏按钮设计规范
+
+基于参考实现，MainWindow 的自定义标题栏（HeaderBar）按钮需遵循以下视觉与逻辑标准：
+
+### 1. 基础样式参数 (QSS)
+- **尺寸**: 按钮固定宽高为 `24x24px`。
+- **圆角**: `border-radius: 4px`。
+- **背景**: 默认 `transparent`。
+- **悬停态**: `background-color: rgba(255, 255, 255, 0.1)`。
+- **点击态**: `background-color: rgba(255, 255, 255, 0.2)`。
+- **图标尺寸**: 统一使用 `18x18px` 矢量图标。
+
+### 2. 物理排列顺序 (从右往左)
+1. **关闭按钮**: 悬停背景色 `#e81123`。
+2. **最大化/还原按钮**。
+3. **最小化按钮**。
+4. **置顶按钮** (`Alt + Q`)。
+5. **新建/编辑按钮**。
+6. **元数据面板开关** (`Ctrl + I`)。
+7. **高级筛选面板开关** (`Ctrl + G`)。
+
+### 3. 特定状态反馈
+- **置顶按钮 (StayOnTop)**:
+  - 未置顶：图标 `pin_tilted` (#aaaaaa)。
+  - 已置顶：图标 `pin_vertical` (#FF551C)，背景保持悬停色（浅灰）。
+- **工具箱按钮 (Toolbox)**:
+  - 激活态：图标颜色 `#00A650` (绿色)。
+  - 非激活态：图标颜色 `#aaaaaa` (灰色)。
+- **全局锁定按钮**: 快捷键提示 `Ctrl + Shift + Alt + S`。
+
+### 4. 交互增强 (ToolTip)
+- **拦截机制**: 必须通过 `eventFilter` 拦截 `QEvent::ToolTip` 和 `HoverEnter`。
+- **显示标准**: 调用全局 `ToolTipOverlay`。
+- **持续时间**: 统一设为 `2000ms` (2秒)。
+
+---
+
 ## UI 模块：整体布局
 
 ### 主窗口尺寸
