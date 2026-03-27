@@ -8,12 +8,20 @@
 #include <QLabel>
 #include <QCheckBox>
 
+#include "FilterEngine.h"
+
 namespace ArcMeta {
 
 class FilterPanel : public QWidget {
     Q_OBJECT
 public:
     explicit FilterPanel(QWidget* parent = nullptr);
+
+signals:
+    void filterChanged(const FilterState& state);
+
+private slots:
+    void onCheckboxToggled();
 
 private:
     void initSections();

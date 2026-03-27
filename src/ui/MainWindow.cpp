@@ -5,6 +5,7 @@
 #include <QStyle>
 #include <QEvent>
 #include <QHelpEvent>
+#include <QShortcut>
 #include "db/ConfigRepo.h"
 
 namespace ArcMeta {
@@ -23,6 +24,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     initToolBar();
     initLayout();
+
+    // 设置快捷键
+    new QShortcut(QKeySequence("F2"), this, [](){ /* 重命名逻辑 */ });
+    new QShortcut(QKeySequence("Space"), this, [](){ /* QuickLook 逻辑 */ });
+    new QShortcut(QKeySequence("Ctrl+L"), this, [this](){ m_pathEdit->setFocus(); });
+    new QShortcut(QKeySequence("Ctrl+F"), this, [this](){ m_searchEdit->setFocus(); });
 
     // 设置中央窗口布局，包含标题栏
     QWidget* central = new QWidget(this);

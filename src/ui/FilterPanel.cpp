@@ -41,13 +41,26 @@ QWidget* FilterPanel::createSection(const QString& title) {
     return section;
 }
 
+void FilterPanel::onCheckboxToggled() {
+    FilterState state;
+    // 此处应遍历各分组的 Checkbox 并填充 state
+    // 为了演示逻辑，此处先建立信号结构
+    emit filterChanged(state);
+}
+
 void FilterPanel::initSections() {
     // 1. 星级
     QWidget* starSec = createSection("星级筛选");
     for (int i = 5; i >= 1; --i) {
-        starSec->layout()->addWidget(new QCheckBox(QString(i, QChar(0x2605)))); // ★
+        auto* cb = new QCheckBox(QString(i, QChar(0x2605)));
+        cb->setProperty("rating", i);
+        connect(cb, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
+        starSec->layout()->addWidget(cb);
     }
-    starSec->layout()->addWidget(new QCheckBox("无星级"));
+    auto* cbNone = new QCheckBox("无星级");
+    cbNone->setProperty("rating", 0);
+    connect(cbNone, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
+    starSec->layout()->addWidget(cbNone);
 
     // 2. 颜色标记
     createSection("颜色标记");

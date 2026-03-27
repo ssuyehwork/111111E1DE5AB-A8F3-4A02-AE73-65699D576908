@@ -8,6 +8,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QLineEdit>
+#include <QMenu>
+#include "CategoryModel.h"
 
 namespace ArcMeta {
 
@@ -15,6 +17,15 @@ class CategoryPanel : public QWidget {
     Q_OBJECT
 public:
     explicit CategoryPanel(QWidget* parent = nullptr);
+
+signals:
+    void categorySelected(int categoryId);
+
+private slots:
+    void showContextMenu(const QPoint& pos);
+    void onAddCategory();
+    void onRenameCategory();
+    void onDeleteCategory();
 
 private:
     void initStatisticsArea();
@@ -24,6 +35,7 @@ private:
     QVBoxLayout* m_mainLayout;
     QListWidget* m_statsList;
     QTreeView* m_categoryTree;
+    CategoryModel* m_model;
     QLineEdit* m_searchEdit;
 };
 

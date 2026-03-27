@@ -35,10 +35,57 @@ void CategoryPanel::initCategoryTree() {
     m_categoryTree = new QTreeView(this);
     m_categoryTree->header()->hide();
     m_categoryTree->setIndentation(15);
+    m_categoryTree->setDragEnabled(true);
+    m_categoryTree->setAcceptDrops(true);
+    m_categoryTree->setDropIndicatorShown(true);
+    m_categoryTree->setDragDropMode(QAbstractItemView::InternalMove);
     m_categoryTree->setStyleSheet("QTreeView { border: none; background: transparent; }");
 
-    // 后续对接 CategoryModel
+    m_model = new CategoryModel(this);
+    m_categoryTree->setModel(m_model);
+
+    m_categoryTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_categoryTree, &QTreeView::customContextMenuRequested, this, &CategoryPanel::showContextMenu);
+
     m_mainLayout->addWidget(m_categoryTree, 1);
+}
+
+void CategoryPanel::showContextMenu(const QPoint& pos) {
+    QModelIndex index = m_categoryTree->indexAt(pos);
+    QMenu menu(this);
+
+    menu.addAction("新建子分类", this, &CategoryPanel::onAddCategory);
+    if (index.isValid()) {
+        menu.addAction("重命名", this, &CategoryPanel::onRenameCategory);
+        menu.addAction("删除分类", this, &CategoryPanel::onDeleteCategory);
+    }
+
+    menu.exec(m_categoryTree->mapToGlobal(pos));
+}
+
+void CategoryPanel::onAddCategory() {
+    QModelIndex index = m_categoryTree->currentIndex();
+    Category cat;
+    cat.name = "新分类";
+    cat.parentId = index.isValid() ? index.data(CategoryModel::IdRole).toInt() : 0;
+    CategoryRepo::add(cat);
+    m_model->refresh();
+}
+
+void CategoryPanel::onRenameCategory() {
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (index.isValid()) {
+        m_categoryTree->edit(index);
+    }
+}
+
+void CategoryPanel::onDeleteCategory() {
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (index.isValid()) {
+        int id = index.data(CategoryModel::IdRole).toInt();
+        CategoryRepo::remove(id);
+        m_model->refresh();
+    }
 }
 
 void CategoryPanel::initBottomToolbar() {
