@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "IconHelper.h"
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QStyle>
@@ -22,15 +23,17 @@ void MainWindow::initToolBar() {
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
 
-    // 设置内边距和间距（通过样式表或布局，这里先设基础样式）
     toolbar->setStyleSheet("QToolBar { spacing: 8px; padding: 0 12px; border-bottom: 1px solid #333333; }");
 
     // 1. 导航按钮
-    QPushButton* btnBack = new QPushButton("后退");
+    QPushButton* btnBack = new QPushButton();
+    btnBack->setIcon(IconHelper::getIcon("arrow_left"));
     btnBack->setFixedSize(60, 28);
-    QPushButton* btnForward = new QPushButton("前进");
+    QPushButton* btnForward = new QPushButton();
+    btnForward->setIcon(IconHelper::getIcon("arrow_right"));
     btnForward->setFixedSize(60, 28);
-    QPushButton* btnUp = new QPushButton("上级");
+    QPushButton* btnUp = new QPushButton();
+    btnUp->setIcon(IconHelper::getIcon("arrow_up"));
     btnUp->setFixedSize(60, 28);
 
     toolbar->addWidget(btnBack);
@@ -49,7 +52,7 @@ void MainWindow::initToolBar() {
     m_searchEdit->setPlaceholderText("在当前目录搜索...");
     toolbar->addWidget(m_searchEdit);
 
-    // 4. 视图切换（占位）
+    // 4. 视图切换
     QPushButton* btnViewMode = new QPushButton("视图");
     btnViewMode->setFixedSize(40, 28);
     toolbar->addWidget(btnViewMode);
@@ -57,44 +60,43 @@ void MainWindow::initToolBar() {
 
 void MainWindow::initLayout() {
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
-    m_mainSplitter->setHandleWidth(3); // 规范要求 3px
+    m_mainSplitter->setHandleWidth(3);
     m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #333333; }");
 
-    auto createPanel = [](const QString& name, int minWidth) {
-        QWidget* panel = new QWidget();
-        panel->setMinimumWidth(minWidth);
-        panel->setObjectName(name);
-        // 临时背景色以便于调试布局
-        panel->setAutoFillBackground(true);
-        return panel;
-    };
-
-    // 按顺序创建六大面板
-    m_categoryPanel = createPanel("CategoryPanel", 200);
+    // 实例化所有真实面板
+    m_categoryPanel = new CategoryPanel(this);
     m_navPanel = new NavPanel(this);
-    m_navPanel->setMinimumWidth(200);
-    m_favoritesPanel = createPanel("FavoritesPanel", 200);
+    m_favoritesPanel = new FavoritesPanel(this);
     m_contentPanel = new ContentPanel(this);
-    m_contentPanel->setMinimumWidth(200);
-    m_metaPanel = createPanel("MetaPanel", 200);
-    m_filterPanel = createPanel("FilterPanel", 200);
+    m_metaPanel = new MetaPanel(this);
+    m_filterPanel = new FilterPanel(this);
 
+    // 设置最小宽度
+    m_categoryPanel->setMinimumWidth(200);
+    m_navPanel->setMinimumWidth(200);
+    m_favoritesPanel->setMinimumWidth(200);
+    m_contentPanel->setMinimumWidth(200);
+    m_metaPanel->setMinimumWidth(200);
+    m_filterPanel->setMinimumWidth(200);
+
+    // 添加到 Splitter
     m_mainSplitter->addWidget(m_categoryPanel);
     m_mainSplitter->addWidget(m_navPanel);
     m_mainSplitter->addWidget(m_favoritesPanel);
     m_mainSplitter->addWidget(m_contentPanel);
     m_mainSplitter->addWidget(m_metaPanel);
+    m_mainSplitter->addWidget(m_filterPanel);
 
     // 建立导航联动
     connect(m_navPanel, &NavPanel::directorySelected, m_contentPanel, &ContentPanel::setRootPath);
     connect(m_navPanel, &NavPanel::directorySelected, [this](const QString& path) {
         m_pathEdit->setText(path);
     });
-    m_mainSplitter->addWidget(m_filterPanel);
 
-    // 设置初始宽度分配（合计 1600px）
-    // 分类:230, 导航:200, 收藏:200, 内容:弹性, 元数据:240, 筛选:230
-    // 剩余给内容面板 = 1600 - (230+200+200+240+230) - 5*3 = 485
+    // 建立内容与元数据联动
+    connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
+
+    // 设置初始宽度分配
     QList<int> sizes;
     sizes << 230 << 200 << 200 << 485 << 240 << 230;
     m_mainSplitter->setSizes(sizes);

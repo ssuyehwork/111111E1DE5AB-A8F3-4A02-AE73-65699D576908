@@ -9,6 +9,10 @@
 #include <QPushButton>
 #include "NavPanel.h"
 #include "ContentPanel.h"
+#include "CategoryPanel.h"
+#include "MetaPanel.h"
+#include "FavoritesPanel.h"
+#include "FilterPanel.h"
 
 namespace ArcMeta {
 
@@ -23,13 +27,13 @@ private:
     void initLayout();
     void initToolBar();
 
-    // 六大面板占位
-    QWidget* m_categoryPanel;
+    // 六大面板
+    CategoryPanel* m_categoryPanel;
     NavPanel* m_navPanel;
-    QWidget* m_favoritesPanel;
+    FavoritesPanel* m_favoritesPanel;
     ContentPanel* m_contentPanel;
-    QWidget* m_metaPanel;
-    QWidget* m_filterPanel;
+    MetaPanel* m_metaPanel;
+    FilterPanel* m_filterPanel;
 
     QSplitter* m_mainSplitter;
 
