@@ -743,7 +743,7 @@ name | size | ctime | mtime | type | rating | color | custom
 - 置顶 / 取消置顶
 - 加密保护 / 解除加密 / 修改密码
 - ────────────────
-- 批量重命名 (Ctrl+M)
+- 批量重命名 (Ctrl+Shift+S)
 - ────────────────
 - 重命名
 - 复制
@@ -977,6 +977,7 @@ name | size | ctime | mtime | type | rating | color | custom
 ### 文件操作
 - **Enter**：打开文件 / 进入目录
 - **F2**：快速重命名
+- **Ctrl+Shift+S**：批量重命名
 - **Delete**：移至回收站 / **Shift+Delete**：彻底删除
 - **Ctrl+C / X / V**：复制、剪切、粘贴
 - **Ctrl+Shift+C**：复制选中项完整物理路径
