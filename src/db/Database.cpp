@@ -83,6 +83,15 @@ bool Database::createTables() {
     query.exec("CREATE INDEX IF NOT EXISTS idx_items_tags ON items(tags)");
     query.exec("CREATE INDEX IF NOT EXISTS idx_items_pinned ON items(pinned)");
 
+    // 5. sync_state 表
+    ok = query.exec(
+        "CREATE TABLE IF NOT EXISTS sync_state ("
+        "    key         TEXT PRIMARY KEY,"
+        "    value       TEXT"
+        ")"
+    );
+    if (!ok) return false;
+
     return true;
 }
 

@@ -13,6 +13,8 @@
 #include "MetaPanel.h"
 #include "FavoritesPanel.h"
 #include "FilterPanel.h"
+#include "HeaderBar.h"
+#include "ToolTipOverlay.h"
 
 namespace ArcMeta {
 
@@ -23,9 +25,15 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     void initLayout();
     void initToolBar();
+
+    HeaderBar* m_headerBar;
 
     // 六大面板
     CategoryPanel* m_categoryPanel;

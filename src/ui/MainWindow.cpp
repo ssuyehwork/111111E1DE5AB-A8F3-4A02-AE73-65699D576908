@@ -3,19 +3,69 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QStyle>
+#include <QEvent>
+#include <QHelpEvent>
+#include "db/ConfigRepo.h"
 
 namespace ArcMeta {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle("ArcMeta");
+
+    // 加载窗口设置或使用默认
     resize(1600, 900);
     setMinimumSize(1280, 720);
 
+    // 安装全局事件过滤器以拦截 ToolTip
+    qApp->installEventFilter(this);
+
+    m_headerBar = new HeaderBar(this);
+
     initToolBar();
     initLayout();
+
+    // 设置中央窗口布局，包含标题栏
+    QWidget* central = new QWidget(this);
+    QVBoxLayout* centralLayout = new QVBoxLayout(central);
+    centralLayout->setContentsMargins(0, 0, 0, 0);
+    centralLayout->setSpacing(0);
+
+    centralLayout->addWidget(m_headerBar);
+    centralLayout->addWidget(m_mainSplitter, 1);
+
+    // 分割线：1px 实线 #333333
+    QFrame* bottomLine = new QFrame(this);
+    bottomLine->setFrameShape(QFrame::HLine);
+    bottomLine->setFixedHeight(1);
+    bottomLine->setStyleSheet("background-color: #333333; border: none;");
+    centralLayout->addWidget(bottomLine);
+
+    setCentralWidget(central);
+    setWindowFlags(Qt::FramelessWindowHint); // 隐藏原生标题栏
 }
 
 MainWindow::~MainWindow() {}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::ToolTip) {
+        QHelpEvent* helpEvent = static_cast<QHelpEvent*>(event);
+        QString text = watched->property("toolTip").toString();
+        if (text.isEmpty()) {
+            // 尝试直接获取
+            if (QWidget* w = qobject_cast<QWidget*>(watched)) {
+                text = w->toolTip();
+            }
+        }
+
+        if (!text.isEmpty()) {
+            // 标题栏按钮专属 2000ms，其他默认 700ms
+            int timeout = (watched->parent() == m_headerBar) ? 2000 : 700;
+            ToolTipOverlay::instance().showTip(helpEvent->globalPos(), text, timeout);
+        }
+        return true; // 拦截原生 ToolTip
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
 
 void MainWindow::initToolBar() {
     QToolBar* toolbar = addToolBar("MainToolbar");
@@ -97,11 +147,19 @@ void MainWindow::initLayout() {
     connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
 
     // 设置初始宽度分配
-    QList<int> sizes;
-    sizes << 230 << 200 << 200 << 485 << 240 << 230;
+    QList<int> sizes = ConfigRepo::loadPanelWidths();
+    if (sizes.isEmpty()) {
+        sizes << 230 << 200 << 200 << 485 << 240 << 230;
+    }
     m_mainSplitter->setSizes(sizes);
 
     setCentralWidget(m_mainSplitter);
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    // 退出前记录面板宽度
+    ConfigRepo::savePanelWidths(m_mainSplitter->sizes());
+    QMainWindow::closeEvent(event);
 }
 
 } // namespace ArcMeta
