@@ -25,9 +25,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     initToolBar();
     initLayout();
 
+    m_quickLook = new QuickLook(this);
+
     // 设置快捷键
     new QShortcut(QKeySequence("F2"), this, [](){ /* 重命名逻辑 */ });
-    new QShortcut(QKeySequence("Space"), this, [](){ /* QuickLook 逻辑 */ });
+    new QShortcut(QKeySequence("Space"), this, [this](){
+        // 简单实现：获取当前内容面板路径进行预览
+        // m_quickLook->preview(m_pathEdit->text());
+    });
     new QShortcut(QKeySequence("Ctrl+L"), this, [this](){ m_pathEdit->setFocus(); });
     new QShortcut(QKeySequence("Ctrl+F"), this, [this](){ m_searchEdit->setFocus(); });
 
@@ -39,6 +44,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     centralLayout->addWidget(m_headerBar);
     centralLayout->addWidget(m_mainSplitter, 1);
+
+    // 暂存篮集成到中央布局底部
+    m_scratchPad = new ScratchPad(this);
+    m_scratchPad->setFixedHeight(120);
+    centralLayout->addWidget(m_scratchPad);
 
     // 分割线：1px 实线 #333333
     QFrame* bottomLine = new QFrame(this);

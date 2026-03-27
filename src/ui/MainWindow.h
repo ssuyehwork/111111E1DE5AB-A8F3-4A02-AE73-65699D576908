@@ -15,6 +15,8 @@
 #include "FilterPanel.h"
 #include "HeaderBar.h"
 #include "ToolTipOverlay.h"
+#include "ScratchPad.h"
+#include "QuickLook.h"
 
 namespace ArcMeta {
 
@@ -42,6 +44,8 @@ private:
     ContentPanel* m_contentPanel;
     MetaPanel* m_metaPanel;
     FilterPanel* m_filterPanel;
+    ScratchPad* m_scratchPad;
+    QuickLook* m_quickLook;
 
     QSplitter* m_mainSplitter;
 

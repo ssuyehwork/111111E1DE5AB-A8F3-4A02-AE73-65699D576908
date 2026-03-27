@@ -55,11 +55,22 @@ void MetaPanel::initEditableArea() {
     m_chkPinned = new QCheckBox("置顶该项");
     m_containerLayout->addWidget(m_chkPinned);
 
-    // 星级（占位）
+    // 星级评分
     m_containerLayout->addWidget(new QLabel("星级评分"));
     m_ratingWidget = new QWidget();
-    m_ratingWidget->setFixedHeight(30);
-    m_ratingWidget->setStyleSheet("background: #333;");
+    QHBoxLayout* starLayout = new QHBoxLayout(m_ratingWidget);
+    starLayout->setContentsMargins(0, 0, 0, 0);
+    starLayout->setSpacing(4);
+    for (int i = 1; i <= 5; ++i) {
+        QPushButton* star = new QPushButton("★");
+        star->setFixedSize(20, 20);
+        star->setCheckable(true);
+        star->setCursor(Qt::PointingHandCursor);
+        star->setStyleSheet("QPushButton { color: #555; border: none; font-size: 16px; } "
+                           "QPushButton:checked { color: #EF9F27; }");
+        starLayout->addWidget(star);
+    }
+    starLayout->addStretch();
     m_containerLayout->addWidget(m_ratingWidget);
 
     // 颜色标记

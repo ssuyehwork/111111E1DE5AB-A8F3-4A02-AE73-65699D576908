@@ -63,7 +63,13 @@ void FilterPanel::initSections() {
     starSec->layout()->addWidget(cbNone);
 
     // 2. 颜色标记
-    createSection("颜色标记");
+    QWidget* colorSec = createSection("颜色标记");
+    QStringList colorNames = {"red", "orange", "yellow", "green", "cyan", "blue", "purple", "gray"};
+    for (const QString& name : colorNames) {
+        auto* cb = new QCheckBox(name);
+        connect(cb, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
+        colorSec->layout()->addWidget(cb);
+    }
 
     // 3. 标签
     createSection("标签筛选");

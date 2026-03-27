@@ -26,5 +26,11 @@ int main(int argc, char *argv[]) {
     ArcMeta::MainWindow w;
     w.show();
 
+    // 5. 生命周期管理：程序退出前强制刷新元数据队列，确保数据真值完整落地
+    QObject::connect(&a, &QCoreApplication::aboutToQuit, []() {
+        ArcMeta::SyncQueue::instance().flush();
+        ArcMeta::Database::instance().close();
+    });
+
     return a.exec();
 }
