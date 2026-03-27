@@ -17,6 +17,7 @@
 #include "ToolTipOverlay.h"
 #include "ScratchPad.h"
 #include "QuickLook.h"
+#include "../mft/MftReader.h"
 
 namespace ArcMeta {
 
@@ -24,7 +25,7 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(FileIndex& index, QWidget* parent = nullptr);
     ~MainWindow();
 
 protected:
@@ -52,6 +53,9 @@ private:
     // 工具栏组件
     QLineEdit* m_pathEdit;
     QLineEdit* m_searchEdit;
+
+    // 全局索引引用
+    FileIndex& m_index;
 };
 
 } // namespace ArcMeta

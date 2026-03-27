@@ -32,8 +32,15 @@ bool ItemRepo::removeByFrn(DWORDLONG frn) {
 bool ItemRepo::removeByParentPath(const QString& parentPath) {
     QSqlDatabase db = Database::instance().getDb();
     QSqlQuery query(db);
-    query.prepare("DELETE FROM items WHERE parent_path = ?");
+    // 使用 LIKE 进行深度递归删除
+    QString pattern = parentPath;
+    if (!pattern.endsWith("/")) pattern += "/";
+    pattern += "%";
+
+    query.prepare("DELETE FROM items WHERE parent_path = ? OR parent_path LIKE ?");
     query.addBindValue(parentPath);
+    query.addBindValue(pattern);
+
     return query.exec();
 }
 

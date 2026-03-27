@@ -1,5 +1,6 @@
 #include "CategoryPanel.h"
 #include <QHeaderView>
+#include "../db/CategoryItemRepo.h"
 
 namespace ArcMeta {
 
@@ -28,6 +29,11 @@ void CategoryPanel::initStatisticsArea() {
         item->setSizeHint(QSize(0, 26)); // 每行约 26px
     }
 
+    connect(m_statsList, &QListWidget::currentRowChanged, [this](int row) {
+        // -1 代表特殊统计项，此处简单用负数区分
+        emit categorySelected(-1 - row);
+    });
+
     m_mainLayout->addWidget(m_statsList);
 }
 
@@ -46,6 +52,13 @@ void CategoryPanel::initCategoryTree() {
 
     m_categoryTree->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_categoryTree, &QTreeView::customContextMenuRequested, this, &CategoryPanel::showContextMenu);
+
+    connect(m_categoryTree->selectionModel(), &QItemSelectionModel::selectionChanged, [this](const QItemSelection& selected) {
+        if (!selected.indexes().isEmpty()) {
+            int id = selected.indexes().first().data(CategoryModel::IdRole).toInt();
+            emit categorySelected(id);
+        }
+    });
 
     m_mainLayout->addWidget(m_categoryTree, 1);
 }
@@ -97,6 +110,7 @@ void CategoryPanel::initBottomToolbar() {
 
     QPushButton* btnAdd = new QPushButton("+ 新建分类");
     btnAdd->setCursor(Qt::PointingHandCursor);
+    connect(btnAdd, &QPushButton::clicked, this, &CategoryPanel::onAddCategory);
 
     m_searchEdit = new QLineEdit();
     m_searchEdit->setPlaceholderText("搜索分类...");

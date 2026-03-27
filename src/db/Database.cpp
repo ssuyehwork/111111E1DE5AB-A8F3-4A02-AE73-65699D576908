@@ -66,7 +66,32 @@ bool Database::createTables() {
     );
     if (!ok) return false;
 
-    // 3. tags 表
+    // 3. categories 表
+    ok = query.exec(
+        "CREATE TABLE IF NOT EXISTS categories ("
+        "    id          INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "    parent_id   INTEGER DEFAULT 0,"
+        "    name        TEXT,"
+        "    color       TEXT,"
+        "    preset_tags TEXT,"
+        "    sort_order  INTEGER DEFAULT 0,"
+        "    pinned      INTEGER DEFAULT 0,"
+        "    created_at  REAL"
+        ")"
+    );
+    if (!ok) return false;
+
+    // 4. category_items 表 (关联 FRN 与 Category ID)
+    ok = query.exec(
+        "CREATE TABLE IF NOT EXISTS category_items ("
+        "    category_id INTEGER,"
+        "    frn         INTEGER,"
+        "    PRIMARY KEY (category_id, frn)"
+        ")"
+    );
+    if (!ok) return false;
+
+    // 5. tags 表
     ok = query.exec(
         "CREATE TABLE IF NOT EXISTS tags ("
         "    tag         TEXT PRIMARY KEY,"
@@ -75,15 +100,7 @@ bool Database::createTables() {
     );
     if (!ok) return false;
 
-    // 4. 索引创建
-    query.exec("CREATE INDEX IF NOT EXISTS idx_items_path ON items(path)");
-    query.exec("CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_path)");
-    query.exec("CREATE INDEX IF NOT EXISTS idx_items_rating ON items(rating)");
-    query.exec("CREATE INDEX IF NOT EXISTS idx_items_color ON items(color)");
-    query.exec("CREATE INDEX IF NOT EXISTS idx_items_tags ON items(tags)");
-    query.exec("CREATE INDEX IF NOT EXISTS idx_items_pinned ON items(pinned)");
-
-    // 5. sync_state 表
+    // 6. sync_state 表
     ok = query.exec(
         "CREATE TABLE IF NOT EXISTS sync_state ("
         "    key         TEXT PRIMARY KEY,"
@@ -91,6 +108,10 @@ bool Database::createTables() {
         ")"
     );
     if (!ok) return false;
+
+    // 索引
+    query.exec("CREATE INDEX IF NOT EXISTS idx_items_path ON items(path)");
+    query.exec("CREATE INDEX IF NOT EXISTS idx_cat_items_frn ON category_items(frn)");
 
     return true;
 }

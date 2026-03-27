@@ -3,9 +3,11 @@
 
 #include <QWidget>
 #include <QTreeView>
+#include <QListView>
 #include <QFileSystemModel>
 #include <QVBoxLayout>
 #include <QStringListModel>
+#include <QStackedWidget>
 #include "../mft/MftReader.h"
 
 namespace ArcMeta {
@@ -26,13 +28,22 @@ public slots:
     // 执行全盘并行搜索
     void performSearch(const FileIndex& index, const QString& query);
 
+    // 显示指定分类下的文件
+    void showCategory(const FileIndex& index, int categoryId);
+
 private slots:
     void onSelectionChanged(const QItemSelection& selected, const QItemSelection& deselected);
 
+public slots:
+    void setViewMode(bool isGrid);
+
 private:
     void initListView();
+    void initGridView();
 
+    QStackedWidget* m_viewStack;
     QTreeView* m_treeView;
+    QListView* m_gridView;
     QFileSystemModel* m_model;
     QStringListModel* m_searchResultModel;
 };

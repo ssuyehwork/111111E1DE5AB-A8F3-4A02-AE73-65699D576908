@@ -122,10 +122,21 @@ void UsnWatcher::handleRecord(PUSN_RECORD_V2 record) {
         m_index[frn] = entry;
     }
     else if (reason & USN_REASON_FILE_DELETE) {
+        bool isDir = (record->FileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+
+        PathBuilder builder(m_index);
+        QString oldPath = builder.getFullPath(frn, m_volumeRoot);
+
         m_index.erase(frn);
+
         // 级联清理数据库记录
         ItemRepo::removeByFrn(frn);
-        emit fileDeleted(frn, "");
+        if (isDir && !oldPath.isEmpty()) {
+            ItemRepo::removeByParentPath(oldPath);
+            // 注意：深层递归可通过数据库中的 parent_path LIKE 'oldPath/%' 实现
+        }
+
+        emit fileDeleted(frn, oldPath);
     }
     else if (reason & USN_REASON_RENAME_NEW_NAME) {
         if (m_index.count(frn)) {
@@ -140,12 +151,9 @@ void UsnWatcher::handleRecord(PUSN_RECORD_V2 record) {
             m_index[frn] = entry;
         }
 
-        // 核心：元数据自动追踪
-        // 利用 PathBuilder 重建新路径并更新数据库
         PathBuilder builder(m_index);
         QString newPath = builder.getFullPath(frn, m_volumeRoot);
 
-        // 获取父目录路径
         DWORDLONG parentFrn = record->ParentFileReferenceNumber;
         QString newParentPath = builder.getFullPath(parentFrn, m_volumeRoot);
 

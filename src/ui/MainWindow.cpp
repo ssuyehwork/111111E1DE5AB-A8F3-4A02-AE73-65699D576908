@@ -6,11 +6,13 @@
 #include <QEvent>
 #include <QHelpEvent>
 #include <QShortcut>
-#include "db/ConfigRepo.h"
+#include <QApplication>
+#include "../db/ConfigRepo.h"
 
 namespace ArcMeta {
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
+MainWindow::MainWindow(FileIndex& index, QWidget* parent)
+    : QMainWindow(parent), m_index(index) {
     setWindowTitle("ArcMeta");
 
     // 加载窗口设置或使用默认
@@ -68,18 +70,16 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
         QHelpEvent* helpEvent = static_cast<QHelpEvent*>(event);
         QString text = watched->property("toolTip").toString();
         if (text.isEmpty()) {
-            // 尝试直接获取
             if (QWidget* w = qobject_cast<QWidget*>(watched)) {
                 text = w->toolTip();
             }
         }
 
         if (!text.isEmpty()) {
-            // 标题栏按钮专属 2000ms，其他默认 700ms
             int timeout = (watched->parent() == m_headerBar) ? 2000 : 700;
             ToolTipOverlay::instance().showTip(helpEvent->globalPos(), text, timeout);
         }
-        return true; // 拦截原生 ToolTip
+        return true;
     }
     return QMainWindow::eventFilter(watched, event);
 }
@@ -116,12 +116,17 @@ void MainWindow::initToolBar() {
     // 3. 搜索框（固定宽度）
     m_searchEdit = new QLineEdit();
     m_searchEdit->setFixedWidth(200);
-    m_searchEdit->setPlaceholderText("在当前目录搜索...");
+    m_searchEdit->setPlaceholderText("全盘并行搜索...");
     toolbar->addWidget(m_searchEdit);
 
     // 4. 视图切换
     QPushButton* btnViewMode = new QPushButton("视图");
     btnViewMode->setFixedSize(40, 28);
+    connect(btnViewMode, &QPushButton::clicked, [this]() {
+        static bool isGrid = true;
+        isGrid = !isGrid;
+        m_contentPanel->setViewMode(isGrid);
+    });
     toolbar->addWidget(btnViewMode);
 }
 
@@ -130,7 +135,6 @@ void MainWindow::initLayout() {
     m_mainSplitter->setHandleWidth(3);
     m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #333333; }");
 
-    // 实例化所有真实面板
     m_categoryPanel = new CategoryPanel(this);
     m_navPanel = new NavPanel(this);
     m_favoritesPanel = new FavoritesPanel(this);
@@ -138,7 +142,6 @@ void MainWindow::initLayout() {
     m_metaPanel = new MetaPanel(this);
     m_filterPanel = new FilterPanel(this);
 
-    // 设置最小宽度
     m_categoryPanel->setMinimumWidth(200);
     m_navPanel->setMinimumWidth(200);
     m_favoritesPanel->setMinimumWidth(200);
@@ -146,7 +149,6 @@ void MainWindow::initLayout() {
     m_metaPanel->setMinimumWidth(200);
     m_filterPanel->setMinimumWidth(200);
 
-    // 添加到 Splitter
     m_mainSplitter->addWidget(m_categoryPanel);
     m_mainSplitter->addWidget(m_navPanel);
     m_mainSplitter->addWidget(m_favoritesPanel);
@@ -154,33 +156,29 @@ void MainWindow::initLayout() {
     m_mainSplitter->addWidget(m_metaPanel);
     m_mainSplitter->addWidget(m_filterPanel);
 
-    // 建立导航联动
     connect(m_navPanel, &NavPanel::directorySelected, m_contentPanel, &ContentPanel::setRootPath);
     connect(m_navPanel, &NavPanel::directorySelected, [this](const QString& path) {
         m_pathEdit->setText(path);
     });
 
-    // 建立内容与元数据联动
-    connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
-
-    // 建立全量搜索联动
-    connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
-        // 此处应传入全局缓存的 index，演示逻辑直接调用
-        // m_contentPanel->performSearch(globalIndex, text);
+    connect(m_categoryPanel, &CategoryPanel::categorySelected, [this](int id) {
+        m_contentPanel->showCategory(m_index, id);
     });
 
-    // 设置初始宽度分配
+    connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
+
+    connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
+        m_contentPanel->performSearch(m_index, text);
+    });
+
     QList<int> sizes = ConfigRepo::loadPanelWidths();
     if (sizes.isEmpty()) {
         sizes << 230 << 200 << 200 << 485 << 240 << 230;
     }
     m_mainSplitter->setSizes(sizes);
-
-    setCentralWidget(m_mainSplitter);
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
-    // 退出前记录面板宽度
     ConfigRepo::savePanelWidths(m_mainSplitter->sizes());
     QMainWindow::closeEvent(event);
 }

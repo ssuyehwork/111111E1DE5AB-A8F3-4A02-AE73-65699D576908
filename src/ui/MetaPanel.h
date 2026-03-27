@@ -8,6 +8,7 @@
 #include <QCheckBox>
 #include <QPlainTextEdit>
 #include <QLineEdit>
+#include <QPushButton>
 
 namespace ArcMeta {
 
@@ -18,6 +19,16 @@ public:
 
     // 更新面板显示的元数据内容
     void setTargetFile(const QString& filePath);
+
+private slots:
+    void onRatingClicked(int rating);
+    void onColorClicked(const QString& color);
+    void onPinnedToggled(bool checked);
+    void onTagsChanged();
+    void onNoteChanged();
+
+    // 统一保存逻辑
+    void saveCurrentMetadata();
 
 private:
     void initReadOnlyArea();
@@ -39,6 +50,10 @@ private:
     QWidget* m_colorWidget;
     QLineEdit* m_tagEdit;
     QPlainTextEdit* m_noteEdit;
+
+    // 当前选中的文件路径
+    QString m_currentFilePath;
+    bool m_isLoading = false; // 用于避免加载时触发保存
 };
 
 } // namespace ArcMeta
