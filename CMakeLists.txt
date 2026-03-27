@@ -14,7 +14,7 @@ endif()
 set(CMAKE_PREFIX_PATH "C:/Qt/6.10.2/msvc2022_64")
 
 # 查找 Qt 组件
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent Svg)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent Svg Sql)
 
 # 编译选项：/W4 (四级警告), /O2 (速度优化)
 add_compile_options(/W4 /O2 /utf-8)
@@ -49,6 +49,7 @@ target_link_libraries(ArcMeta PRIVATE
     Qt6::Widgets
     Qt6::Concurrent
     Qt6::Svg
+    Qt6::Sql
     ${EXTERNAL_LIBS}
 )
 
