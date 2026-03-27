@@ -7,20 +7,17 @@
 
 namespace ArcMeta {
 
-/**
- * @brief 内容面板，显示当前目录下的条目
- */
 class ContentPanel : public QWidget {
     Q_OBJECT
 public:
     explicit ContentPanel(QWidget* parent = nullptr);
     ~ContentPanel();
 
-    /**
-     * @brief 刷新视图
-     * 2026-03-27 此处体现上下文：将 MFT 的空状态映射到原生图标滤镜
-     */
     void updateItems(const std::vector<const FileEntry*>& entries, const QString& currentPath);
+
+protected:
+    // 2026-03-27 按照宪法：新增事件过滤器以拦截原生 Tip
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     QListView* m_listView = nullptr;
