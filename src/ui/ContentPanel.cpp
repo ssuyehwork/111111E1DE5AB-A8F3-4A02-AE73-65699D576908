@@ -1,4 +1,6 @@
 #include "ContentPanel.h"
+#include "../mft/ParallelSearcher.h"
+#include "../mft/PathBuilder.h"
 #include <QHeaderView>
 
 namespace ArcMeta {
@@ -33,10 +35,34 @@ void ContentPanel::initListView() {
 }
 
 void ContentPanel::setRootPath(const QString& path) {
+    m_treeView->setModel(m_model);
     QModelIndex index = m_model->index(path);
     if (index.isValid()) {
         m_treeView->setRootIndex(index);
     }
+}
+
+void ContentPanel::performSearch(const FileIndex& index, const QString& query) {
+    if (query.isEmpty()) {
+        m_treeView->setModel(m_model);
+        return;
+    }
+
+    // 1. 执行并行搜索
+    std::vector<DWORDLONG> frns = ParallelSearcher::search(index, query.toStdWString());
+
+    // 2. 转换结果为路径列表
+    PathBuilder builder(index);
+    QStringList results;
+    for (DWORDLONG frn : frns) {
+        results << builder.getFullPath(frn, "C:");
+    }
+
+    // 3. 更新视图
+    if (!m_searchResultModel) m_searchResultModel = new QStringListModel(this);
+    m_searchResultModel->setStringList(results);
+    m_treeView->setModel(m_searchResultModel);
+    m_treeView->setRootIndex(QModelIndex());
 }
 
 } // namespace ArcMeta

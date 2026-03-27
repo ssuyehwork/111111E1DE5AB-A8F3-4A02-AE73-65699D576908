@@ -42,6 +42,39 @@ void SyncEngine::fullScan(const QString& rootPath, std::function<void(int curren
     rebuildTagIndex();
 }
 
+void SyncEngine::incrementalSync() {
+    QSqlDatabase db = Database::instance().getDb();
+    QSqlQuery query(db);
+
+    // 1. 获取上次全局同步时间
+    query.exec("SELECT value FROM sync_state WHERE key = 'last_sync_time'");
+    double lastSync = 0;
+    if (query.next()) lastSync = query.value(0).toDouble();
+
+    // 2. 遍历 folders 表中的已知路径
+    query.exec("SELECT path FROM folders");
+    QStringList pathsToCheck;
+    while (query.next()) pathsToCheck.append(query.value(0).toString());
+
+    db.transaction();
+    for (const QString& dirPath : pathsToCheck) {
+        QString jsonPath = QDir(dirPath).filePath(".am_meta.json");
+        QFileInfo fi(jsonPath);
+        if (fi.exists() && fi.lastModified().toSecsSinceEpoch() > lastSync) {
+            syncDirectory(dirPath);
+        }
+    }
+
+    // 3. 更新同步时间
+    QSqlQuery updateSync(db);
+    updateSync.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
+    updateSync.addBindValue(QDateTime::currentDateTime().toSecsSinceEpoch());
+    updateSync.exec();
+
+    db.commit();
+    rebuildTagIndex();
+}
+
 bool SyncEngine::syncDirectory(const QString& dirPath) {
     AmMeta meta = AmMetaJson::load(dirPath);
     QSqlDatabase db = Database::instance().getDb();

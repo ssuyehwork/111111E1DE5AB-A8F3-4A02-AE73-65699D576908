@@ -19,6 +19,9 @@ public:
     bool encryptFile(const QString& srcPath, const QString& destPath, const QString& password,
                     std::vector<BYTE>& outSalt, std::vector<BYTE>& outHash);
 
+    // 验证密码并生成校验哈希
+    bool calculateVerifyHash(const QString& password, const std::vector<BYTE>& salt, std::vector<BYTE>& outHash);
+
     // 解密文件
     bool decryptFile(const QString& srcPath, const QString& destPath, const QString& password,
                     const std::vector<BYTE>& salt, const std::vector<BYTE>& verifyHash);

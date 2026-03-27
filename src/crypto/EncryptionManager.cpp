@@ -50,11 +50,24 @@ bool EncryptionManager::encryptFile(const QString& srcPath, const QString& destP
     destFile.write((const char*)encryptedData.data(), encryptedData.size());
     destFile.close();
 
-    // 简单生成验证哈希（实际应使用更复杂的 HMAC）
-    outHash.resize(32);
-    // 占位逻辑：此处可进一步实现摘要计算
+    // 生成验证哈希
+    return calculateVerifyHash(password, outSalt, outHash);
+}
 
-    return true;
+bool EncryptionManager::calculateVerifyHash(const QString& password, const std::vector<BYTE>& salt, std::vector<BYTE>& outHash) {
+    std::vector<BYTE> key;
+    if (!deriveKey(password, salt, key)) return false;
+
+    // 对密码派生出的 Key 再进行一次 SHA256 运算，存入 JSON 作为校验锚点
+    BCRYPT_ALG_HANDLE hAlg = NULL;
+    NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+    if (!NT_SUCCESS(status)) return false;
+
+    outHash.resize(32);
+    status = BCryptHash(hAlg, NULL, 0, (PUCHAR)key.data(), (ULONG)key.size(), outHash.data(), (ULONG)outHash.size());
+
+    BCryptCloseAlgorithmProvider(hAlg, 0);
+    return NT_SUCCESS(status);
 }
 
 bool EncryptionManager::processCrypto(bool encrypt, const std::vector<BYTE>& data, const std::vector<BYTE>& key,

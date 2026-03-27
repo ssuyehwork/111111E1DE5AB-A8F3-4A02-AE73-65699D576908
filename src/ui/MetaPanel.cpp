@@ -62,11 +62,29 @@ void MetaPanel::initEditableArea() {
     m_ratingWidget->setStyleSheet("background: #333;");
     m_containerLayout->addWidget(m_ratingWidget);
 
-    // 颜色（占位）
+    // 颜色标记
     m_containerLayout->addWidget(new QLabel("颜色标记"));
     m_colorWidget = new QWidget();
-    m_colorWidget->setFixedHeight(30);
-    m_colorWidget->setStyleSheet("background: #333;");
+    QHBoxLayout* colorLayout = new QHBoxLayout(m_colorWidget);
+    colorLayout->setContentsMargins(0, 0, 0, 0);
+    colorLayout->setSpacing(6);
+
+    // 根据规范定义的颜色映射表
+    QMap<QString, QString> colorMap = {
+        {"red", "#E24B4A"}, {"orange", "#EF9F27"}, {"yellow", "#FAC775"},
+        {"green", "#639922"}, {"cyan", "#1D9E75"}, {"blue", "#378ADD"},
+        {"purple", "#7F77DD"}, {"gray", "#5F5E5A"}
+    };
+
+    for (auto it = colorMap.begin(); it != colorMap.end(); ++it) {
+        QPushButton* btn = new QPushButton();
+        btn->setFixedSize(18, 18);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setToolTip(it.key());
+        btn->setStyleSheet(QString("background-color: %1; border-radius: 9px; border: none;").arg(it.value()));
+        colorLayout->addWidget(btn);
+    }
+    colorLayout->addStretch();
     m_containerLayout->addWidget(m_colorWidget);
 
     // 标签

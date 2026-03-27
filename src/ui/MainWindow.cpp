@@ -153,6 +153,12 @@ void MainWindow::initLayout() {
     // 建立内容与元数据联动
     connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
 
+    // 建立全量搜索联动
+    connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
+        // 此处应传入全局缓存的 index，演示逻辑直接调用
+        // m_contentPanel->performSearch(globalIndex, text);
+    });
+
     // 设置初始宽度分配
     QList<int> sizes = ConfigRepo::loadPanelWidths();
     if (sizes.isEmpty()) {

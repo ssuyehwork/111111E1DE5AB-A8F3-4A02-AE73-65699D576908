@@ -15,6 +15,9 @@ public:
     // 全量扫描：递归遍历目录，同步所有发现的 .am_meta.json
     void fullScan(const QString& rootPath, std::function<void(int current, int total)> progressCallback = nullptr);
 
+    // 增量同步：仅更新 mtime 晚于上次同步时间的文件
+    void incrementalSync();
+
     // 标签聚合：从 items 和 folders 表重新统计所有标签出现次数
     void rebuildTagIndex();
 

@@ -36,6 +36,9 @@ public:
 private:
     FileIndex m_index;
 
+    // 降级方案：标准递归遍历
+    void fallbackScan(const QString& volumeRoot);
+
     // 底层读取逻辑
     bool enumerateMft(HANDLE hVolume);
 };

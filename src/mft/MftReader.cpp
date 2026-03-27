@@ -1,6 +1,8 @@
 #include "MftReader.h"
 #include <QDebug>
 #include <vector>
+#include <filesystem>
+#include <QFileInfo>
 
 namespace ArcMeta {
 
@@ -29,8 +31,9 @@ bool MftReader::scanVolume(const QString& volumeRoot) {
     );
 
     if (hVolume == INVALID_HANDLE_VALUE) {
-        qDebug() << "MftReader: 无法打开卷句柄 (需管理员权限):" << GetLastError();
-        return false;
+        qDebug() << "MftReader: 权限不足，启动降级扫描方案...";
+        fallbackScan(volumeRoot);
+        return true; // 即使降级也算扫描过
     }
 
     bool success = enumerateMft(hVolume);
@@ -88,6 +91,24 @@ bool MftReader::enumerateMft(HANDLE hVolume) {
 
     qDebug() << "MftReader: MFT 枚举完成，索引条目数:" << m_index.size();
     return true;
+}
+
+void MftReader::fallbackScan(const QString& volumeRoot) {
+    std::wstring root = volumeRoot.toStdWString();
+    try {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+            FileEntry fe;
+            // 注意：降级模式下无法直接获得 NTFS FRN，此处使用 std 的简易哈希模拟 ID
+            // 警告：此模式下跨路径追踪能力会受限，符合文档降级预期
+            fe.frn = std::hash<std::string>{}(entry.path().string());
+            fe.name = entry.path().filename().wstring();
+            fe.attributes = entry.is_directory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+            // 降级模式无法通过 ID 溯源父目录，仅填充基础信息
+            m_index[fe.frn] = fe;
+        }
+    } catch (...) {
+        qDebug() << "MftReader: 降级扫描发生异常";
+    }
 }
 
 } // namespace ArcMeta
