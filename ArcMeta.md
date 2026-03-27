@@ -17,6 +17,7 @@
 ## 重要声明
 
 - 本项目只在 Windows 系统环境下运行，不考虑任何跨平台兼容性
+- 编译工具链强制要求：本项目必须且仅能由 Visual Studio 2022 进行编译。所有针对 MSVC 的特定优化及 C++17 特性实现均须在此环境下通过验证。
 - 编译器只使用 MSVC 2022 64位，不使用 MinGW，不使用 GCC，不使用 Clang
 - 所有代码均面向 MSVC 编译器编写，可自由使用 MSVC 专有特性
 - 不需要任何跨平台宏、条件编译、平台抽象层
@@ -127,7 +128,9 @@ struct FileEntry {
     DWORDLONG parentFrn;   // 父目录 FRN
     std::wstring name;     // 文件名（宽字符）
     DWORD attributes;      // 文件属性
+    int visibleChildCount = 0; // 用于追踪可见子项数量（排除隐藏项）
     bool isDir() const { return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+    bool isEmptyDir() const { return isDir() && visibleChildCount == 0; }
 };
 
 using FileIndex = std::unordered_map<DWORDLONG, FileEntry>;
@@ -539,6 +542,16 @@ CREATE INDEX IF NOT EXISTS idx_cat_items_path ON category_items(item_path);
   - **通用默认值**: `700ms`。
   - **上限限制**: `60000ms`（60秒）。
 - **刷新机制**: 采用计时器重置逻辑，确保连续交互时内容实时更新，不产生视觉残留。
+
+---
+
+## UI 模块：文件夹状态显示规范
+
+- **空文件夹视觉标识**：
+  - **判定准则**：若文件夹内不含任何可见子项（即排除 `.am_meta.json` 等带有 `FILE_ATTRIBUTE_HIDDEN` 属性的项），则该文件夹被判定为“空”。
+  - **数据维护**：由 `MftReader` 扫描及 `UsnWatcher` 监听过程中动态维护 `visibleChildCount` 计数。
+  - **视觉效果**：空文件夹的图标颜色应统一显示为**银灰色**（推荐 HEX 色值：`#A0A0A0`），以便于用户在海量目录中快速识别空路径。
+  - **适用范围**：此规范同步适用于「导航面板」和「内容面板」。
 
 ---
 
