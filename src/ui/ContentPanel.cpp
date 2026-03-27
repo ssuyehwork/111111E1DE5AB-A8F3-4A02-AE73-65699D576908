@@ -5,10 +5,15 @@
 #include "../mft/ParallelSearcher.h"
 #include "../mft/PathBuilder.h"
 #include "../db/CategoryItemRepo.h"
-#include "../db/ItemRepo.h"
-#include "../meta/AmMetaJson.h"
+#include "../db/FavoritesRepo.h"
 #include <QHeaderView>
 #include <QMenu>
+#include <QApplication>
+#include <QClipboard>
+#include <QDesktopServices>
+#include <QUrl>
+#include <windows.h>
+#include <shellapi.h>
 
 namespace ArcMeta {
 
@@ -46,32 +51,70 @@ ContentPanel::ContentPanel(QWidget* parent) : QWidget(parent) {
     });
 
     setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(this, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
-        QMenu menu(this);
+    connect(this, &QWidget::customContextMenuRequested, this, &ContentPanel::showContextMenu);
+}
 
-        QModelIndexList selected = m_viewStack->currentIndex() == 0 ?
-            m_gridView->selectionModel()->selectedIndexes() :
-            m_treeView->selectionModel()->selectedIndexes();
+void ContentPanel::showContextMenu(const QPoint& pos) {
+    QModelIndexList selected = m_viewStack->currentIndex() == 0 ?
+        m_gridView->selectionModel()->selectedIndexes() :
+        m_treeView->selectionModel()->selectedIndexes();
 
-        if (selected.size() > 1) {
-            menu.addAction("批量重命名 (Ctrl+Shift+S)", [this, selected]() {
-                QStringList paths;
-                for (auto& idx : selected) paths << m_model->filePath(m_proxyModel->mapToSource(idx));
-                BatchRenameDialog dlg(paths, this);
-                dlg.exec();
-            });
-        } else if (selected.size() == 1) {
-            QString path = m_model->filePath(m_proxyModel->mapToSource(selected.first()));
-            menu.addAction("加密该项", [this, path]() {
-                CryptoWorkflow::encryptFile(path, this);
-            });
-            menu.addAction("在资源管理器中显示", [this, path]() {
-                // TODO: Windows API
-            });
-        }
+    if (selected.isEmpty()) return;
 
-        menu.exec(mapToGlobal(pos));
+    QString path = m_model->filePath(m_proxyModel->mapToSource(selected.first()));
+    QMenu menu(this);
+
+    menu.addAction("打开", [path]() { QDesktopServices::openUrl(QUrl::fromLocalFile(path)); });
+    menu.addAction("在资源管理器中显示", [path]() {
+        QStringList args;
+        args << "/select," << QDir::toNativeSeparators(path);
+        QProcess::startDetached("explorer", args);
     });
+    menu.addSeparator();
+    menu.addAction("添加到收藏夹", [path]() {
+        Favorite fav;
+        fav.path = path;
+        fav.name = QFileInfo(path).fileName();
+        fav.type = QFileInfo(path).isDir() ? "folder" : "file";
+        FavoritesRepo::add(fav);
+    });
+    menu.addSeparator();
+
+    if (path.endsWith(".amenc")) {
+        menu.addAction("解除加密", [path, this]() { CryptoWorkflow::handleFileOpen(path, this); });
+    } else {
+        menu.addAction("加密保护", [path, this]() { CryptoWorkflow::encryptFile(path, this); });
+    }
+
+    menu.addSeparator();
+    if (selected.size() > 1) {
+        menu.addAction("批量重命名 (Ctrl+Shift+S)", [this, selected]() {
+            QStringList paths;
+            for (auto& idx : selected) paths << m_model->filePath(m_proxyModel->mapToSource(idx));
+            BatchRenameDialog dlg(paths, this);
+            dlg.exec();
+        });
+        menu.addSeparator();
+    }
+
+    menu.addAction("重命名", [this, selected]() {
+        if (m_viewStack->currentIndex() == 0) m_gridView->edit(selected.first());
+        else m_treeView->edit(selected.first());
+    });
+    menu.addAction("删除", [path]() { QFile::moveToTrash(path); });
+    menu.addSeparator();
+    menu.addAction("复制路径", [path]() { QApplication::clipboard()->setText(path); });
+    menu.addAction("属性", [path]() {
+        std::wstring wpath = QDir::toNativeSeparators(path).toStdWString();
+        SHELLEXECUTEINFOW sei = { sizeof(sei) };
+        sei.fMask = SEE_MASK_INVOKEIDLIST;
+        sei.lpVerb = L"properties";
+        sei.lpFile = wpath.c_str();
+        sei.nShow = SW_SHOW;
+        ShellExecuteExW(&sei);
+    });
+
+    menu.exec(mapToGlobal(pos));
 }
 
 void ContentPanel::onSelectionChanged(const QItemSelection& selected, const QItemSelection& deselected) {
@@ -86,6 +129,15 @@ void ContentPanel::onSelectionChanged(const QItemSelection& selected, const QIte
 
 void ContentPanel::setViewMode(bool isGrid) {
     m_viewStack->setCurrentIndex(isGrid ? 0 : 1);
+}
+
+void ContentPanel::refreshItem(const QString& filePath) {
+    QModelIndex sourceIndex = m_model->index(filePath);
+    if (sourceIndex.isValid()) {
+        QModelIndex proxyIndex = m_proxyModel->mapFromSource(sourceIndex);
+        // 触发视图重绘该行/该项
+        emit m_proxyModel->dataChanged(proxyIndex, proxyIndex);
+    }
 }
 
 void ContentPanel::initListView() {
@@ -148,7 +200,6 @@ void ContentPanel::performSearch(const FileIndex& index, const QString& query) {
     if (!m_searchResultModel) m_searchResultModel = new QStringListModel(this);
     m_searchResultModel->setStringList(results);
 
-    // 搜索模式下暂时关闭代理，直接显示列表
     m_treeView->setModel(m_searchResultModel);
     m_gridView->setModel(m_searchResultModel);
 
@@ -160,9 +211,6 @@ void ContentPanel::showCategory(const FileIndex& index, int categoryId) {
     std::vector<DWORDLONG> frns;
     if (categoryId >= 0) {
         frns = CategoryItemRepo::getItems(categoryId);
-    } else {
-        // 特殊统计项逻辑
-        // 此处可通过 SQL 查询获取 FRN 列表再显示
     }
 
     PathBuilder builder(index);

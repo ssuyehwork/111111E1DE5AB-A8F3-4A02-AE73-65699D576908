@@ -24,8 +24,6 @@ public:
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override {
-        // 此处需要获取元数据进行匹配
-        // 为了演示逻辑，暂定总是通过，实际需调用 FilterEngine::match
         return true;
     }
 
@@ -47,8 +45,12 @@ public slots:
     void showCategory(const FileIndex& index, int categoryId);
     void applyFilter(const FilterState& state);
 
+    // 局部实时重绘
+    void refreshItem(const QString& filePath);
+
 private slots:
     void onSelectionChanged(const QItemSelection& selected, const QItemSelection& deselected);
+    void showContextMenu(const QPoint& pos);
 
 public slots:
     void setViewMode(bool isGrid);

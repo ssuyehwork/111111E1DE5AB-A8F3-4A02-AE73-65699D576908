@@ -2,6 +2,8 @@
 #include <QScrollArea>
 #include <QLabel>
 #include <QCheckBox>
+#include "../db/Database.h"
+#include <QSqlQuery>
 
 namespace ArcMeta {
 
@@ -49,17 +51,18 @@ QWidget* FilterPanel::createSection(const QString& title) {
 void FilterPanel::onCheckboxToggled() {
     FilterState state;
 
-    // 收集星级
     for (auto* cb : m_starCheckboxes) {
         if (cb->isChecked()) state.ratings.insert(cb->property("rating").toInt());
     }
 
-    // 收集颜色
     for (auto* cb : m_colorCheckboxes) {
         if (cb->isChecked()) state.colors.append(cb->property("color").toString());
     }
 
-    // 其他开关
+    for (auto* cb : m_tagCheckboxes) {
+        if (cb->isChecked()) state.tags.append(cb->text());
+    }
+
     state.onlyPinned = m_chkOnlyPinned->isChecked();
     state.onlyEncrypted = m_chkOnlyEncrypted->isChecked();
 
@@ -68,9 +71,25 @@ void FilterPanel::onCheckboxToggled() {
 
 void FilterPanel::clearAllFilters() {
     for (auto* cb : findChildren<QCheckBox*>()) {
+        cb->blockSignals(true);
         cb->setChecked(false);
+        cb->blockSignals(false);
     }
     onCheckboxToggled();
+}
+
+void FilterPanel::refreshTags() {
+    // 清理旧标签 Checkbox
+    qDeleteAll(m_tagCheckboxes);
+    m_tagCheckboxes.clear();
+
+    QSqlQuery q("SELECT tag FROM tags ORDER BY item_count DESC LIMIT 20", Database::instance().getDb());
+    while (q.next()) {
+        auto* cb = new QCheckBox(q.value(0).toString());
+        connect(cb, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
+        m_tagSection->layout()->addWidget(cb);
+        m_tagCheckboxes.append(cb);
+    }
 }
 
 void FilterPanel::initSections() {
@@ -83,13 +102,8 @@ void FilterPanel::initSections() {
         starSec->layout()->addWidget(cb);
         m_starCheckboxes.append(cb);
     }
-    auto* cbNone = new QCheckBox("无星级");
-    cbNone->setProperty("rating", 0);
-    connect(cbNone, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
-    starSec->layout()->addWidget(cbNone);
-    m_starCheckboxes.append(cbNone);
 
-    // 2. 颜色标记
+    // 2. 颜色
     QWidget* colorSec = createSection("颜色标记");
     QStringList colorNames = {"red", "orange", "yellow", "green", "cyan", "blue", "purple", "gray"};
     for (const QString& name : colorNames) {
@@ -100,7 +114,11 @@ void FilterPanel::initSections() {
         m_colorCheckboxes.append(cb);
     }
 
-    // 3. 置顶与加密
+    // 3. 标签 (动态填充)
+    m_tagSection = createSection("标签筛选");
+    refreshTags();
+
+    // 4. 置顶与加密
     QWidget* statusSec = createSection("状态筛选");
     m_chkOnlyPinned = new QCheckBox("只显示置顶项");
     m_chkOnlyEncrypted = new QCheckBox("只显示加密项");

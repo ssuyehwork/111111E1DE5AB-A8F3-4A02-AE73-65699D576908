@@ -1,5 +1,7 @@
 #include "CategoryPanel.h"
 #include <QHeaderView>
+#include <QInputDialog>
+#include <QColorDialog>
 #include "../db/CategoryItemRepo.h"
 #include "../db/CategoryRepo.h"
 
@@ -83,10 +85,38 @@ void CategoryPanel::showContextMenu(const QPoint& pos) {
     QModelIndex index = m_categoryTree->indexAt(pos);
     QMenu menu(this);
 
-    menu.addAction("新建子分类", this, &CategoryPanel::onAddCategory);
     if (index.isValid()) {
+        int id = index.data(CategoryModel::IdRole).toInt();
+        menu.addAction("新建数据", [](){});
+        menu.addAction("归类到此分类", [](){});
+        menu.addSeparator();
+        menu.addAction("导入数据", [](){});
+        menu.addAction("导出", [](){});
+        menu.addSeparator();
+        menu.addAction("设置颜色", [this, index](){
+            QColor color = QColorDialog::getColor(Qt::white, this, "选择分类颜色");
+            if (color.isValid()) {
+                // TODO: Save to repo
+            }
+        });
+        menu.addAction("设置预设标签", [this, index](){
+            bool ok;
+            QString tags = QInputDialog::getText(this, "预设标签", "输入标签(逗号分隔):", QLineEdit::Normal, "", &ok);
+            if (ok) {
+                // TODO: Save to repo
+            }
+        });
+        menu.addSeparator();
+        menu.addAction("新建分类（同级）", this, &CategoryPanel::onAddCategory);
+        menu.addAction("新建子分类", this, &CategoryPanel::onAddCategory);
+        menu.addSeparator();
+        menu.addAction("置顶 / 取消置顶", [](){});
         menu.addAction("重命名", this, &CategoryPanel::onRenameCategory);
         menu.addAction("删除分类", this, &CategoryPanel::onDeleteCategory);
+        menu.addSeparator();
+        menu.addAction("密码保护", [](){});
+    } else {
+        menu.addAction("新建顶级分类", this, &CategoryPanel::onAddCategory);
     }
 
     menu.exec(m_categoryTree->mapToGlobal(pos));

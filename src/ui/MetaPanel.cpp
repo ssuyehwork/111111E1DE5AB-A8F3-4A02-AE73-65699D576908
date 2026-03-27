@@ -122,14 +122,13 @@ void MetaPanel::setTargetFile(const QString& filePath) {
     QFileInfo fi(filePath);
     if (!fi.exists()) return;
 
-    m_isLoading = true; // 加载中，禁止自动保存
+    m_isLoading = true;
 
     m_lblName->setText(fi.fileName());
     m_lblType->setText(fi.isDir() ? "文件夹" : "文件");
     m_lblSize->setText(QString::number(fi.size() / 1024) + " KB");
     m_lblPath->setText(fi.absoluteFilePath());
 
-    // 加载元数据
     AmMeta meta = AmMetaJson::load(fi.absolutePath());
     if (fi.isDir()) {
         m_chkPinned->setChecked(meta.folder.pinned);
@@ -157,8 +156,8 @@ void MetaPanel::onRatingClicked(int rating) {
 }
 
 void MetaPanel::onColorClicked(const QString& color) {
+    Q_UNUSED(color);
     if (m_isLoading) return;
-    // 简单保存，界面状态可在下次加载时体现
     saveCurrentMetadata();
 }
 
@@ -187,7 +186,6 @@ void MetaPanel::saveCurrentMetadata() {
 
     if (fi.isDir()) {
         meta.folder.pinned = m_chkPinned->isChecked();
-        // 获取当前选中的星星数
         int rating = 0;
         for (auto* btn : m_ratingWidget->findChildren<QPushButton*>()) {
             if (btn->isChecked()) rating = qMax(rating, btn->property("rating").toInt());
@@ -209,8 +207,8 @@ void MetaPanel::saveCurrentMetadata() {
     }
 
     if (AmMetaJson::save(dirPath, meta)) {
-        // 触发增量同步到数据库
         SyncQueue::instance().enqueue(dirPath);
+        emit metadataUpdated(m_currentFilePath); // 关键：发出刷新信号
     }
 }
 

@@ -27,12 +27,9 @@ MainWindow::MainWindow(FileIndex& index, QWidget* parent)
 
     m_quickLook = new QuickLook(this);
 
-    // 设置快捷键
     new QShortcut(QKeySequence("F2"), this, [](){ });
     new QShortcut(QKeySequence("Space"), this, [this](){
-        // 获取当前选中项路径并预览
-        QString path = m_pathEdit->text(); // 简化：实际应从 contentPanel 获取
-        m_quickLook->preview(path);
+        m_quickLook->preview(m_pathEdit->text());
     });
     new QShortcut(QKeySequence("Ctrl+L"), this, [this](){ m_pathEdit->setFocus(); });
     new QShortcut(QKeySequence("Ctrl+F"), this, [this](){ m_searchEdit->setFocus(); });
@@ -159,7 +156,7 @@ void MainWindow::initLayout() {
 
     connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
     connect(m_contentPanel, &ContentPanel::itemSelected, [this](const QString& path) {
-        m_pathEdit->setText(path); // 记录当前选中路径用于空格预览
+        m_pathEdit->setText(path);
     });
 
     connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
@@ -167,6 +164,9 @@ void MainWindow::initLayout() {
     });
 
     connect(m_filterPanel, &FilterPanel::filterChanged, m_contentPanel, &ContentPanel::applyFilter);
+
+    // 建立元数据修改后的实时联动信号
+    connect(m_metaPanel, &MetaPanel::metadataUpdated, m_contentPanel, &ContentPanel::refreshItem);
 
     QList<int> sizes = ConfigRepo::loadPanelWidths();
     if (sizes.isEmpty()) {

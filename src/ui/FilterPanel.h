@@ -15,6 +15,9 @@ class FilterPanel : public QWidget {
 public:
     explicit FilterPanel(QWidget* parent = nullptr);
 
+    // 动态刷新标签列表
+    void refreshTags();
+
 signals:
     void filterChanged(const FilterState& state);
 
@@ -33,6 +36,9 @@ private:
 
     QList<QCheckBox*> m_starCheckboxes;
     QList<QCheckBox*> m_colorCheckboxes;
+    QList<QCheckBox*> m_tagCheckboxes;
+    QWidget* m_tagSection;
+
     QCheckBox* m_chkOnlyPinned;
     QCheckBox* m_chkOnlyEncrypted;
 };

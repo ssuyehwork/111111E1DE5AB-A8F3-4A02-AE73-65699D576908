@@ -20,6 +20,10 @@ public:
     // 更新面板显示的元数据内容
     void setTargetFile(const QString& filePath);
 
+signals:
+    // 当元数据被修改并保存后触发，通知内容面板刷新
+    void metadataUpdated(const QString& filePath);
+
 private slots:
     void onRatingClicked(int rating);
     void onColorClicked(const QString& color);
