@@ -498,6 +498,39 @@ CREATE INDEX IF NOT EXISTS idx_cat_items_path ON category_items(item_path);
 
 ---
 
+## UI 模块：ToolTipOverlay 设计规范
+
+### 1. 窗口底层属性
+- **窗口标志 (WindowFlags)**: `Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::WindowTransparentForInput | Qt::NoDropShadowWindowHint | Qt::WindowDoesNotAcceptFocus`。
+- **窗口属性 (Attributes)**: `Qt::WA_TranslucentBackground`, `Qt::WA_ShowWithoutActivating`。
+- **特性**: 物理级 0 延时显隐（规避系统淡入淡出动画），支持鼠标穿透，不抢占焦点。
+
+### 2. 视觉表现参数
+- **背景色**: `#2B2B2B`（深灰）。
+- **边框**: 宽度 `1px`，默认颜色 `#B0B0B0`（绘制时使用 `0.5px` 物理对齐校准）。
+- **圆角半径**: 固定 `4px`。
+- **阴影/投影**: 无（严格执行扁平化 Flat 风格）。
+- **内边距 (Padding)**: 水平 `12px`，垂直 `8px`。
+- **尺寸限制**:
+  - **最小尺寸**: `40x24px`。
+  - **最大宽度**: `450px`（超出则自动折行）。
+
+### 3. 文本渲染属性
+- **字体规范**: `9pt`，优先使用 `微软雅黑 (Microsoft YaHei)` 或 `Segoe UI`。
+- **文字颜色**: 强制覆盖为 `#EEEEEE`（采用 `!important` 样式表确保全局一致）。
+- **内容处理**: 支持标准 HTML 包装器，支持富文本渲染。
+
+### 4. 交互逻辑参数
+- **弹出位置**: 相对于当前光标坐标偏移 `QPoint(15, 15)`。
+- **边缘保护**: 内置 `QScreen` 屏幕边界检测，防止提示框溢出可视区域。
+- **持续时间 (Timeout)**:
+  - **标题栏按钮专属**: `2000ms`（2秒）。
+  - **通用默认值**: `700ms`。
+  - **上限限制**: `60000ms`（60秒）。
+- **刷新机制**: 采用计时器重置逻辑，确保连续交互时内容实时更新，不产生视觉残留。
+
+---
+
 ## UI 模块：整体布局
 
 ### 主窗口尺寸
