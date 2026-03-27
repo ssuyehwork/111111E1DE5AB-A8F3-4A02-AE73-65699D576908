@@ -1,6 +1,7 @@
 #include "CategoryPanel.h"
 #include <QHeaderView>
 #include "../db/CategoryItemRepo.h"
+#include "../db/CategoryRepo.h"
 
 namespace ArcMeta {
 
@@ -12,11 +13,13 @@ CategoryPanel::CategoryPanel(QWidget* parent) : QWidget(parent) {
     initStatisticsArea();
     initCategoryTree();
     initBottomToolbar();
+
+    refreshStatistics();
 }
 
 void CategoryPanel::initStatisticsArea() {
     m_statsList = new QListWidget(this);
-    m_statsList->setFixedHeight(220); // 固定高度
+    m_statsList->setFixedHeight(220);
     m_statsList->setStyleSheet("QListWidget { border: none; background: transparent; }");
 
     QStringList statsItems = {
@@ -26,15 +29,28 @@ void CategoryPanel::initStatisticsArea() {
 
     for (const QString& name : statsItems) {
         auto* item = new QListWidgetItem(name, m_statsList);
-        item->setSizeHint(QSize(0, 26)); // 每行约 26px
+        item->setSizeHint(QSize(0, 26));
     }
 
     connect(m_statsList, &QListWidget::currentRowChanged, [this](int row) {
-        // -1 代表特殊统计项，此处简单用负数区分
         emit categorySelected(-1 - row);
     });
 
     m_mainLayout->addWidget(m_statsList);
+}
+
+void CategoryPanel::refreshStatistics() {
+    auto updateItem = [this](int row, const QString& name, int count) {
+        if (auto* item = m_statsList->item(row)) {
+            item->setText(QString("%1 (%2)").arg(name).arg(count));
+        }
+    };
+
+    updateItem(0, "全部数据", CategoryRepo::getTotalItemCount());
+    updateItem(1, "今日数据", CategoryRepo::getTodayItemCount());
+    updateItem(4, "未分类", CategoryRepo::getUncategorizedCount());
+    updateItem(5, "未标签", CategoryRepo::getUntaggedCount());
+    updateItem(6, "收藏", CategoryRepo::getPinnedCount());
 }
 
 void CategoryPanel::initCategoryTree() {

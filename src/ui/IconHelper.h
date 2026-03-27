@@ -5,7 +5,7 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QPixmap>
-#include "../../SvgIcons.h"
+#include "../SvgIcons.h"
 
 namespace ArcMeta {
 

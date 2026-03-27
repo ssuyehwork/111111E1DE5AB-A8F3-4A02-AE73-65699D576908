@@ -1,9 +1,14 @@
 #include "ContentPanel.h"
 #include "FileItemDelegate.h"
+#include "CryptoWorkflow.h"
+#include "BatchRenameDialog.h"
 #include "../mft/ParallelSearcher.h"
 #include "../mft/PathBuilder.h"
 #include "../db/CategoryItemRepo.h"
+#include "../db/ItemRepo.h"
+#include "../meta/AmMetaJson.h"
 #include <QHeaderView>
+#include <QMenu>
 
 namespace ArcMeta {
 
@@ -17,23 +22,64 @@ ContentPanel::ContentPanel(QWidget* parent) : QWidget(parent) {
     m_model->setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
     m_model->setRootPath(QDir::rootPath());
 
+    m_proxyModel = new FileFilterProxyModel();
+    m_proxyModel->setSourceModel(m_model);
+
     initListView();
     initGridView();
 
-    m_viewStack->addWidget(m_gridView); // Index 0: Grid (Default)
-    m_viewStack->addWidget(m_treeView); // Index 1: List
+    m_viewStack->addWidget(m_gridView);
+    m_viewStack->addWidget(m_treeView);
 
     layout->addWidget(m_viewStack);
 
     connect(m_treeView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
     connect(m_gridView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
+
+    connect(m_treeView, &QTreeView::doubleClicked, [this](const QModelIndex& index) {
+        QString path = m_model->filePath(m_proxyModel->mapToSource(index));
+        CryptoWorkflow::handleFileOpen(path, this);
+    });
+    connect(m_gridView, &QListView::doubleClicked, [this](const QModelIndex& index) {
+        QString path = m_model->filePath(m_proxyModel->mapToSource(index));
+        CryptoWorkflow::handleFileOpen(path, this);
+    });
+
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
+        QMenu menu(this);
+
+        QModelIndexList selected = m_viewStack->currentIndex() == 0 ?
+            m_gridView->selectionModel()->selectedIndexes() :
+            m_treeView->selectionModel()->selectedIndexes();
+
+        if (selected.size() > 1) {
+            menu.addAction("批量重命名 (Ctrl+Shift+S)", [this, selected]() {
+                QStringList paths;
+                for (auto& idx : selected) paths << m_model->filePath(m_proxyModel->mapToSource(idx));
+                BatchRenameDialog dlg(paths, this);
+                dlg.exec();
+            });
+        } else if (selected.size() == 1) {
+            QString path = m_model->filePath(m_proxyModel->mapToSource(selected.first()));
+            menu.addAction("加密该项", [this, path]() {
+                CryptoWorkflow::encryptFile(path, this);
+            });
+            menu.addAction("在资源管理器中显示", [this, path]() {
+                // TODO: Windows API
+            });
+        }
+
+        menu.exec(mapToGlobal(pos));
+    });
 }
 
 void ContentPanel::onSelectionChanged(const QItemSelection& selected, const QItemSelection& deselected) {
     Q_UNUSED(deselected);
     if (!selected.indexes().isEmpty()) {
         QModelIndex index = selected.indexes().first();
-        QString path = m_model->filePath(index);
+        QModelIndex sourceIndex = m_proxyModel->mapToSource(index);
+        QString path = m_model->filePath(sourceIndex);
         emit itemSelected(path);
     }
 }
@@ -44,8 +90,9 @@ void ContentPanel::setViewMode(bool isGrid) {
 
 void ContentPanel::initListView() {
     m_treeView = new QTreeView(this);
-    m_treeView->setModel(m_model);
-    m_treeView->setDragEnabled(true); // 启用拖拽
+    m_treeView->setModel(m_proxyModel);
+    m_treeView->setDragEnabled(true);
+    m_treeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
     m_treeView->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_treeView->setColumnWidth(1, 80);
@@ -62,20 +109,27 @@ void ContentPanel::initGridView() {
     m_gridView->setSpacing(8);
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setMovement(QListView::Static);
-    m_gridView->setDragEnabled(true); // 启用拖拽
+    m_gridView->setDragEnabled(true);
+    m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
-    m_gridView->setModel(m_model);
+    m_gridView->setModel(m_proxyModel);
     m_gridView->setItemDelegate(new FileItemDelegate(this));
 }
 
 void ContentPanel::setRootPath(const QString& path) {
-    QModelIndex index = m_model->index(path);
-    if (index.isValid()) {
-        m_treeView->setModel(m_model);
-        m_gridView->setModel(m_model);
-        m_treeView->setRootIndex(index);
-        m_gridView->setRootIndex(index);
+    m_treeView->setModel(m_proxyModel);
+    m_gridView->setModel(m_proxyModel);
+
+    QModelIndex sourceIndex = m_model->index(path);
+    if (sourceIndex.isValid()) {
+        QModelIndex proxyIndex = m_proxyModel->mapFromSource(sourceIndex);
+        m_treeView->setRootIndex(proxyIndex);
+        m_gridView->setRootIndex(proxyIndex);
     }
+}
+
+void ContentPanel::applyFilter(const FilterState& state) {
+    m_proxyModel->setFilterState(state);
 }
 
 void ContentPanel::performSearch(const FileIndex& index, const QString& query) {
@@ -94,6 +148,7 @@ void ContentPanel::performSearch(const FileIndex& index, const QString& query) {
     if (!m_searchResultModel) m_searchResultModel = new QStringListModel(this);
     m_searchResultModel->setStringList(results);
 
+    // 搜索模式下暂时关闭代理，直接显示列表
     m_treeView->setModel(m_searchResultModel);
     m_gridView->setModel(m_searchResultModel);
 
@@ -102,9 +157,14 @@ void ContentPanel::performSearch(const FileIndex& index, const QString& query) {
 }
 
 void ContentPanel::showCategory(const FileIndex& index, int categoryId) {
-    if (categoryId < 0) return;
+    std::vector<DWORDLONG> frns;
+    if (categoryId >= 0) {
+        frns = CategoryItemRepo::getItems(categoryId);
+    } else {
+        // 特殊统计项逻辑
+        // 此处可通过 SQL 查询获取 FRN 列表再显示
+    }
 
-    std::vector<DWORDLONG> frns = CategoryItemRepo::getItems(categoryId);
     PathBuilder builder(index);
     QStringList results;
     for (DWORDLONG frn : frns) {

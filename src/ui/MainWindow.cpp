@@ -15,11 +15,9 @@ MainWindow::MainWindow(FileIndex& index, QWidget* parent)
     : QMainWindow(parent), m_index(index) {
     setWindowTitle("ArcMeta");
 
-    // 加载窗口设置或使用默认
     resize(1600, 900);
     setMinimumSize(1280, 720);
 
-    // 安装全局事件过滤器以拦截 ToolTip
     qApp->installEventFilter(this);
 
     m_headerBar = new HeaderBar(this);
@@ -30,15 +28,15 @@ MainWindow::MainWindow(FileIndex& index, QWidget* parent)
     m_quickLook = new QuickLook(this);
 
     // 设置快捷键
-    new QShortcut(QKeySequence("F2"), this, [](){ /* 重命名逻辑 */ });
+    new QShortcut(QKeySequence("F2"), this, [](){ });
     new QShortcut(QKeySequence("Space"), this, [this](){
-        // 简单实现：获取当前内容面板路径进行预览
-        // m_quickLook->preview(m_pathEdit->text());
+        // 获取当前选中项路径并预览
+        QString path = m_pathEdit->text(); // 简化：实际应从 contentPanel 获取
+        m_quickLook->preview(path);
     });
     new QShortcut(QKeySequence("Ctrl+L"), this, [this](){ m_pathEdit->setFocus(); });
     new QShortcut(QKeySequence("Ctrl+F"), this, [this](){ m_searchEdit->setFocus(); });
 
-    // 设置中央窗口布局，包含标题栏
     QWidget* central = new QWidget(this);
     QVBoxLayout* centralLayout = new QVBoxLayout(central);
     centralLayout->setContentsMargins(0, 0, 0, 0);
@@ -47,12 +45,10 @@ MainWindow::MainWindow(FileIndex& index, QWidget* parent)
     centralLayout->addWidget(m_headerBar);
     centralLayout->addWidget(m_mainSplitter, 1);
 
-    // 暂存篮集成到中央布局底部
     m_scratchPad = new ScratchPad(this);
     m_scratchPad->setFixedHeight(120);
     centralLayout->addWidget(m_scratchPad);
 
-    // 分割线：1px 实线 #333333
     QFrame* bottomLine = new QFrame(this);
     bottomLine->setFrameShape(QFrame::HLine);
     bottomLine->setFixedHeight(1);
@@ -60,7 +56,7 @@ MainWindow::MainWindow(FileIndex& index, QWidget* parent)
     centralLayout->addWidget(bottomLine);
 
     setCentralWidget(central);
-    setWindowFlags(Qt::FramelessWindowHint); // 隐藏原生标题栏
+    setWindowFlags(Qt::FramelessWindowHint);
 }
 
 MainWindow::~MainWindow() {}
@@ -92,7 +88,6 @@ void MainWindow::initToolBar() {
 
     toolbar->setStyleSheet("QToolBar { spacing: 8px; padding: 0 12px; border-bottom: 1px solid #333333; }");
 
-    // 1. 导航按钮
     QPushButton* btnBack = new QPushButton();
     btnBack->setIcon(IconHelper::getIcon("arrow_left"));
     btnBack->setFixedSize(60, 28);
@@ -107,19 +102,16 @@ void MainWindow::initToolBar() {
     toolbar->addWidget(btnForward);
     toolbar->addWidget(btnUp);
 
-    // 2. 路径输入框（弹性）
     m_pathEdit = new QLineEdit();
     m_pathEdit->setMinimumWidth(200);
     m_pathEdit->setPlaceholderText("输入路径...");
     toolbar->addWidget(m_pathEdit);
 
-    // 3. 搜索框（固定宽度）
     m_searchEdit = new QLineEdit();
     m_searchEdit->setFixedWidth(200);
     m_searchEdit->setPlaceholderText("全盘并行搜索...");
     toolbar->addWidget(m_searchEdit);
 
-    // 4. 视图切换
     QPushButton* btnViewMode = new QPushButton("视图");
     btnViewMode->setFixedSize(40, 28);
     connect(btnViewMode, &QPushButton::clicked, [this]() {
@@ -166,10 +158,15 @@ void MainWindow::initLayout() {
     });
 
     connect(m_contentPanel, &ContentPanel::itemSelected, m_metaPanel, &MetaPanel::setTargetFile);
+    connect(m_contentPanel, &ContentPanel::itemSelected, [this](const QString& path) {
+        m_pathEdit->setText(path); // 记录当前选中路径用于空格预览
+    });
 
     connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
         m_contentPanel->performSearch(m_index, text);
     });
+
+    connect(m_filterPanel, &FilterPanel::filterChanged, m_contentPanel, &ContentPanel::applyFilter);
 
     QList<int> sizes = ConfigRepo::loadPanelWidths();
     if (sizes.isEmpty()) {

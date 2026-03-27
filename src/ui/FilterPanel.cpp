@@ -1,14 +1,19 @@
 #include "FilterPanel.h"
 #include <QScrollArea>
+#include <QLabel>
+#include <QCheckBox>
 
 namespace ArcMeta {
 
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
+    m_mainLayout->setSpacing(0);
 
     m_btnClearAll = new QPushButton("清除所有筛选");
     m_btnClearAll->setFixedHeight(32);
+    m_btnClearAll->setCursor(Qt::PointingHandCursor);
+    connect(m_btnClearAll, &QPushButton::clicked, this, &FilterPanel::clearAllFilters);
     m_mainLayout->addWidget(m_btnClearAll);
 
     QScrollArea* scroll = new QScrollArea(this);
@@ -43,9 +48,29 @@ QWidget* FilterPanel::createSection(const QString& title) {
 
 void FilterPanel::onCheckboxToggled() {
     FilterState state;
-    // 此处应遍历各分组的 Checkbox 并填充 state
-    // 为了演示逻辑，此处先建立信号结构
+
+    // 收集星级
+    for (auto* cb : m_starCheckboxes) {
+        if (cb->isChecked()) state.ratings.insert(cb->property("rating").toInt());
+    }
+
+    // 收集颜色
+    for (auto* cb : m_colorCheckboxes) {
+        if (cb->isChecked()) state.colors.append(cb->property("color").toString());
+    }
+
+    // 其他开关
+    state.onlyPinned = m_chkOnlyPinned->isChecked();
+    state.onlyEncrypted = m_chkOnlyEncrypted->isChecked();
+
     emit filterChanged(state);
+}
+
+void FilterPanel::clearAllFilters() {
+    for (auto* cb : findChildren<QCheckBox*>()) {
+        cb->setChecked(false);
+    }
+    onCheckboxToggled();
 }
 
 void FilterPanel::initSections() {
@@ -56,31 +81,33 @@ void FilterPanel::initSections() {
         cb->setProperty("rating", i);
         connect(cb, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
         starSec->layout()->addWidget(cb);
+        m_starCheckboxes.append(cb);
     }
     auto* cbNone = new QCheckBox("无星级");
     cbNone->setProperty("rating", 0);
     connect(cbNone, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
     starSec->layout()->addWidget(cbNone);
+    m_starCheckboxes.append(cbNone);
 
     // 2. 颜色标记
     QWidget* colorSec = createSection("颜色标记");
     QStringList colorNames = {"red", "orange", "yellow", "green", "cyan", "blue", "purple", "gray"};
     for (const QString& name : colorNames) {
         auto* cb = new QCheckBox(name);
+        cb->setProperty("color", name);
         connect(cb, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
         colorSec->layout()->addWidget(cb);
+        m_colorCheckboxes.append(cb);
     }
 
-    // 3. 标签
-    createSection("标签筛选");
-
-    // 4. 文件类型
-    QWidget* typeSec = createSection("文件类型");
-    typeSec->layout()->addWidget(new QCheckBox("文件夹"));
-
-    // 5. 置顶状态
-    QWidget* pinSec = createSection("置顶筛选");
-    pinSec->layout()->addWidget(new QCheckBox("只显示置顶项"));
+    // 3. 置顶与加密
+    QWidget* statusSec = createSection("状态筛选");
+    m_chkOnlyPinned = new QCheckBox("只显示置顶项");
+    m_chkOnlyEncrypted = new QCheckBox("只显示加密项");
+    connect(m_chkOnlyPinned, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
+    connect(m_chkOnlyEncrypted, &QCheckBox::toggled, this, &FilterPanel::onCheckboxToggled);
+    statusSec->layout()->addWidget(m_chkOnlyPinned);
+    statusSec->layout()->addWidget(m_chkOnlyEncrypted);
 }
 
 } // namespace ArcMeta

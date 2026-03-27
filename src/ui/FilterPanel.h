@@ -3,11 +3,9 @@
 
 #include <QWidget>
 #include <QVBoxLayout>
-#include <QScrollArea>
 #include <QPushButton>
-#include <QLabel>
 #include <QCheckBox>
-
+#include <QList>
 #include "FilterEngine.h"
 
 namespace ArcMeta {
@@ -22,6 +20,7 @@ signals:
 
 private slots:
     void onCheckboxToggled();
+    void clearAllFilters();
 
 private:
     void initSections();
@@ -31,6 +30,11 @@ private:
     QWidget* m_container;
     QVBoxLayout* m_containerLayout;
     QPushButton* m_btnClearAll;
+
+    QList<QCheckBox*> m_starCheckboxes;
+    QList<QCheckBox*> m_colorCheckboxes;
+    QCheckBox* m_chkOnlyPinned;
+    QCheckBox* m_chkOnlyEncrypted;
 };
 
 } // namespace ArcMeta
