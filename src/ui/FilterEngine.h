@@ -3,6 +3,7 @@
 
 #include <QStringList>
 #include <QSet>
+#include <windows.h>
 
 namespace ArcMeta {
 
@@ -19,13 +20,9 @@ public:
     static bool match(const FilterState& state, int rating, const QString& color,
                      const QStringList& tags, bool pinned, bool encrypted) {
 
-        // 星级匹配
         if (!state.ratings.isEmpty() && !state.ratings.contains(rating)) return false;
-
-        // 颜色匹配
         if (!state.colors.isEmpty() && !state.colors.contains(color)) return false;
 
-        // 标签匹配 (逻辑：包含任意一个选中的标签)
         if (!state.tags.isEmpty()) {
             bool tagFound = false;
             for (const auto& t : state.tags) {
@@ -37,10 +34,7 @@ public:
             if (!tagFound) return false;
         }
 
-        // 置顶匹配
         if (state.onlyPinned && !pinned) return false;
-
-        // 加密匹配
         if (state.onlyEncrypted && !encrypted) return false;
 
         return true;
