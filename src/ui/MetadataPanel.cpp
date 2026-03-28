@@ -1,7 +1,6 @@
 #include "MetadataPanel.h"
 #include "TagCapsule.h"
 #include "ToolTipOverlay.h"
-#include "../core/DatabaseManager.h"
 #include "IconHelper.h"
 #include "FlowLayout.h"
 #include "../meta/AmMetaJson.h"

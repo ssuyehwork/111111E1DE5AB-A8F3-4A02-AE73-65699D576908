@@ -22,7 +22,6 @@
 #include <QWheelEvent>
 #include <QList>
 #include <QVariantMap>
-#include "Editor.h"
 #include "HeaderBar.h"
 #include "MetadataPanel.h"
 #include "FilterPanel.h"
@@ -140,7 +139,6 @@ private:
     MetadataPanel* m_metaPanel;
     FilterPanel* m_filterPanel;
     QWidget* m_filterWrapper;
-    QStackedWidget* m_contentStack;
     QListView* m_fileView;
     QStandardItemModel* m_fileModel;
     QWidget* m_contentStatusBar;
@@ -150,7 +148,6 @@ private:
     QCheckBox* m_checkThumbnailOnly;
     QCheckBox* m_checkTile;
     QLabel* m_itemCountLabel;
-    Editor* m_editor;
     QPushButton* m_editBtn;
 
     QString m_currentKeyword;

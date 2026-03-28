@@ -29,33 +29,26 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 
 include_directories(src)
 
-# 基于当前磁盘实际物理文件重建源代码列表
+# ArcMeta 极速文件管理器 - 纯净源码清单
 set(SOURCES
     src/main.cpp
     src/core/DatabaseManager.cpp
     src/core/DatabaseManager.h
-    src/core/FileStorageHelper.h
-    src/core/HttpServer.h
-    src/core/MessageCaptureHandler.h
-    src/core/ClipboardMonitor.h
     src/meta/AmMetaJson.h
     src/ui/MainWindow.cpp
     src/ui/MainWindow.h
     src/ui/HeaderBar.cpp
-    src/ui/Editor.cpp
-    src/ui/Editor.h
+    src/ui/HeaderBar.h
     src/ui/MetadataPanel.cpp
     src/ui/MetadataPanel.h
     src/ui/FilterPanel.cpp
     src/ui/FilterPanel.h
     src/ui/FileItemDelegate.cpp
-    src/ui/StringUtils.h
-    src/ui/ToolTipOverlay.h
-    src/ui/HeaderBar.h
     src/ui/IconHelper.h
     src/ui/TagCapsule.h
     src/ui/FlowLayout.h
     src/ui/ClickableLineEdit.h
+    src/ui/ToolTipOverlay.h
     resources/app.manifest
     SvgIcons.h
 )
@@ -63,7 +56,7 @@ set(SOURCES
 add_executable(ArcMeta ${SOURCES})
 
 # 强制管理端宏定义
-target_compile_definitions(ArcMeta PRIVATE RAPID_MANAGER_TARGET)
+target_compile_definitions(ArcMeta PRIVATE AM_MANAGER_TARGET)
 
 target_link_libraries(ArcMeta PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Sql Qt6::Network Qt6::Concurrent Qt6::Svg

@@ -15,7 +15,6 @@
 #include <QMenu>
 #include <QShortcut>
 #include <QItemSelection>
-#include <QSettings>
 #include <QTimer>
 #include <QDesktopServices>
 #include <QUrl>
@@ -28,7 +27,6 @@
 #include <QMimeData>
 #include "FileItemDelegate.h"
 #include "../meta/AmMetaJson.h"
-#include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QSlider>
 #include <QCheckBox>
@@ -95,8 +93,7 @@ void MainWindow::initUI() {
         auto items = m_navTree->selectedItems();
         if (!items.isEmpty()) {
             QString p = items.first()->data(0, Qt::UserRole).toString();
-            if (QFileInfo(p).isDir()) { m_contentStack->setCurrentIndex(0); loadDirectory(p); }
-            else { m_contentStack->setCurrentIndex(1); QVariantMap item; item["content"] = p; m_editor->setItem(item, false); }
+            if (QFileInfo(p).isDir()) { loadDirectory(p); }
         }
     });
     l2Layout->addWidget(m_navTree);
@@ -113,7 +110,6 @@ void MainWindow::initUI() {
 
     m_contentContainer = new QFrame();
     auto* midLayout = new QVBoxLayout(m_contentContainer);
-    m_contentStack = new QStackedWidget();
     m_fileView = new QListView(); m_fileView->setViewMode(QListView::IconMode);
     m_fileModel = new QStandardItemModel(this); m_fileView->setModel(m_fileModel);
     m_fileView->setItemDelegate(new FileItemDelegate(this));
@@ -127,9 +123,7 @@ void MainWindow::initUI() {
         else if (idxs.size() == 1) { QString p = idxs.first().data((int)FileItemDelegate::PathRole).toString(); QVariantMap m; m["content"] = p; m_metaPanel->setItem(m); }
         else m_metaPanel->setMultipleNotes(idxs.size());
     });
-    m_contentStack->addWidget(m_fileView);
-    m_editor = new Editor(); m_editor->togglePreview(true); m_contentStack->addWidget(m_editor);
-    midLayout->addWidget(m_contentStack);
+    midLayout->addWidget(m_fileView);
     m_contentStatusBar = new QWidget();
     auto* sLayout = new QHBoxLayout(m_contentStatusBar);
     m_itemCountLabel = new QLabel("0 个项目"); sLayout->addWidget(m_itemCountLabel);
