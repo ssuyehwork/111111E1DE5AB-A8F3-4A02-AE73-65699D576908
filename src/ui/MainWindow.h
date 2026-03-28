@@ -39,6 +39,9 @@ private slots:
     void onForwardClicked();
     void onUpClicked();
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     void initUi();
     void updateNavButtons();
@@ -72,6 +75,7 @@ private:
 
     // 状态管理
     bool m_isPinned = false;
+    QString m_currentPath;
     QStringList m_history;
     int m_historyIndex = -1;
 

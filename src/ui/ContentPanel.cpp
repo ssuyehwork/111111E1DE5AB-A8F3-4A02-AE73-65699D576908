@@ -88,7 +88,7 @@ void ContentPanel::updateGridSize() {
     m_zoomLevel = qBound(32, m_zoomLevel, 128);
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
-    int cardW = m_zoomLevel + 30; // 缩小 10px (40 -> 30)
+    int cardW = m_zoomLevel + 20; // 再次缩小 10px (30 -> 20)
     int cardH = m_zoomLevel + 50;
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
@@ -248,7 +248,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
             }
             if (keyEvent->key() == Qt::Key_Backspace) {
                 QDir dir(m_currentPath);
-                if (dir.cdUp()) loadDirectory(dir.absolutePath());
+                if (dir.cdUp()) emit directorySelected(dir.absolutePath());
                 return true;
             }
             if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
@@ -289,7 +289,7 @@ void ContentPanel::initGridView() {
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
-    m_gridView->setGridSize(QSize(116, 146)); // 126 -> 116 (缩小 10px)
+    m_gridView->setGridSize(QSize(116, 146)); // 136 -> 126 -> 116 (缩小 20px)
     m_gridView->setSpacing(10);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -458,7 +458,6 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
     QFileInfo info(path);
     if (info.isDir()) {
         emit directorySelected(path); 
-        loadDirectory(path);
     } else {
         QDesktopServices::openUrl(QUrl::fromLocalFile(path));
     }

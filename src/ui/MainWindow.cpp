@@ -16,6 +16,7 @@
 #include <QMouseEvent>
 #include <QApplication>
 #include <QSettings>
+#include <QCloseEvent>
 #include "UiHelper.h"
 #include <QFileInfo>
 #include "../meta/AmMetaJson.h"
@@ -111,6 +112,11 @@ MainWindow::MainWindow(QWidget* parent)
     setStyleSheet(qss);
 
     initUi();
+
+    // 恢复最后一次打开的路径
+    QString lastPath = settings.value("MainWindow/LastPath", "C:/").toString();
+    if (!QDir(lastPath).exists()) lastPath = "C:/";
+    navigateTo(lastPath);
 }
 
 void MainWindow::initUi() {
@@ -125,8 +131,12 @@ void MainWindow::initUi() {
 
     // 核心红线：建立各面板间的信号联动 (Data Linkage)
     
-    // 1. 导航/收藏选择 -> 内容面板刷新
-    connect(m_navPanel, &NavPanel::directorySelected, [this](const QString& path) {
+    // 1. 导航/收藏/内容面板 双击跳转 -> 统一路径调度
+    connect(m_navPanel, &NavPanel::directorySelected, this, [this](const QString& path) {
+        navigateTo(path);
+    });
+
+    connect(m_contentPanel, &ContentPanel::directorySelected, this, [this](const QString& path) {
         navigateTo(path);
     });
 
@@ -195,7 +205,13 @@ void MainWindow::initUi() {
 
     // 6. 工具栏路径跳转
     connect(m_pathEdit, &QLineEdit::returnPressed, [this]() {
-        navigateTo(m_pathEdit->text());
+        QString input = m_pathEdit->text();
+        if (QDir(input).exists()) {
+            navigateTo(input);
+        } else {
+            // 如果路径无效，恢复为当前实际路径
+            m_pathEdit->setText(QDir::toNativeSeparators(m_currentPath));
+        }
     });
 
     // 7. 工具栏极速搜索对接 (MFT 并行引擎)
@@ -424,6 +440,8 @@ void MainWindow::navigateTo(const QString& path, bool record) {
     if (path.isEmpty()) return;
 
     QString normPath = QDir::toNativeSeparators(path);
+    m_currentPath = normPath;
+
     if (record) {
         // 如果在历史中间进行跳转，清除之后的历史
         if (m_historyIndex < m_history.size() - 1) {
@@ -457,7 +475,7 @@ void MainWindow::onForwardClicked() {
 }
 
 void MainWindow::onUpClicked() {
-    QDir dir(m_pathEdit->text());
+    QDir dir(m_currentPath);
     if (dir.cdUp()) {
         navigateTo(dir.absolutePath());
     }
@@ -467,8 +485,8 @@ void MainWindow::updateNavButtons() {
     m_btnBack->setEnabled(m_historyIndex > 0);
     m_btnForward->setEnabled(m_historyIndex < m_history.size() - 1);
 
-    QDir dir(m_pathEdit->text());
-    m_btnUp->setEnabled(!dir.isRoot());
+    QDir dir(m_currentPath);
+    m_btnUp->setEnabled(!dir.isRoot() && !m_currentPath.isEmpty());
 }
 
 void MainWindow::onPinToggled(bool checked) {
@@ -493,6 +511,12 @@ void MainWindow::onPinToggled(bool checked) {
     // 持久化存储
     QSettings settings("ArcMeta团队", "ArcMeta");
     settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    QSettings settings("ArcMeta团队", "ArcMeta");
+    settings.setValue("MainWindow/LastPath", m_currentPath);
+    QMainWindow::closeEvent(event);
 }
 
 } // namespace ArcMeta
