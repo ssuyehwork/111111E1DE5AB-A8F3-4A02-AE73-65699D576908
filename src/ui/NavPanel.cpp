@@ -1,6 +1,7 @@
 #include "NavPanel.h"
 #include <QHeaderView>
 #include <QScrollBar>
+#include <QLabel>
 
 namespace ArcMeta {
 

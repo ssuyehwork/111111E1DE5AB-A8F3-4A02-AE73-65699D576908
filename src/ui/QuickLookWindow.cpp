@@ -1,5 +1,6 @@
 #include "QuickLookWindow.h"
 #include <QKeyEvent>
+#include <QLabel>
 #include <QFileInfo>
 #include <QFile>
 #include <QGraphicsPixmapItem>

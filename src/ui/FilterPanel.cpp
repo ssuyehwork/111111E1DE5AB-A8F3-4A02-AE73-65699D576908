@@ -1,6 +1,7 @@
 #include "FilterPanel.h"
 #include <QScrollBar>
 #include <QSlider>
+#include <QLabel>
 
 namespace ArcMeta {
 

@@ -1,5 +1,6 @@
 #include "ToolTipOverlay.h"
 #include <QVBoxLayout>
+#include <QLabel>
 #include <QScreen>
 #include <QGuiApplication>
 #include <QStyleOption>

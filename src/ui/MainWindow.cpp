@@ -166,9 +166,9 @@ void MainWindow::initUi() {
 void MainWindow::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         // 点击工具栏区域（前 40px）允许拖动窗口
-        if (event->pos().y() <= 40) {
+        if (event->position().y() <= 40) {
             m_isDragging = true;
-            m_dragPosition = event->globalPos() - frameGeometry().topLeft();
+            m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
             event->accept();
         }
     }
@@ -176,12 +176,13 @@ void MainWindow::mousePressEvent(QMouseEvent* event) {
 
 void MainWindow::mouseMoveEvent(QMouseEvent* event) {
     if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
-        move(event->globalPos() - m_dragPosition);
+        move(event->globalPosition().toPoint() - m_dragPosition);
         event->accept();
     }
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
+    Q_UNUSED(event);
     m_isDragging = false;
 }
 

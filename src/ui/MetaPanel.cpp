@@ -1,5 +1,6 @@
 #include "MetaPanel.h"
 #include "../../SvgIcons.h"
+#include <QLabel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPainter>

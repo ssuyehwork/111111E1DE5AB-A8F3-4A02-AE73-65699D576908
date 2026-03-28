@@ -18,6 +18,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QFileIconProvider>
+#include <QLabel>
 #include "../mft/MftReader.h"
 
 namespace ArcMeta {
