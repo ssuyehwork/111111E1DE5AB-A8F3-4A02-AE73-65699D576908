@@ -18,20 +18,25 @@ std::wstring PathBuilder::resolveRecursive(const std::wstring& volume, DWORDLONG
     if (depth > 64) return L"";
 
     // 2. 环路检测
-    if (visited.count(frn)) return L"";
+    if (visited.find(frn) != visited.end()) return L"";
     visited.insert(frn);
 
     // 3. 从索引获取 Entry
-    auto& volumeMap = MftReader::instance().getIndex()[volume];
-    if (volumeMap.find(frn) == volumeMap.end()) {
+    const auto& globalIndex = MftReader::instance().getIndex();
+    auto itVolume = globalIndex.find(volume);
+    if (itVolume == globalIndex.end()) return L"";
+
+    const auto& volumeMap = itVolume->second;
+    auto itEntry = volumeMap.find(frn);
+    if (itEntry == volumeMap.end()) {
         return L""; // 索引不完整
     }
 
-    const FileEntry& entry = volumeMap[frn];
+    const FileEntry& entry = itEntry->second;
 
     // 4. 根目录判断条件：(parentFrn & 0x0000FFFFFFFFFFFF) == 5
     DWORDLONG pureParentFrn = entry.parentFrn & 0x0000FFFFFFFFFFFFLL;
-    if (pureParentFrn == 5) {
+    if (pureParentFrn == 5 || entry.frn == entry.parentFrn) {
         return volume + L"\\" + entry.name;
     }
 

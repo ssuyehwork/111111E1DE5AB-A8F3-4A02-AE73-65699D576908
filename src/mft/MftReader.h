@@ -39,6 +39,13 @@ public:
      */
     std::vector<FileEntry> getChildren(const std::wstring& folderPath);
 
+    /**
+     * @brief 并行全局搜索文件名
+     * @param query 搜索关键词
+     * @param volume 限制在特定卷搜索，为空则全盘搜索
+     */
+    std::vector<FileEntry> search(const std::wstring& query, const std::wstring& volume = L"");
+
 private:
     MftReader() = default;
 
@@ -50,6 +57,9 @@ private:
 
     // 关键优化：父子关系反向索引 volume -> (parentFrn -> vector of childFrns)
     std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, std::vector<DWORDLONG>>> m_parentToChildren;
+
+    // 性能优化：volume -> (fullPath -> frn)
+    std::unordered_map<std::wstring, std::unordered_map<std::wstring, DWORDLONG>> m_pathToFrn;
 
     /**
      * @brief 根据路径获取对应的 FRN（用于 MFT 模式下的钻取）

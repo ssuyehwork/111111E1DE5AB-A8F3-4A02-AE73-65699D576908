@@ -5,6 +5,9 @@
 #include "../db/FolderRepo.h"
 #include <winioctl.h>
 #include <vector>
+#include <QSqlQuery>
+#include <QVariant>
+#include <QString>
 
 namespace ArcMeta {
 
@@ -38,14 +41,14 @@ void UsnWatcher::watcherThread() {
         return;
     }
 
-    // 1. 离线变更追平逻辑：从数据库读取 NextUsn
-    auto sqlite = Database::instance().sqlite();
-    std::string key = "usn_state_" + QString::fromStdWString(m_volume).toStdString();
-    SQLite::Statement st(*sqlite, "SELECT value FROM sync_state WHERE key = ?");
-    st.bind(1, key);
+    // 1. 离线变更追平逻辑：从数据库读取 NextUsn (原生 QtSql 实现)
+    QString key = "usn_state_" + QString::fromStdWString(m_volume);
+    QSqlQuery query;
+    query.prepare("SELECT value FROM sync_state WHERE key = ?");
+    query.addBindValue(key);
 
-    if (st.executeStep()) {
-        m_lastUsn = std::stoll(st.getColumn(0).getText());
+    if (query.exec() && query.next()) {
+        m_lastUsn = query.value(0).toString().toLongLong();
     } else {
         m_lastUsn = journalData.NextUsn;
     }
@@ -114,14 +117,48 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
     }
 
     if (reason & USN_REASON_RENAME_NEW_NAME) {
-        // 1. 获取旧路径与新路径
-        std::wstring oldPath = ItemRepo::getPathByFrn(m_volume, frnStr);
+        // 1. 获取新路径及新父目录路径
         std::wstring newPath = PathBuilder::getPath(m_volume, pRecord->FileReferenceNumber);
+        std::wstring newParentPath = PathBuilder::getPath(m_volume, pRecord->ParentFileReferenceNumber);
+        std::wstring oldPath = ItemRepo::getPathByFrn(m_volume, frnStr);
 
-        if (!oldPath.empty() && !newPath.empty() && oldPath != newPath) {
-            // 2. 物理迁移 .am_meta.json 中的条目 (基于 FRN 跨路径追踪)
-            // 逻辑由 AmMetaJson 与 Repository 配合完成更新
-            ItemRepo::updatePath(m_volume, frnStr, newPath);
+        if (!newPath.empty() && oldPath != newPath) {
+            // 2. 跨目录元数据迁移事务逻辑 (两阶段提交思想)
+            // 第一阶段：读取旧路径所在目录的 JSON
+            std::wstring oldParentDir = oldPath.substr(0, oldPath.find_last_of(L"\\/"));
+            AmMetaJson oldMetaJson(oldParentDir);
+
+            if (oldMetaJson.load()) {
+                std::wstring fileNameOnly = oldPath.substr(oldPath.find_last_of(L"\\/") + 1);
+                if (oldMetaJson.items().count(fileNameOnly)) {
+                    ItemMeta meta = oldMetaJson.items()[fileNameOnly];
+
+                    // 第二阶段：物理迁移 JSON 记录到新目录
+                    AmMetaJson newMetaJson(newParentPath);
+                    newMetaJson.load();
+                    std::wstring newFileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
+                    newMetaJson.items()[newFileNameOnly] = meta;
+
+                    if (newMetaJson.save()) {
+                        // 成功后删除旧位置记录并更新数据库
+                        oldMetaJson.items().erase(fileNameOnly);
+                        oldMetaJson.save();
+                        ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
+                    }
+                } else {
+                    // 如果 JSON 中无记录，仅更新数据库路径
+                    ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
+                }
+            }
+
+            // 更新内存 MFT 索引
+            FileEntry entry;
+            entry.volume = m_volume;
+            entry.frn = pRecord->FileReferenceNumber;
+            entry.parentFrn = pRecord->ParentFileReferenceNumber;
+            entry.attributes = pRecord->FileAttributes;
+            entry.name = newPath.substr(newPath.find_last_of(L"\\/") + 1);
+            MftReader::instance().updateEntry(entry);
         }
     }
 }

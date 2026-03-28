@@ -60,6 +60,11 @@ signals:
     void loadDirectory(const QString& path);
 
     /**
+     * @brief 全局/本地搜索
+     */
+    void search(const QString& query);
+
+    /**
      * @brief 应用当前筛选器
      */
     void applyFilters();

@@ -69,10 +69,11 @@ std::wstring ItemRepo::getPathByFrn(const std::wstring& volume, const std::wstri
     return L"";
 }
 
-bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath) {
+bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath) {
     QSqlQuery q;
-    q.prepare("UPDATE items SET path = ? WHERE volume = ? AND frn = ?");
+    q.prepare("UPDATE items SET path = ?, parent_path = ? WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(newPath));
+    q.addBindValue(QString::fromStdWString(newParentPath));
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
     return q.exec();

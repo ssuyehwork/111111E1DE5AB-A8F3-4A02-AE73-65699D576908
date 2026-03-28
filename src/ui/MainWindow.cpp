@@ -87,9 +87,13 @@ void MainWindow::initUi() {
         m_contentPanel->loadDirectory(path);
     });
 
-    // 7. 工具栏本地搜索过滤
-    connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
-        // m_contentPanel->setSearchFilter(text);
+    // 7. 工具栏极速搜索对接 (MFT 并行引擎)
+    connect(m_searchEdit, &QLineEdit::textEdited, [this](const QString& text) {
+        if (text.isEmpty()) {
+            m_contentPanel->loadDirectory(m_pathEdit->text());
+        } else if (text.length() >= 2) {
+            m_contentPanel->search(text);
+        }
     });
 }
 

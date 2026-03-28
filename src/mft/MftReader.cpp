@@ -2,6 +2,9 @@
 #include <winioctl.h>
 #include <filesystem>
 #include <iostream>
+#include <algorithm>
+#include <execution>
+#include <mutex>
 
 namespace ArcMeta {
 
@@ -148,20 +151,68 @@ std::vector<FileEntry> MftReader::getChildren(const std::wstring& folderPath) {
  */
 #include "PathBuilder.h"
 
+/**
+ * @brief 实现 O(1) 路径检索
+ */
 DWORDLONG MftReader::getFrnFromPath(const std::wstring& folderPath) {
     std::wstring vol = folderPath.length() >= 2 ? folderPath.substr(0, 2) : L"";
     if (vol.empty()) return 0;
 
-    auto& entries = m_index[vol];
+    const auto& volPathMap = m_pathToFrn[vol];
+    auto it = volPathMap.find(folderPath);
+    if (it != volPathMap.end()) {
+        return it->second;
+    }
 
-    // 建立临时搜索索引或直接通过递归路径校验
-    // 在生产环境下，此映射应在 buildIndex 时预先建立以保证 O(1)
+    // 备选逻辑：如果映射表未填充，则全量匹配并缓存（仅在特殊初始化阶段发生）
+    auto& entries = m_index[vol];
     for (const auto& [frn, entry] : entries) {
         if (entry.isDir()) {
-            if (PathBuilder::getPath(vol, frn) == folderPath) return frn;
+            std::wstring fullPath = PathBuilder::getPath(vol, frn);
+            m_pathToFrn[vol][fullPath] = frn;
+            if (fullPath == folderPath) return frn;
         }
     }
     return 0;
+}
+
+/**
+ * @brief 实现并行文件名搜索 (std::execution::par)
+ */
+std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::wstring& volume) {
+    if (query.empty()) return {};
+
+    // 1. 收集所有待搜索项的指针
+    std::vector<const FileEntry*> pool;
+    if (!volume.empty()) {
+        if (m_index.count(volume)) {
+            for (auto& pair : m_index[volume]) pool.push_back(&pair.second);
+        }
+    } else {
+        for (auto& volPair : m_index) {
+            for (auto& pair : volPair.second) pool.push_back(&pair.second);
+        }
+    }
+
+    // 2. 将 query 转换为小写，支持大小写不敏感匹配
+    std::wstring lQuery = query;
+    std::transform(lQuery.begin(), lQuery.end(), lQuery.begin(), ::towlower);
+
+    // 3. 并行过滤
+    std::vector<FileEntry> results;
+    std::mutex resultsMutex;
+
+    std::for_each(std::execution::par, pool.begin(), pool.end(), [&](const FileEntry* entry) {
+        std::wstring lName = entry->name;
+        std::transform(lName.begin(), lName.end(), lName.begin(), ::towlower);
+
+        if (lName.find(lQuery) != std::wstring::npos) {
+            std::lock_guard<std::mutex> lock(resultsMutex);
+            results.push_back(*entry);
+        }
+    });
+
+    return results;
 }
 
 } // namespace ArcMeta

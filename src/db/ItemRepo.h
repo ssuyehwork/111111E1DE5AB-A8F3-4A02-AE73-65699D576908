@@ -24,7 +24,7 @@ public:
     /**
      * @brief 物理更新路径
      */
-    static bool updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath);
+    static bool updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath);
 };
 
 } // namespace ArcMeta

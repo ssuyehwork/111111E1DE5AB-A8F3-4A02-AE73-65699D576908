@@ -5,6 +5,13 @@
 #include <QDateTime>
 #include <QFileInfo>
 #include <QDir>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QSqlDatabase>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <filesystem>
+#include <map>
 
 namespace ArcMeta {
 

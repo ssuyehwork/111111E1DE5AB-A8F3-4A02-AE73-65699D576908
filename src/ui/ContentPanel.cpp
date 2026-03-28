@@ -252,6 +252,42 @@ void ContentPanel::loadDirectory(const QString& path) {
     }
 }
 
+/**
+ * @brief 实现 UI 搜索逻辑，调用 MFTReader 的并行搜索
+ */
+void ContentPanel::search(const QString& query) {
+    if (query.isEmpty()) return;
+
+    m_model->clear();
+    m_model->setHorizontalHeaderLabels({"名称", "路径", "类型", "修改时间"});
+
+    // 1. 调用并行搜索引擎
+    auto results = MftReader::instance().search(query.toStdWString());
+    QFileIconProvider iconProvider;
+
+    // 2. 限制展示前 1000 条以保证 UI 流畅度
+    int count = 0;
+    for (const auto& entry : results) {
+        if (++count > 1000) break;
+
+        QString fileName = QString::fromStdWString(entry.name);
+        // 此处无法直接获取 fullPath，在 MFT 模式下需要 PathBuilder 配合
+        // 为了对接 UI，临时展示卷标+FRN (生产模式应预加载路径)
+        QString displayPath = QString::fromStdWString(entry.volume) + " [FRN: " + QString::number(entry.frn, 16) + "]";
+
+        QList<QStandardItem*> row;
+        auto* nameItem = new QStandardItem(fileName);
+        nameItem->setData(fileName, PathRole); // 临时，搜索结果通常跳转用
+
+        row << nameItem;
+        row << new QStandardItem(displayPath);
+        row << new QStandardItem(entry.isDir() ? "文件夹" : "文件");
+        row << new QStandardItem("-");
+
+        m_model->appendRow(row);
+    }
+}
+
 void ContentPanel::applyFilters() {
     // 逻辑：遍历模型行，根据筛选条件设置行的可见性
 }
@@ -335,7 +371,7 @@ QSize GridItemDelegate::sizeHint(const QStyleOptionViewItem&, const QModelIndex&
  * @brief 静态辅助方法，供外部和 Delegate 使用
  */
 QIcon ContentPanel::getSvgIcon(const QString& key, const QColor& color) {
-    if (!SvgIcons::icons.contains(key)) return QIcon();
+    if (SvgIcons::icons.find(key) == SvgIcons::icons.end()) return QIcon();
     QString svgDataStr = SvgIcons::icons[key];
     svgDataStr.replace("currentColor", color.name());
     QSvgRenderer renderer(svgDataStr.toUtf8());
