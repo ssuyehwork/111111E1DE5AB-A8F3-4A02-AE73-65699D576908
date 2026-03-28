@@ -4,6 +4,9 @@ project(ArcMeta)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 修复：明确 Qt 6 搜索前缀 (文档红线: C:\Qt\6.10.2\msvc2022_64)
+set(CMAKE_PREFIX_PATH "C:/Qt/6.10.2/msvc2022_64")
+
 # 强制 MSVC 编译器及选项 (文档红线: /W4 /O2)
 if(MSVC)
     add_compile_options(/W4 /O2 /utf-8)

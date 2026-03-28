@@ -29,6 +29,7 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::initUi() {
     initToolbar();
     setupSplitters();
+    setupCustomTitleBarButtons();
 
     // 设置默认权重分配: 230 | 200 | 200 | 弹性 | 240 | 230
     QList<int> sizes;
