@@ -23,7 +23,8 @@ enum ItemRole {
     EncryptedRole,
     PathRole,
     IsLockedRole,
-    TagsRole
+    TagsRole,
+    TypeRole
 };
 
 /**

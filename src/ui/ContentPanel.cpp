@@ -50,6 +50,10 @@ public:
 
     FilterState currentFilter;
 
+    void updateFilter() {
+        invalidateFilter();
+    }
+
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override {
         QModelIndex idx = sourceModel()->index(sourceRow, 0, sourceParent);
@@ -82,7 +86,7 @@ protected:
 
         // 4. 类型过滤
         if (!currentFilter.types.isEmpty()) {
-            QString type = idx.data(Qt::UserRole).toString(); // "folder" or "file"
+            QString type = idx.data(TypeRole).toString(); // "folder" or "file"
             QString ext = QFileInfo(idx.data(PathRole).toString()).suffix().toUpper();
             bool matchType = false;
             for (const QString& fType : currentFilter.types) {
@@ -609,7 +613,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         for (const QFileInfo& drive : drives) {
             auto* item = new QStandardItem(iconProvider.icon(drive), drive.absolutePath());
             item->setData(drive.absolutePath(), PathRole);
-            item->setData("folder", Qt::UserRole);
+        item->setData("folder", TypeRole);
             QList<QStandardItem*> row;
             row << item;
             row << new QStandardItem("-");
@@ -676,7 +680,7 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         QList<QStandardItem*> row;
         auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
         nameItem->setData(fullPath, PathRole);
-        nameItem->setData(info.isDir() ? "folder" : "file", Qt::UserRole);
+        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
 
         // 元数据反填 + 统计
         int     itemRating = 0;
@@ -751,7 +755,7 @@ void ContentPanel::search(const QString& query) {
         QList<QStandardItem*> row;
         auto* nameItem = new QStandardItem(iconProvider.icon(QFileInfo(fullPath)), fileName);
         nameItem->setData(fullPath, PathRole); 
-        nameItem->setData(entry.isDir() ? "folder" : "file", Qt::UserRole);
+        nameItem->setData(entry.isDir() ? "folder" : "file", TypeRole);
         
         // --- 搜索模式下单体探针：由于不在同一目录，需单体读取所属父目录元数据 ---
         // 虽然有轻微性能损耗，但在 1000 级结果内依然是 I/O 无感的
@@ -786,7 +790,7 @@ void ContentPanel::applyFilters(const FilterState& state) {
 void ContentPanel::applyFilters() {
     auto* proxy = static_cast<FilterProxyModel*>(m_proxyModel);
     proxy->currentFilter = m_currentFilter;
-    proxy->invalidateFilter();
+    proxy->updateFilter();
 }
 
 // --- Delegate ---
