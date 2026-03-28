@@ -76,8 +76,8 @@ public:
         }
 
         // 4. 哈希法生成新颜色 (HSL 保证色彩分布)
-        uint hash = qHash(upperExt);
-        int hue = hash % 360; // 0-359 色相
+        size_t hash = qHash(upperExt);
+        int hue = static_cast<int>(hash % 360); // 0-359 色相
         // 固定 S=160, L=110 保证在深色背景下的可读性且色彩饱满
         QColor color = QColor::fromHsl(hue, 160, 110, 200);
 
