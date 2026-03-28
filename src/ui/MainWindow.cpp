@@ -50,9 +50,19 @@ void MainWindow::initUi() {
     // 2. 内容面板选中项改变 -> 元数据面板刷新
     connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
         if (paths.isEmpty()) {
-            // m_metaPanel->clear();
+            m_metaPanel->updateInfo("-", "-", "-", "-", "-", "-", "-", false);
         } else {
-            // m_metaPanel->loadMetadata(paths.first()); // 批量逻辑略
+            QFileInfo info(paths.first());
+            m_metaPanel->updateInfo(
+                info.fileName(),
+                info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件",
+                info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB",
+                info.birthTime().toString("yyyy-MM-dd"),
+                info.lastModified().toString("yyyy-MM-dd"),
+                info.lastRead().toString("yyyy-MM-dd"),
+                info.absoluteFilePath(),
+                false
+            );
         }
     });
 
@@ -63,12 +73,12 @@ void MainWindow::initUi() {
 
     // 4. QuickLook 打标 -> 元数据面板同步
     connect(&QuickLookWindow::instance(), &QuickLookWindow::ratingRequested, [this](int rating) {
-        // m_metaPanel->setRating(rating);
+        m_metaPanel->setRating(rating);
     });
 
     // 5. 筛选面板变更 -> 内容面板过滤
     connect(m_filterPanel, &FilterPanel::filterChanged, [this]() {
-        // m_contentPanel->applyFilters();
+        m_contentPanel->applyFilters();
     });
 
     // 6. 工具栏路径跳转

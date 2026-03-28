@@ -48,10 +48,28 @@ private:
     // volume -> (frn -> Entry)
     std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>> m_index;
 
+    // 关键优化：父子关系反向索引 volume -> (parentFrn -> vector of childFrns)
+    std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, std::vector<DWORDLONG>>> m_parentToChildren;
+
+    /**
+     * @brief 根据路径获取对应的 FRN（用于 MFT 模式下的钻取）
+     */
+    DWORDLONG getFrnFromPath(const std::wstring& folderPath);
+
     // 降级模式下的路径索引：fullPath -> Entry
     std::unordered_map<std::wstring, FileEntry> m_pathIndex;
 
     bool m_isUsingMft = false;
+
+public:
+    const std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>>& getIndex() const { return m_index; }
+
+    /**
+     * @brief USN 监听器更新内存索引
+     */
+    void updateEntry(const FileEntry& entry) {
+        m_index[entry.volume][entry.frn] = entry;
+    }
 };
 
 } // namespace ArcMeta

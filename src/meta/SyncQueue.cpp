@@ -85,8 +85,7 @@ bool SyncQueue::processBatch() {
 
     try {
         // 关键红线：使用事务批量提交
-        auto transaction = Database::instance().createTransaction();
-        auto sqlite = Database::instance().sqlite();
+        QSqlDatabase::database().transaction();
 
         for (const auto& path : batch) {
             AmMetaJson meta(path);
@@ -101,10 +100,10 @@ bool SyncQueue::processBatch() {
             }
         }
 
-        transaction->commit();
+        QSqlDatabase::database().commit();
         return true;
     } catch (const std::exception& e) {
-        // 事务失败会自动回滚 (RAII Transaction)
+        QSqlDatabase::database().rollback();
         return false;
     }
 }

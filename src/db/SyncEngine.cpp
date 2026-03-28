@@ -17,19 +17,18 @@ SyncEngine& SyncEngine::instance() {
  * @brief 增量同步：只处理 mtime > last_sync_time 的 .am_meta.json
  */
 void SyncEngine::runIncrementalSync() {
-    auto sqlite = Database::instance().sqlite();
     double lastSyncTime = 0;
 
     // 获取上次同步时间
-    SQLite::Statement st(*sqlite, "SELECT value FROM sync_state WHERE key = 'last_sync_time'");
-    if (st.executeStep()) {
-        lastSyncTime = st.getColumn(0).getDouble();
+    QSqlQuery st("SELECT value FROM sync_state WHERE key = 'last_sync_time'");
+    if (st.next()) {
+        lastSyncTime = st.value(0).toDouble();
     }
 
     // 执行全表增量扫描逻辑
-    SQLite::Statement query(*sqlite, "SELECT path FROM folders");
-    while (query.executeStep()) {
-        std::wstring path = QString::fromStdString(query.getColumn(0).getText()).toStdWString();
+    QSqlQuery query("SELECT path FROM folders");
+    while (query.next()) {
+        std::wstring path = query.value(0).toString().toStdWString();
         std::wstring jsonPath = path + L"\\.am_meta.json";
 
         QFileInfo info(QString::fromStdWString(jsonPath));
@@ -57,8 +56,10 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
     }
 
     // 清理并重建核心表
-    auto sqlite = Database::instance().sqlite();
-    sqlite->exec("DELETE FROM folders; DELETE FROM items; DELETE FROM tags;");
+    QSqlQuery q;
+    q.exec("DELETE FROM folders");
+    q.exec("DELETE FROM items");
+    q.exec("DELETE FROM tags");
 
     int total = (int)metaFiles.size();
     for (int i = 0; i < total; ++i) {
@@ -72,8 +73,9 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
     // 强制刷空队列
     SyncQueue::instance().flush();
     // 更新同步时间
-    SQLite::Statement updateSync(*sqlite, "INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
-    updateSync.bind(1, (double)QDateTime::currentMSecsSinceEpoch());
+    QSqlQuery updateSync;
+    updateSync.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
+    updateSync.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
     updateSync.exec();
 
     rebuildTagStats();
@@ -83,16 +85,16 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
  * @brief 标签聚合统计逻辑
  */
 void SyncEngine::rebuildTagStats() {
-    auto sqlite = Database::instance().sqlite();
-    auto transaction = Database::instance().createTransaction();
+    QSqlDatabase db = QSqlDatabase::database();
+    db.transaction();
 
-    sqlite->exec("DELETE FROM tags");
+    QSqlQuery("DELETE FROM tags");
 
-    // 聚合 items 表中的标签（解析存储在数据库中的 JSON 字符串）
-    SQLite::Statement query(*sqlite, "SELECT tags FROM items WHERE tags != ''");
+    // 聚合 items 表中的标签
+    QSqlQuery query("SELECT tags FROM items WHERE tags != ''");
     std::map<std::string, int> tagCounts;
-    while (query.executeStep()) {
-        QByteArray jsonData = QByteArray::fromStdString(query.getColumn(0).getText());
+    while (query.next()) {
+        QByteArray jsonData = query.value(0).toByteArray();
         QJsonDocument doc = QJsonDocument::fromJson(jsonData);
         if (doc.isArray()) {
             for (const auto& val : doc.array()) {
@@ -103,13 +105,14 @@ void SyncEngine::rebuildTagStats() {
     }
 
     for (const auto& [tag, count] : tagCounts) {
-        SQLite::Statement ins(*sqlite, "INSERT INTO tags (tag, item_count) VALUES (?, ?)");
-        ins.bind(1, tag);
-        ins.bind(2, count);
+        QSqlQuery ins;
+        ins.prepare("INSERT INTO tags (tag, item_count) VALUES (?, ?)");
+        ins.addBindValue(QString::fromStdString(tag));
+        ins.addBindValue(count);
         ins.exec();
     }
 
-    transaction->commit();
+    db.commit();
 }
 
 /**
@@ -123,7 +126,7 @@ void SyncEngine::scanDirectory(const std::filesystem::path& root, std::vector<st
             }
         }
     } catch (...) {
-        // 忽略访问受限目录
+        // 无权限访问目录
     }
 }
 

@@ -1,70 +1,59 @@
 #include "FolderRepo.h"
+#include <QSqlQuery>
+#include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QString>
 
 namespace ArcMeta {
 
 bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
-    try {
-        auto sqlite = Database::instance().sqlite();
-        SQLite::Statement query(*sqlite, "INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    QSqlQuery q;
+    q.prepare("INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    q.addBindValue(QString::fromStdWString(path));
+    q.addBindValue(meta.rating);
+    q.addBindValue(QString::fromStdWString(meta.color));
 
-        query.bind(1, QString::fromStdWString(path).toStdString());
-        query.bind(2, meta.rating);
-        query.bind(3, QString::fromStdWString(meta.color).toStdString());
+    QJsonArray tagsArr;
+    for (const auto& t : meta.tags) tagsArr.append(QString::fromStdWString(t));
+    q.addBindValue(QJsonDocument(tagsArr).toJson(QJsonDocument::Compact));
 
-        // 关键：标签存储为 JSON 数组字符串
-        QJsonArray tagsArr;
-        for (const auto& t : meta.tags) tagsArr.append(QString::fromStdWString(t));
-        query.bind(4, QJsonDocument(tagsArr).toJson(QJsonDocument::Compact).toStdString());
+    q.addBindValue(meta.pinned ? 1 : 0);
+    q.addBindValue(QString::fromStdWString(meta.note));
+    q.addBindValue(QString::fromStdWString(meta.sortBy));
+    q.addBindValue(QString::fromStdWString(meta.sortOrder));
 
-        query.bind(5, meta.pinned ? 1 : 0);
-        query.bind(6, QString::fromStdWString(meta.note).toStdString());
-        query.bind(7, QString::fromStdWString(meta.sortBy).toStdString());
-        query.bind(8, QString::fromStdWString(meta.sortOrder).toStdString());
-
-        return query.exec() > 0;
-    } catch (...) {
-        return false;
-    }
+    return q.exec();
 }
 
 bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
-    try {
-        auto sqlite = Database::instance().sqlite();
-        SQLite::Statement query(*sqlite, "SELECT rating, color, tags, pinned, note, sort_by, sort_order FROM folders WHERE path = ?");
-        query.bind(1, QString::fromStdWString(path).toStdString());
+    QSqlQuery q;
+    q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order FROM folders WHERE path = ?");
+    q.addBindValue(QString::fromStdWString(path));
 
-        if (query.executeStep()) {
-            meta.rating = query.getColumn(0).getInt();
-            meta.color = QString::fromStdString(query.getColumn(1).getText()).toStdWString();
+    if (q.exec() && q.next()) {
+        meta.rating = q.value(0).toInt();
+        meta.color = q.value(1).toString().toStdWString();
 
-            QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(query.getColumn(2).getText()));
-            meta.tags.clear();
-            if (doc.isArray()) {
-                for (const auto& v : doc.array()) meta.tags.push_back(v.toString().toStdWString());
-            }
-
-            meta.pinned = query.getColumn(3).getInt() != 0;
-            meta.note = QString::fromStdString(query.getColumn(4).getText()).toStdWString();
-            meta.sortBy = QString::fromStdString(query.getColumn(5).getText()).toStdWString();
-            meta.sortOrder = QString::fromStdString(query.getColumn(6).getText()).toStdWString();
-            return true;
+        QJsonDocument doc = QJsonDocument::fromJson(q.value(2).toByteArray());
+        meta.tags.clear();
+        if (doc.isArray()) {
+            for (const auto& v : doc.array()) meta.tags.push_back(v.toString().toStdWString());
         }
-    } catch (...) {}
+
+        meta.pinned = q.value(3).toInt() != 0;
+        meta.note = q.value(4).toString().toStdWString();
+        meta.sortBy = q.value(5).toString().toStdWString();
+        meta.sortOrder = q.value(6).toString().toStdWString();
+        return true;
+    }
     return false;
 }
 
 bool FolderRepo::remove(const std::wstring& path) {
-    try {
-        auto sqlite = Database::instance().sqlite();
-        SQLite::Statement query(*sqlite, "DELETE FROM folders WHERE path = ?");
-        query.bind(1, QString::fromStdWString(path).toStdString());
-        return query.exec() > 0;
-    } catch (...) {
-        return false;
-    }
+    QSqlQuery q;
+    q.prepare("DELETE FROM folders WHERE path = ?");
+    q.addBindValue(QString::fromStdWString(path));
+    return q.exec();
 }
 
 } // namespace ArcMeta

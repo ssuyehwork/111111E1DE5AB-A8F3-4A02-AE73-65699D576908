@@ -76,7 +76,7 @@ void FilterPanel::initUi() {
     addCheckboxFilter(m_typeLayout, "文件夹", 0);
     addCheckboxFilter(m_typeLayout, "图片", 0);
 
-    // 5. 文件大小 (实现具体的 Slider)
+    // 5. 文件大小
     m_containerLayout->addWidget(createFilterGroup("大小 (MB)", m_sizeLayout));
     QSlider* sizeSlider = new QSlider(Qt::Horizontal, m_container);
     sizeSlider->setRange(0, 1024);

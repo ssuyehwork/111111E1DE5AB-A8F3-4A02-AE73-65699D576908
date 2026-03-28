@@ -311,4 +311,8 @@ void MetaPanel::updateInfo(const QString& n, const QString& t, const QString& s,
     btnEncrypt->setVisible(!e); btnDecrypt->setVisible(e); btnChangePwd->setVisible(e);
 }
 
+void MetaPanel::setRating(int rating) {
+    m_starRating->setRating(rating);
+}
+
 } // namespace ArcMeta

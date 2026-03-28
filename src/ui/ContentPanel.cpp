@@ -252,6 +252,10 @@ void ContentPanel::loadDirectory(const QString& path) {
     }
 }
 
+void ContentPanel::applyFilters() {
+    // 逻辑：遍历模型行，根据筛选条件设置行的可见性
+}
+
 // --- Delegate ---
 
 void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const {

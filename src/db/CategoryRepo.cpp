@@ -1,85 +1,75 @@
 #include "CategoryRepo.h"
+#include <QSqlQuery>
+#include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QString>
 #include <QDateTime>
 
 namespace ArcMeta {
 
 bool CategoryRepo::add(Category& cat) {
-    try {
-        auto sqlite = Database::instance().sqlite();
-        SQLite::Statement query(*sqlite, "INSERT INTO categories (parent_id, name, color, preset_tags, sort_order, pinned, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    QSqlQuery q;
+    q.prepare("INSERT INTO categories (parent_id, name, color, preset_tags, sort_order, pinned, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    q.addBindValue(cat.parentId);
+    q.addBindValue(QString::fromStdWString(cat.name));
+    q.addBindValue(QString::fromStdWString(cat.color));
 
-        query.bind(1, cat.parentId);
-        query.bind(2, QString::fromStdWString(cat.name).toStdString());
-        query.bind(3, QString::fromStdWString(cat.color).toStdString());
+    QJsonArray tagsArr;
+    for (const auto& t : cat.presetTags) tagsArr.append(QString::fromStdWString(t));
+    q.addBindValue(QJsonDocument(tagsArr).toJson(QJsonDocument::Compact));
 
-        QJsonArray tagsArr;
-        for (const auto& t : cat.presetTags) tagsArr.append(QString::fromStdWString(t));
-        query.bind(4, QJsonDocument(tagsArr).toJson(QJsonDocument::Compact).toStdString());
+    q.addBindValue(cat.sortOrder);
+    q.addBindValue(cat.pinned ? 1 : 0);
+    q.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
 
-        query.bind(5, cat.sortOrder);
-        query.bind(6, cat.pinned ? 1 : 0);
-        query.bind(7, (double)QDateTime::currentMSecsSinceEpoch());
-
-        if (query.exec() > 0) {
-            cat.id = (int)sqlite->getLastInsertRowid();
-            return true;
-        }
-    } catch (...) {}
+    if (q.exec()) {
+        cat.id = q.lastInsertId().toInt();
+        return true;
+    }
     return false;
 }
 
 bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPath) {
-    try {
-        auto sqlite = Database::instance().sqlite();
-        SQLite::Statement query(*sqlite, "INSERT OR IGNORE INTO category_items (category_id, item_path, added_at) VALUES (?, ?, ?)");
-        query.bind(1, categoryId);
-        query.bind(2, QString::fromStdWString(itemPath).toStdString());
-        query.bind(3, (double)QDateTime::currentMSecsSinceEpoch());
-        return query.exec() > 0;
-    } catch (...) {
-        return false;
-    }
+    QSqlQuery q;
+    q.prepare("INSERT OR IGNORE INTO category_items (category_id, item_path, added_at) VALUES (?, ?, ?)");
+    q.addBindValue(categoryId);
+    q.addBindValue(QString::fromStdWString(itemPath));
+    q.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
+    return q.exec();
 }
 
 std::vector<Category> CategoryRepo::getAll() {
     std::vector<Category> results;
-    try {
-        auto sqlite = Database::instance().sqlite();
-        SQLite::Statement query(*sqlite, "SELECT id, parent_id, name, color, preset_tags, sort_order, pinned FROM categories ORDER BY sort_order ASC");
+    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned FROM categories ORDER BY sort_order ASC");
+    while (q.next()) {
+        Category cat;
+        cat.id = q.value(0).toInt();
+        cat.parentId = q.value(1).toInt();
+        cat.name = q.value(2).toString().toStdWString();
+        cat.color = q.value(3).toString().toStdWString();
 
-        while (query.executeStep()) {
-            Category cat;
-            cat.id = query.getColumn(0).getInt();
-            cat.parentId = query.getColumn(1).getInt();
-            cat.name = QString::fromStdString(query.getColumn(2).getText()).toStdWString();
-            cat.color = QString::fromStdString(query.getColumn(3).getText()).toStdWString();
-
-            QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(query.getColumn(4).getText()));
-            if (doc.isArray()) {
-                for (const auto& v : doc.array()) cat.presetTags.push_back(v.toString().toStdWString());
-            }
-
-            cat.sortOrder = query.getColumn(5).getInt();
-            cat.pinned = query.getColumn(6).getInt() != 0;
-            results.push_back(cat);
+        QJsonDocument doc = QJsonDocument::fromJson(q.value(4).toByteArray());
+        if (doc.isArray()) {
+            for (const auto& v : doc.array()) cat.presetTags.push_back(v.toString().toStdWString());
         }
-    } catch (...) {}
+
+        cat.sortOrder = q.value(5).toInt();
+        cat.pinned = q.value(6).toBool();
+        results.push_back(cat);
+    }
     return results;
 }
 
 bool CategoryRepo::remove(int id) {
-    try {
-        auto sqlite = Database::instance().sqlite();
-        sqlite->exec("DELETE FROM category_items WHERE category_id = " + std::to_string(id));
-        SQLite::Statement query(*sqlite, "DELETE FROM categories WHERE id = ?");
-        query.bind(1, id);
-        return query.exec() > 0;
-    } catch (...) {
-        return false;
-    }
+    QSqlQuery q1;
+    q1.prepare("DELETE FROM category_items WHERE category_id = ?");
+    q1.addBindValue(id);
+    q1.exec();
+
+    QSqlQuery q2;
+    q2.prepare("DELETE FROM categories WHERE id = ?");
+    q2.addBindValue(id);
+    return q2.exec();
 }
 
 } // namespace ArcMeta

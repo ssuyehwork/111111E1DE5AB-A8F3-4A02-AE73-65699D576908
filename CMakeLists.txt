@@ -10,7 +10,7 @@ if(MSVC)
 endif()
 
 # Qt 6 基础组件
-find_package(Qt6 REQUIRED COMPONENTS Widgets Svg)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql)
 
 # 自动生成 MOC/UIC/RCC
 set(CMAKE_AUTOMOC ON)
@@ -26,10 +26,11 @@ file(GLOB_RECURSE SOURCES
 # 可执行文件
 add_executable(ArcMeta ${SOURCES})
 
-# 链接库 (文档红线列表: ntdll, ole32, bcrypt)
+# 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
     Qt6::Widgets
     Qt6::Svg
+    Qt6::Sql
     ntdll
     ole32
     bcrypt

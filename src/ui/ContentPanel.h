@@ -59,6 +59,11 @@ signals:
      */
     void loadDirectory(const QString& path);
 
+    /**
+     * @brief 应用当前筛选器
+     */
+    void applyFilters();
+
 private:
     void initUi();
     void initGridView();

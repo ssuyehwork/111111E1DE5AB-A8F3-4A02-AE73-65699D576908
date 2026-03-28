@@ -110,6 +110,12 @@ public:
     void updateInfo(const QString& name, const QString& type, const QString& size,
                     const QString& ctime, const QString& mtime, const QString& atime,
                     const QString& path, bool encrypted);
+
+    /**
+     * @brief 设置星级显示
+     */
+    void setRating(int rating);
+
     void setTags(const QStringList& tags);
 
 private:
