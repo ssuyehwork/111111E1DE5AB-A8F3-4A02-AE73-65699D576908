@@ -6,6 +6,8 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QPixmap>
+#include <QMap>
+#include <QSettings>
 #include "../../SvgIcons.h"
 
 namespace ArcMeta {
@@ -48,6 +50,41 @@ public:
         renderer.render(&painter);
         
         return pixmap;
+    }
+
+    /**
+     * @brief 获取扩展名对应的颜色 (哈希生成 + 持久化缓存)
+     */
+    static QColor getExtensionColor(const QString& ext) {
+        static QMap<QString, QColor> s_cache;
+        QString upperExt = ext.toUpper();
+
+        // 1. 文件夹特殊处理
+        if (upperExt == "DIR") return QColor(45, 65, 85, 200);
+        if (upperExt.isEmpty()) return QColor(60, 60, 60, 180);
+
+        // 2. 检查运行时缓存
+        if (s_cache.contains(upperExt)) return s_cache[upperExt];
+
+        // 3. 检查持久化存储 (QSettings)
+        QSettings settings("ArcMeta团队", "ArcMeta");
+        QString settingKey = QString("ExtensionColors/%1").arg(upperExt);
+        if (settings.contains(settingKey)) {
+            QColor color = settings.value(settingKey).value<QColor>();
+            s_cache[upperExt] = color;
+            return color;
+        }
+
+        // 4. 哈希法生成新颜色 (HSL 保证色彩分布)
+        uint hash = qHash(upperExt);
+        int hue = hash % 360; // 0-359 色相
+        // 固定 S=160, L=110 保证在深色背景下的可读性且色彩饱满
+        QColor color = QColor::fromHsl(hue, 160, 110, 200);
+
+        // 写入缓存并持久化
+        s_cache[upperExt] = color;
+        settings.setValue(settingKey, color);
+        return color;
     }
 };
 

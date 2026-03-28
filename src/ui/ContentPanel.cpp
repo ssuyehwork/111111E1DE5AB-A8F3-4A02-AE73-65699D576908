@@ -554,21 +554,9 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
 
     QString path = index.data(PathRole).toString();
     QFileInfo info(path);
-    QString ext = info.suffix().toUpper();
-    QColor badgeColor(60, 60, 60, 180);
-    
-    if (info.isDir()) {
-        ext = "DIR";
-        badgeColor = QColor(45, 65, 85, 200);
-    } else if (ext == "AHK") {
-        badgeColor = QColor(100, 80, 40, 200);
-    } else if (ext == "JSON") {
-        badgeColor = QColor(120, 90, 30, 200);
-    } else if (ext == "CPP" || ext == "H") {
-        badgeColor = QColor(60, 100, 160, 200);
-    } else if (ext.isEmpty()) {
-        ext = "FILE";
-    }
+    QString ext = info.isDir() ? "DIR" : info.suffix().toUpper();
+    if (ext.isEmpty()) ext = "FILE";
+    QColor badgeColor = UiHelper::getExtensionColor(ext);
 
     QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
     painter->setPen(Qt::NoPen);
@@ -591,7 +579,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int gap2 = 4;
     
     int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 5;
+    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
 
     QRect iconRect(cardRect.left() + (cardRect.width() - iconDrawSize) / 2, startY, iconDrawSize, iconDrawSize);
     QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
@@ -674,7 +662,7 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             int gap1 = 6;
             int gap2 = 4;
             int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-            int startY = option.rect.top() + (option.rect.height() - totalH) / 2 + 5;
+            int startY = option.rect.top() + (option.rect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
             int ratingY = startY + iconDrawSize + gap1;
             int starSize = 12; // 用户缩小要求
             int starSpacing = 2;
@@ -784,7 +772,7 @@ void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionV
     int gap2 = 4;
     
     int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 5;
+    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
     int ratingY = startY + iconDrawSize + gap1;
     int nameY = ratingY + ratingH + gap2;
     
