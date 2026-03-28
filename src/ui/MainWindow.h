@@ -22,7 +22,6 @@
 #include <QWheelEvent>
 #include <QList>
 #include <QVariantMap>
-#include "../models/CategoryModel.h"
 #include "Editor.h"
 #include "HeaderBar.h"
 #include "MetadataPanel.h"
@@ -152,7 +151,6 @@ private:
     QCheckBox* m_checkTile;
     QLabel* m_itemCountLabel;
     Editor* m_editor;
-    CategoryLockWidget* m_lockWidget;
     QPushButton* m_editBtn;
 
     QString m_currentKeyword;

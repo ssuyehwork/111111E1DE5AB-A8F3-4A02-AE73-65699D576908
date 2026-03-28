@@ -28,7 +28,6 @@
 #include <QMimeData>
 #include "FileItemDelegate.h"
 #include "../meta/AmMetaJson.h"
-#include "../core/ShortcutManager.h"
 #include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QSlider>
@@ -45,7 +44,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent, Qt::FramelessWindo
     connect(m_searchTimer, &QTimer::timeout, this, &MainWindow::refreshData);
     restoreLayout(); 
     setupShortcuts();
-    connect(&ShortcutManager::instance(), &ShortcutManager::shortcutsChanged, this, &MainWindow::updateShortcuts);
     installEventFilter(this);
 }
 
@@ -187,8 +185,8 @@ void MainWindow::onItemExpanded(QTreeWidgetItem* item) {
 
 void MainWindow::refreshData() { if (auto* it = m_navTree->currentItem()) loadDirectory(it->data(0, Qt::UserRole).toString()); }
 void MainWindow::setupShortcuts() {
-    auto add = [&](const QString& id, std::function<void()> f) { new QShortcut(ShortcutManager::instance().getShortcut(id), this, f); };
-    add("mw_refresh", [this](){ refreshData(); }); add("mw_pin", [this](){ doTogglePin(); }); add("mw_close", [this](){ close(); });
+    new QShortcut(QKeySequence(Qt::Key_F5), this, [this](){ refreshData(); });
+    new QShortcut(QKeySequence(Qt::Key_Escape), this, [this](){ close(); });
 }
 
 void MainWindow::doTogglePin() {

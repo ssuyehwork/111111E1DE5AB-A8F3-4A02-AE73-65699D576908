@@ -5,10 +5,6 @@ project(ArcMeta VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# if(NOT MSVC)
-#     message(FATAL_ERROR "🔴 [编译器拦截] 此项目必须且只能使用 Visual Studio 2022 (MSVC) 进行编译。")
-# endif()
-
 add_compile_options(/utf-8)
 add_compile_options(/MP)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
@@ -33,48 +29,33 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 
 include_directories(src)
 
-# 严格对应磁盘现状的源文件列表
+# 基于当前磁盘实际物理文件重建源代码列表
 set(SOURCES
-    src/manager_main.cpp
+    src/main.cpp
     src/core/DatabaseManager.cpp
-    src/core/ActionRecorder.cpp
+    src/core/DatabaseManager.h
     src/core/FileStorageHelper.cpp
-    src/core/ShortcutManager.cpp
-    src/core/FileCryptoHelper.cpp
-    src/core/ClipboardMonitor.cpp
-    src/core/HotkeyManager.cpp
-    src/core/KeyboardHook.cpp
-    src/core/HardwareInfoHelper.cpp
-    src/core/AES.cpp
-    src/core/SuffixColorManager.h
-    src/models/CategoryModel.cpp
+    src/core/HttpServer.cpp
+    src/core/MessageCaptureHandler.cpp
     src/meta/AmMetaJson.h
     src/ui/MainWindow.cpp
+    src/ui/MainWindow.h
     src/ui/HeaderBar.cpp
     src/ui/Editor.cpp
+    src/ui/Editor.h
     src/ui/MetadataPanel.cpp
+    src/ui/MetadataPanel.h
     src/ui/FilterPanel.cpp
-    src/ui/CategoryLockWidget.cpp
-    src/ui/CleanListView.cpp
-    src/ui/DropTreeView.cpp
-    src/ui/FramelessDialog.cpp
-    src/ui/CategoryPasswordDialog.cpp
-    src/ui/PasswordVerifyDialog.cpp
-    src/ui/SearchLineEdit.cpp
-    src/ui/FlowLayout.cpp
-    src/ui/ClickableLineEdit.h
-    src/ui/FileItemDelegate.h
+    src/ui/FilterPanel.h
     src/ui/FileItemDelegate.cpp
+    src/ui/StringUtils.h
+    src/ui/IconHelper.h
     src/ui/TagCapsule.h
-    src/ui/TitleEditorDialog.h
-    src/ui/ToolTipOverlay.h
-    resources/resources.qrc
+    src/ui/FlowLayout.h
+    src/ui/ClickableLineEdit.h
     resources/app.manifest
+    SvgIcons.h
 )
-
-if(WIN32)
-    list(APPEND SOURCES resources/app_icon.rc)
-endif()
 
 add_executable(ArcMeta ${SOURCES})
 
