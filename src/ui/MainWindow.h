@@ -132,6 +132,7 @@ private:
     QTreeWidget* m_placesTree;
     QWidget* m_categoryContainer;
     QWidget* m_navContainer;
+    QWidget* m_favoritesContainer;
     QWidget* m_contentContainer;
     QWidget* m_listFocusLine;
     QWidget* m_sidebarFocusLine;

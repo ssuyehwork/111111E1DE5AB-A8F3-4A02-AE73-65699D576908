@@ -27,12 +27,9 @@ public:
     void closeAndPack();
     
     // 核心项目（Item）操作
-    int addItem(const QString& title, const QString& content, const QStringList& tags = QStringList(), 
-                const QString& color = "", int categoryId = -1, 
-                const QString& itemType = "file");
-    bool updateItem(int id, const QString& title, const QString& content, const QStringList& tags);
-    bool deleteItemsBatch(const QList<int>& ids);
-    bool updateItemState(int id, const QString& column, const QVariant& value);
+    bool updateItemMeta(quint64 frn, const QVariantMap& meta);
+    bool deleteItem(quint64 frn);
+    bool updateFolderMeta(const QString& path, const QVariantMap& meta);
     
     // 分类管理 (保留分类逻辑，但泛化为文件夹包)
     int addCategory(const QString& name, int parentId = -1);

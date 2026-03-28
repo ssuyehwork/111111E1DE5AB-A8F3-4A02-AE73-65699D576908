@@ -35,7 +35,7 @@
 #include <QCheckBox>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent, Qt::FramelessWindowHint) {
-    setWindowTitle("KingPenguin - 超级资源管理器");
+    setWindowTitle("ArcMeta");
     setAcceptDrops(true);
     resize(1200, 800);
     setMouseTracking(true);
@@ -58,7 +58,7 @@ void MainWindow::initUI() {
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
     m_header = new HeaderBar(this);
-    if (auto* title = m_header->findChild<QLabel*>()) title->setText("超级资源管理器");
+    if (auto* title = m_header->findChild<QLabel*>()) title->setText("ArcMeta");
     connect(m_header, &HeaderBar::searchChanged, this, [this](const QString& text){ m_currentKeyword = text; m_currentPage = 1; m_searchTimer->start(300); });
     connect(m_header, &HeaderBar::refreshRequested, this, &MainWindow::refreshData);
     connect(m_header, &HeaderBar::stayOnTopRequested, this, [this](bool checked){
@@ -103,6 +103,16 @@ void MainWindow::initUI() {
     });
     l2Layout->addWidget(m_navTree);
     splitter->addWidget(m_navContainer);
+
+    m_favoritesContainer = new QFrame();
+    m_favoritesContainer->setMinimumWidth(200);
+    auto* l3Layout = new QVBoxLayout(m_favoritesContainer);
+    QLabel* favLabel = new QLabel("收藏面板 (待实现)");
+    favLabel->setAlignment(Qt::AlignCenter);
+    favLabel->setStyleSheet("color: #666;");
+    l3Layout->addWidget(favLabel);
+    splitter->addWidget(m_favoritesContainer);
+
     m_contentContainer = new QFrame();
     auto* midLayout = new QVBoxLayout(m_contentContainer);
     m_contentStack = new QStackedWidget();
@@ -139,6 +149,14 @@ void MainWindow::initUI() {
     contentLayout->addWidget(splitter);
     mainLayout->addWidget(contentWidget);
     m_placesTree->installEventFilter(this); m_navTree->installEventFilter(this); m_fileView->installEventFilter(this);
+
+    // 设置初始比例
+    splitter->setStretchFactor(0, 0); // 分类
+    splitter->setStretchFactor(1, 0); // 导航
+    splitter->setStretchFactor(2, 0); // 收藏
+    splitter->setStretchFactor(3, 1); // 内容
+    splitter->setStretchFactor(4, 0); // 元数据
+    splitter->setStretchFactor(5, 0); // 筛选
     loadDrives();
 }
 

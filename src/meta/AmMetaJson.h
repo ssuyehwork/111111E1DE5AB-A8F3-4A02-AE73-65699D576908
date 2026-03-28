@@ -14,8 +14,18 @@
 #include <QList>
 #include <QDebug>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 class AmMetaJson {
 public:
+    static void setHidden(const QString& path) {
+#ifdef Q_OS_WIN
+        SetFileAttributesW((LPCWSTR)path.utf16(), FILE_ATTRIBUTE_HIDDEN);
+#endif
+    }
+
     static QVariantMap read(const QString& folderPath) {
         QString jsonPath = QDir(folderPath).filePath(".am_meta.json");
         QFile file(jsonPath);
@@ -51,10 +61,23 @@ public:
         }
 
         // 3. 原子替换 (Windows 兼容)
+        bool success = false;
+#ifdef Q_OS_WIN
         if (QFile::exists(jsonPath)) {
-            if (!QFile::remove(jsonPath)) return false;
+            success = ReplaceFileW((LPCWSTR)jsonPath.utf16(), (LPCWSTR)tmpPath.utf16(), NULL, REPLACEFILE_IGNORE_MERGE_ERRORS, NULL, NULL);
+        } else {
+            success = QFile::rename(tmpPath, jsonPath);
         }
-        return QFile::rename(tmpPath, jsonPath);
+#else
+        if (QFile::exists(jsonPath)) {
+            QFile::remove(jsonPath);
+        }
+        success = QFile::rename(tmpPath, jsonPath);
+#endif
+        if (success) {
+            setHidden(jsonPath);
+        }
+        return success;
     }
 
     static QVariantMap getItemMeta(const QString& fullPath) {

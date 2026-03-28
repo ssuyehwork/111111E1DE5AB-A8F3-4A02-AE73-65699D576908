@@ -29,7 +29,7 @@ HeaderBar::HeaderBar(QWidget* parent) : QWidget(parent) {
     layout->addWidget(appLogo);
     layout->addSpacing(6);
 
-    QLabel* titleLabel = new QLabel("超级资源管理器");
+    QLabel* titleLabel = new QLabel("ArcMeta");
     titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2;");
     layout->addWidget(titleLabel);
     layout->addSpacing(15);
@@ -110,11 +110,11 @@ HeaderBar::HeaderBar(QWidget* parent) : QWidget(parent) {
         layout->addWidget(btn);
     };
 
-    addWinBtn("minimize", "rgba(255,255,255,0.1)", &HeaderBar::windowMinimize);
+    addWinBtn("close", "#e81123", &HeaderBar::windowClose);
     layout->addSpacing(4);
     addWinBtn("maximize", "rgba(255,255,255,0.1)", &HeaderBar::windowMaximize);
     layout->addSpacing(4);
-    addWinBtn("close", "#e81123", &HeaderBar::windowClose);
+    addWinBtn("minimize", "rgba(255,255,255,0.1)", &HeaderBar::windowMinimize);
 
     mainLayout->addWidget(topContent);
 }

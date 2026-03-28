@@ -1,6 +1,8 @@
 #include <QSettings>
 #include <QApplication>
 #include <QFile>
+#include <QDir>
+#include <QStandardPaths>
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QLocalServer>
@@ -13,6 +15,19 @@
 #include "core/DatabaseManager.h"
 #include "ui/ToolTipOverlay.h"
 #include "ui/StringUtils.h"
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
+void cleanTempDir() {
+    QString tempPath = QDir::tempPath() + "/amtemp/";
+    QDir dir(tempPath);
+    if (dir.exists()) {
+        dir.removeRecursively();
+    }
+    dir.mkpath(".");
+}
 
 #ifdef RAPID_NOTES_TARGET
 #include "core/HotkeyManager.h"
@@ -30,13 +45,16 @@
 
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
-    a.setOrganizationName("RapidDev");
+    a.setOrganizationName("ArcMetaProject");
     a.setWindowIcon(QIcon(":/app_icon.png"));
 
+    // 清理临时目录
+    cleanTempDir();
+
 #ifdef RAPID_MANAGER_TARGET
-    a.setApplicationName("KingPenguin");
-    QString serverName = "KingPenguin_SingleInstance_Server";
-    QString dbFileName = "manager_kernel.db";
+    a.setApplicationName("ArcMeta");
+    QString serverName = "ArcMeta_SingleInstance_Server";
+    QString dbFileName = "arcmeta.db";
     a.setQuitOnLastWindowClosed(true);
 #else
     a.setApplicationName("RapidNotes");
@@ -63,10 +81,9 @@ int main(int argc, char *argv[]) {
     }
 
 #ifdef RAPID_MANAGER_TARGET
-    FireworksOverlay::instance();
     MainWindow mainWin;
-    mainWin.setObjectName("RapidMainWindow");
-    mainWin.setWindowTitle("KingPenguin - KingPenguin");
+    mainWin.setObjectName("ArcMetaMainWindow");
+    mainWin.setWindowTitle("ArcMeta");
     mainWin.show();
 #else
     HttpServer::instance().start(23333);
@@ -82,6 +99,10 @@ int main(int argc, char *argv[]) {
 #endif
 
     int result = a.exec();
+
+    // 退出前再次清理临时目录
+    cleanTempDir();
+
     DatabaseManager::instance().closeAndPack();
     return result;
 }
