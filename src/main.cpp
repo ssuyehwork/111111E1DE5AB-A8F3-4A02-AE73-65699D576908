@@ -30,17 +30,12 @@ void cleanTempDir() {
 }
 
 #ifdef RAPID_NOTES_TARGET
-#include "core/HotkeyManager.h"
 #include "core/ClipboardMonitor.h"
-#include "core/KeyboardHook.h"
-#include "core/ReminderService.h"
 #include "core/HttpServer.h"
-#include "ui/FireworksOverlay.h"
 #endif
 
 #ifdef RAPID_MANAGER_TARGET
 #include "ui/MainWindow.h"
-#include "ui/FireworksOverlay.h"
 #endif
 
 int main(int argc, char *argv[]) {
@@ -87,14 +82,10 @@ int main(int argc, char *argv[]) {
     mainWin.show();
 #else
     HttpServer::instance().start(23333);
-    FireworksOverlay::instance(); 
-    KeyboardHook::instance().start();
-    HotkeyManager::instance().reapplyHotkeys();
-    ReminderService::instance().start();
 
     QObject::connect(&ClipboardMonitor::instance(), &ClipboardMonitor::newContentDetected, 
         [](const QString& content, const QString& type, const QByteArray& data, const QString& sourceApp, const QString& sourceTitle){
-        DatabaseManager::instance().addItemAsync("New Note", content, {}, "", -1, type, data, sourceApp, sourceTitle);
+        Q_UNUSED(content); Q_UNUSED(type); Q_UNUSED(data); Q_UNUSED(sourceApp); Q_UNUSED(sourceTitle);
     });
 #endif
 

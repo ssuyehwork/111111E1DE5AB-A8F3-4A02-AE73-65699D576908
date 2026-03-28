@@ -34,9 +34,10 @@ set(SOURCES
     src/main.cpp
     src/core/DatabaseManager.cpp
     src/core/DatabaseManager.h
-    src/core/FileStorageHelper.cpp
-    src/core/HttpServer.cpp
-    src/core/MessageCaptureHandler.cpp
+    src/core/FileStorageHelper.h
+    src/core/HttpServer.h
+    src/core/MessageCaptureHandler.h
+    src/core/ClipboardMonitor.h
     src/meta/AmMetaJson.h
     src/ui/MainWindow.cpp
     src/ui/MainWindow.h
@@ -49,6 +50,8 @@ set(SOURCES
     src/ui/FilterPanel.h
     src/ui/FileItemDelegate.cpp
     src/ui/StringUtils.h
+    src/ui/ToolTipOverlay.h
+    src/ui/HeaderBar.h
     src/ui/IconHelper.h
     src/ui/TagCapsule.h
     src/ui/FlowLayout.h
