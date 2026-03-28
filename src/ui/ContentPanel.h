@@ -5,6 +5,7 @@
 #include <QTreeView>
 #include <QStackedWidget>
 #include <QStandardItemModel>
+#include <QSortFilterProxyModel>
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
 #include <QMap>
@@ -53,6 +54,7 @@ public:
 
     // --- 业务接口 ---
     QAbstractItemModel* model() const { return m_model; }
+    QSortFilterProxyModel* getProxyModel() const { return m_proxyModel; }
     QModelIndexList getSelectedIndexes() const {
         return (m_viewStack->currentWidget() == m_gridView) ? 
                 m_gridView->selectionModel()->selectedIndexes() : 
@@ -97,6 +99,7 @@ private:
     QListView* m_gridView = nullptr;
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
+    QSortFilterProxyModel* m_proxyModel = nullptr;
 
     FilterState m_currentFilter;
 

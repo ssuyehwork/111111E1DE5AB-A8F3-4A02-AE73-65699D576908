@@ -152,6 +152,9 @@ void FilterPanel::rebuildGroups() {
         for (int r : {0, 1, 2, 3, 4, 5}) {
             if (!m_ratingCounts.contains(r)) continue;
             QCheckBox* cb = addFilterRow(gl, ratingDisplayName(r), m_ratingCounts[r]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.ratings.contains(r));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, r](bool on) {
                 if (on) { if (!m_filter.ratings.contains(r)) m_filter.ratings.append(r); }
                 else m_filter.ratings.removeAll(r);
@@ -168,6 +171,9 @@ void FilterPanel::rebuildGroups() {
         for (const QString& key : QStringList{"", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "gray"}) {
             if (!m_colorCounts.contains(key)) continue;
             QCheckBox* cb = addFilterRow(gl, colorDisplayName(key), m_colorCounts[key], colorMap.value(key));
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.colors.contains(key));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, key](bool on) {
                 if (on) { if (!m_filter.colors.contains(key)) m_filter.colors.append(key); }
                 else m_filter.colors.removeAll(key);
@@ -183,8 +189,11 @@ void FilterPanel::rebuildGroups() {
         QWidget* g = buildGroup("标签 / 关键字", gl);
         if (m_tagCounts.contains("__none__")) {
             QCheckBox* cb = addFilterRow(gl, "无标签", m_tagCounts["__none__"]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.tags.contains("__none__"));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this](bool on) {
-                if (on) m_filter.tags.append("__none__");
+                if (on) { if (!m_filter.tags.contains("__none__")) m_filter.tags.append("__none__"); }
                 else    m_filter.tags.removeAll("__none__");
                 emit filterChanged(m_filter);
             });
@@ -194,6 +203,9 @@ void FilterPanel::rebuildGroups() {
         for (const QString& tag : sorted) {
             if (tag == "__none__") continue;
             QCheckBox* cb = addFilterRow(gl, tag, m_tagCounts[tag]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.tags.contains(tag));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, tag](bool on) {
                 if (on) { if (!m_filter.tags.contains(tag)) m_filter.tags.append(tag); }
                 else m_filter.tags.removeAll(tag);
@@ -209,8 +221,11 @@ void FilterPanel::rebuildGroups() {
         QWidget* g = buildGroup("文件类型", gl);
         if (m_typeCounts.contains("folder")) {
             QCheckBox* cb = addFilterRow(gl, "文件夹", m_typeCounts["folder"]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.types.contains("folder"));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this](bool on) {
-                if (on) m_filter.types.append("folder");
+                if (on) { if (!m_filter.types.contains("folder")) m_filter.types.append("folder"); }
                 else    m_filter.types.removeAll("folder");
                 emit filterChanged(m_filter);
             });
@@ -220,6 +235,9 @@ void FilterPanel::rebuildGroups() {
             if (ext == "folder") continue;
             QString label = ext.isEmpty() ? "无扩展名" : ext;
             QCheckBox* cb = addFilterRow(gl, label, m_typeCounts[ext]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.types.contains(ext));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, ext](bool on) {
                 if (on) { if (!m_filter.types.contains(ext)) m_filter.types.append(ext); }
                 else m_filter.types.removeAll(ext);
@@ -238,6 +256,9 @@ void FilterPanel::rebuildGroups() {
             if (!m_createDateCounts.contains(key)) continue;
             QString label = (key == "today") ? "今天" : "昨天";
             QCheckBox* cb = addFilterRow(gl, label, m_createDateCounts[key]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.createDates.contains(key));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, key](bool on) {
                 if (on) { if (!m_filter.createDates.contains(key)) m_filter.createDates.append(key); }
                 else m_filter.createDates.removeAll(key);
@@ -248,6 +269,9 @@ void FilterPanel::rebuildGroups() {
         for (const QString& d : dates) {
             if (d == "today" || d == "yesterday") continue;
             QCheckBox* cb = addFilterRow(gl, d, m_createDateCounts[d]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.createDates.contains(d));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, d](bool on) {
                 if (on) { if (!m_filter.createDates.contains(d)) m_filter.createDates.append(d); }
                 else m_filter.createDates.removeAll(d);
@@ -265,6 +289,9 @@ void FilterPanel::rebuildGroups() {
             if (!m_modifyDateCounts.contains(key)) continue;
             QString label = (key == "today") ? "今天" : "昨天";
             QCheckBox* cb = addFilterRow(gl, label, m_modifyDateCounts[key]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.modifyDates.contains(key));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, key](bool on) {
                 if (on) { if (!m_filter.modifyDates.contains(key)) m_filter.modifyDates.append(key); }
                 else m_filter.modifyDates.removeAll(key);
@@ -275,6 +302,9 @@ void FilterPanel::rebuildGroups() {
         for (const QString& d : dates) {
             if (d == "today" || d == "yesterday") continue;
             QCheckBox* cb = addFilterRow(gl, d, m_modifyDateCounts[d]);
+            cb->blockSignals(true);
+            cb->setChecked(m_filter.modifyDates.contains(d));
+            cb->blockSignals(false);
             connect(cb, &QCheckBox::toggled, this, [this, d](bool on) {
                 if (on) { if (!m_filter.modifyDates.contains(d)) m_filter.modifyDates.append(d); }
                 else m_filter.modifyDates.removeAll(d);

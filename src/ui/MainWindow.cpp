@@ -245,11 +245,13 @@ void MainWindow::initUi() {
             meta.load();
 
             if (rating != -1) {
-                m_contentPanel->model()->setData(idx, rating, RatingRole);
+                // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
+                // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
+                m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
                 meta.items()[info.fileName().toStdWString()].rating = rating;
             }
             if (color != L"__NO_CHANGE__") {
-                m_contentPanel->model()->setData(idx, QString::fromStdWString(color), ColorRole);
+                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
                 meta.items()[info.fileName().toStdWString()].color = color;
             }
             meta.save();

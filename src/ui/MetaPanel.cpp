@@ -153,8 +153,8 @@ void StarRatingWidget::mousePressEvent(QMouseEvent* e) {
 ColorPickerWidget::ColorPickerWidget(QWidget* parent) : QWidget(parent) {
     m_colors = {{L"", QColor("#888780")}, {L"red", QColor("#E24B4A")}, {L"orange", QColor("#EF9F27")}, {L"yellow", QColor("#FAC775")}, {L"green", QColor("#639922")}, {L"cyan", QColor("#1D9E75")}, {L"blue", QColor("#378ADD")}, {L"purple", QColor("#7F77DD")}, {L"gray", QColor("#5F5E5A")}};
     int count = (int)m_colors.size();
-    // 增加固定高度和宽度以容纳描边，并留有一定余量
-    setFixedSize(count * 24, 20);
+    // 增加高度至 24px 以容纳选择外圈 (20px + padding)
+    setFixedSize(count * 24, 24);
     setCursor(Qt::PointingHandCursor);
 }
 
@@ -167,15 +167,15 @@ void ColorPickerWidget::paintEvent(QPaintEvent*) {
     QPainter p(this); 
     p.setRenderHint(QPainter::Antialiasing);
     for (int i = 0; i < (int)m_colors.size(); ++i) {
-        // 居中绘制 18x18 的圆点
-        QRect r(i * 24 + 3, 1, 18, 18);
+        // 圆点 18x18，外圈预留空间
+        QRect r(i * 24 + 3, 3, 18, 18);
         if (m_colors[i].name == m_currentColor) { 
-            p.setPen(QPen(QColor("#EEEEEE"), 2)); 
-            // 绘制选中的外圈，稍微扩大一点
-            p.drawEllipse(r.adjusted(-1, -1, 1, 1)); 
-        } else { 
-            p.setPen(Qt::NoPen); 
+            p.setPen(QPen(QColor("#FFFFFF"), 1.5));
+            // 绘制外层的高亮圈
+            p.drawEllipse(r.adjusted(-2, -2, 2, 2));
         }
+
+        p.setPen(Qt::NoPen);
         p.setBrush(m_colors[i].value); 
         p.drawEllipse(r);
     }

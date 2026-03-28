@@ -41,7 +41,112 @@
 
 namespace ArcMeta {
 
-// 枚举定义已移动到 ContentPanel.h
+/**
+ * @brief 内部代理类：专门处理高级筛选逻辑
+ */
+class FilterProxyModel : public QSortFilterProxyModel {
+public:
+    explicit FilterProxyModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent) {}
+
+    FilterState currentFilter;
+
+protected:
+    bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override {
+        QModelIndex idx = sourceModel()->index(sourceRow, 0, sourceParent);
+
+        // 1. 评级过滤
+        if (!currentFilter.ratings.isEmpty()) {
+            int r = idx.data(RatingRole).toInt();
+            if (!currentFilter.ratings.contains(r)) return false;
+        }
+
+        // 2. 颜色过滤
+        if (!currentFilter.colors.isEmpty()) {
+            QString c = idx.data(ColorRole).toString();
+            if (!currentFilter.colors.contains(c)) return false;
+        }
+
+        // 3. 标签过滤
+        if (!currentFilter.tags.isEmpty()) {
+            QStringList itemTags = idx.data(TagsRole).toStringList();
+            bool matchTag = false;
+            for (const QString& fTag : currentFilter.tags) {
+                if (fTag == "__none__") {
+                    if (itemTags.isEmpty()) { matchTag = true; break; }
+                } else {
+                    if (itemTags.contains(fTag)) { matchTag = true; break; }
+                }
+            }
+            if (!matchTag) return false;
+        }
+
+        // 4. 类型过滤
+        if (!currentFilter.types.isEmpty()) {
+            QString type = idx.data(Qt::UserRole).toString(); // "folder" or "file"
+            QString ext = QFileInfo(idx.data(PathRole).toString()).suffix().toUpper();
+            bool matchType = false;
+            for (const QString& fType : currentFilter.types) {
+                if (fType == "folder") {
+                    if (type == "folder") { matchType = true; break; }
+                } else {
+                    if (ext == fType.toUpper()) { matchType = true; break; }
+                }
+            }
+            if (!matchType) return false;
+        }
+
+        // 5. 创建日期过滤
+        if (!currentFilter.createDates.isEmpty()) {
+            QDate d = QFileInfo(idx.data(PathRole).toString()).birthTime().date();
+            QDate today = QDate::currentDate();
+            QString dStr = d.toString("yyyy-MM-dd");
+            bool matchDate = false;
+            for (const QString& fDate : currentFilter.createDates) {
+                if (fDate == "today" && d == today) { matchDate = true; break; }
+                if (fDate == "yesterday" && d == today.addDays(-1)) { matchDate = true; break; }
+                if (fDate == dStr) { matchDate = true; break; }
+            }
+            if (!matchDate) return false;
+        }
+
+        // 6. 修改日期过滤
+        if (!currentFilter.modifyDates.isEmpty()) {
+            QDate d = QFileInfo(idx.data(PathRole).toString()).lastModified().date();
+            QDate today = QDate::currentDate();
+            QString dStr = d.toString("yyyy-MM-dd");
+            bool matchDate = false;
+            for (const QString& fDate : currentFilter.modifyDates) {
+                if (fDate == "today" && d == today) { matchDate = true; break; }
+                if (fDate == "yesterday" && d == today.addDays(-1)) { matchDate = true; break; }
+                if (fDate == dStr) { matchDate = true; break; }
+            }
+            if (!matchDate) return false;
+        }
+
+        return true;
+    }
+
+    bool lessThan(const QModelIndex& source_left, const QModelIndex& source_right) const override {
+        // 核心红线：置顶优先规则
+        bool leftPinned = source_left.data(IsLockedRole).toBool();
+        bool rightPinned = source_right.data(IsLockedRole).toBool();
+
+        if (leftPinned != rightPinned) {
+            // 在 lessThan(left, right) 中，返回 true 表示 left < right (升序时 left 排在 right 之前)
+            // 如果我们想要 Pinned 的永远在最前面，无论升序降序，我们需要特殊处理。
+            // 但 Qt 的排序是：lessThan 结果决定相对顺序，升序直接用 lessThan，降序取反。
+            // 因此，为了实现“置顶永远在前”，必须根据 sortOrder 动态返回。
+
+            if (sortOrder() == Qt::AscendingOrder)
+                return leftPinned; // 升序时，Pinned 为 "小"，排在前
+            else
+                return !leftPinned; // 降序时，Pinned 为 "大"，排在前
+        }
+
+        // 如果置顶状态相同，则走默认逻辑
+        return QSortFilterProxyModel::lessThan(source_left, source_right);
+    }
+};
 
 
 ContentPanel::ContentPanel(QWidget* parent)
@@ -54,6 +159,9 @@ ContentPanel::ContentPanel(QWidget* parent)
     m_mainLayout->setSpacing(0);
 
     m_model = new QStandardItemModel(this);
+    m_proxyModel = new FilterProxyModel(this);
+    m_proxyModel->setSourceModel(m_model);
+
     m_zoomLevel = 96;
 
     initUi();
@@ -145,7 +253,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
-                        m_model->setData(idx, rating, RatingRole);
+                        m_proxyModel->setData(idx, rating, RatingRole);
                         QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
                             QFileInfo info(path);
@@ -174,7 +282,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                             meta.items()[info.fileName().toStdWString()].pinned = !current;
                             meta.save();
                             // 同步模型显示 (IsLockedRole)
-                            m_model->setData(idx, !current, IsLockedRole);
+                            m_proxyModel->setData(idx, !current, IsLockedRole);
                         }
                     }
                 }
@@ -201,7 +309,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
-                        m_model->setData(idx, color, ColorRole);
+                        m_proxyModel->setData(idx, color, ColorRole);
                         QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
                             QFileInfo info(path);
@@ -323,7 +431,7 @@ void ContentPanel::initGridView() {
     // 禁用双击编辑，将双击权归还给“打开”操作
     m_gridView->setEditTriggers(QAbstractItemView::EditKeyPressed | QAbstractItemView::SelectedClicked);
 
-    m_gridView->setModel(m_model);
+    m_gridView->setModel(m_proxyModel);
     m_gridView->setItemDelegate(new GridItemDelegate(this));
     m_gridView->viewport()->installEventFilter(this);
 
@@ -349,7 +457,7 @@ void ContentPanel::initListView() {
     m_treeView->setExpandsOnDoubleClick(false);
     m_treeView->setRootIsDecorated(false);
 
-    m_treeView->setModel(m_model);
+    m_treeView->setModel(m_proxyModel);
     m_treeView->viewport()->installEventFilter(this);
 
     m_treeView->setStyleSheet(
@@ -655,6 +763,9 @@ void ContentPanel::search(const QString& query) {
             nameItem->setData(it->second.rating, RatingRole);
             nameItem->setData(QString::fromStdWString(it->second.color), ColorRole);
             nameItem->setData(it->second.pinned, IsLockedRole);
+            QStringList tgs;
+            for (const auto& t : it->second.tags) tgs << QString::fromStdWString(t);
+            nameItem->setData(tgs, TagsRole);
         }
 
         
@@ -673,90 +784,9 @@ void ContentPanel::applyFilters(const FilterState& state) {
 }
 
 void ContentPanel::applyFilters() {
-    for (int i = 0; i < m_model->rowCount(); ++i) {
-        QStandardItem* item = m_model->item(i, 0);
-        if (!item) continue;
-
-        bool visible = true;
-
-        // 1. 评级过滤
-        if (!m_currentFilter.ratings.isEmpty()) {
-            int r = item->data(RatingRole).toInt();
-            if (!m_currentFilter.ratings.contains(r)) visible = false;
-        }
-
-        // 2. 颜色过滤
-        if (visible && !m_currentFilter.colors.isEmpty()) {
-            QString c = item->data(ColorRole).toString();
-            if (!m_currentFilter.colors.contains(c)) visible = false;
-        }
-
-        // 3. 标签过滤 - 优化：从模型 Role 中直接读取，避免大量磁盘 I/O
-        if (visible && !m_currentFilter.tags.isEmpty()) {
-            QStringList itemTags = item->data(TagsRole).toStringList();
-
-            bool matchTag = false;
-            for (const QString& fTag : m_currentFilter.tags) {
-                if (fTag == "__none__") {
-                    if (itemTags.isEmpty()) { matchTag = true; break; }
-                } else {
-                    if (itemTags.contains(fTag)) { matchTag = true; break; }
-                }
-            }
-            if (!matchTag) visible = false;
-        }
-
-        // 4. 类型过滤
-        if (visible && !m_currentFilter.types.isEmpty()) {
-            QString type = item->data(Qt::UserRole).toString(); // "folder" or "file"
-            QString ext = QFileInfo(item->data(PathRole).toString()).suffix().toUpper();
-
-            bool matchType = false;
-            for (const QString& fType : m_currentFilter.types) {
-                if (fType == "folder") {
-                    if (type == "folder") { matchType = true; break; }
-                } else {
-                    if (ext == fType.toUpper()) { matchType = true; break; }
-                }
-            }
-            if (!matchType) visible = false;
-        }
-
-        // 5. 日期过滤 (创建日期)
-        if (visible && !m_currentFilter.createDates.isEmpty()) {
-            QDate d = QFileInfo(item->data(PathRole).toString()).birthTime().date();
-            QDate today = QDate::currentDate();
-            QString dStr = d.toString("yyyy-MM-dd");
-
-            bool matchDate = false;
-            for (const QString& fDate : m_currentFilter.createDates) {
-                if (fDate == "today" && d == today) { matchDate = true; break; }
-                if (fDate == "yesterday" && d == today.addDays(-1)) { matchDate = true; break; }
-                if (fDate == dStr) { matchDate = true; break; }
-            }
-            if (!matchDate) visible = false;
-        }
-
-        // 6. 日期过滤 (修改日期)
-        if (visible && !m_currentFilter.modifyDates.isEmpty()) {
-            QDate d = QFileInfo(item->data(PathRole).toString()).lastModified().date();
-            QDate today = QDate::currentDate();
-            QString dStr = d.toString("yyyy-MM-dd");
-
-            bool matchDate = false;
-            for (const QString& fDate : m_currentFilter.modifyDates) {
-                if (fDate == "today" && d == today) { matchDate = true; break; }
-                if (fDate == "yesterday" && d == today.addDays(-1)) { matchDate = true; break; }
-                if (fDate == dStr) { matchDate = true; break; }
-            }
-            if (!matchDate) visible = false;
-        }
-
-        if (m_viewStack->currentWidget() == m_gridView)
-            m_gridView->setRowHidden(i, !visible);
-        else
-            m_treeView->setRowHidden(i, m_treeView->rootIndex(), !visible);
-    }
+    auto* proxy = static_cast<FilterProxyModel*>(m_proxyModel);
+    proxy->currentFilter = m_currentFilter;
+    proxy->invalidateFilter();
 }
 
 // --- Delegate ---
@@ -896,6 +926,7 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             // 1. 判定“清除”图标
             QRect banRect(infoStartX, ratingY + (ratingH - 14) / 2, 14, 14);
             if (banRect.contains(mEvent->pos())) {
+                // 此处的 model 已经是 View 关联的 ProxyModel
                 model->setData(index, 0, RatingRole);
                 QString path = index.data(PathRole).toString();
                 if (!path.isEmpty()) {
