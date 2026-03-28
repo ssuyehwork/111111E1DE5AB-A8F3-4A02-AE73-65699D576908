@@ -28,7 +28,7 @@ public:
     
     // 核心项目（Item）操作
     bool updateItemMeta(quint64 frn, const QVariantMap& meta);
-    bool deleteItem(quint64 frn);
+    bool deleteItem(quint64 frn, const QString& volume = "C:");
     bool updateFolderMeta(const QString& path, const QVariantMap& meta);
     
     // 分类管理 (保留分类逻辑，但泛化为文件夹包)
@@ -37,10 +37,11 @@ public:
     
     // 搜索与查询
     QList<QVariantMap> searchItems(const QString& keyword, int page = -1);
-    QVariantMap getItemById(int id);
+    QVariantMap getItemById(quint64 frn, const QString& volume = "C:");
 
-    // 统计
+    // 统计与同步
     QVariantMap getCounts();
+    void fullScan();
 
     void beginBatch();
     void endBatch();

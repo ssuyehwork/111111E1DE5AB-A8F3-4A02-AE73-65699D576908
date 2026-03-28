@@ -1,6 +1,7 @@
 #include "DatabaseManager.h"
 #include <QSqlRecord>
 #include <QDebug>
+#include <QStorageInfo>
 
 DatabaseManager& DatabaseManager::instance() { static DatabaseManager inst; return inst; }
 DatabaseManager::DatabaseManager(QObject* parent) : QObject(parent) {}
@@ -25,10 +26,11 @@ bool DatabaseManager::init(const QString& dbPath) {
            "sort_order TEXT DEFAULT 'asc', "
            "last_sync REAL)");
 
-    // 2. 文件与子文件夹元数据表
+    // 2. 文件与子文件夹元数据表 (复合主键解决多卷冲突)
     q.exec("CREATE TABLE IF NOT EXISTS items ("
+           "volume TEXT, "
+           "frn TEXT, "
            "path TEXT, "
-           "frn INTEGER PRIMARY KEY, "
            "type TEXT, "
            "rating INTEGER DEFAULT 0, "
            "color TEXT DEFAULT '', "
@@ -39,7 +41,12 @@ bool DatabaseManager::init(const QString& dbPath) {
            "encrypt_salt TEXT DEFAULT '', "
            "encrypt_verify_hash TEXT DEFAULT '', "
            "original_name TEXT DEFAULT '', "
-           "parent_path TEXT)");
+           "parent_path TEXT, "
+           "ctime REAL, "
+           "mtime REAL, "
+           "atime REAL, "
+           "deleted INTEGER DEFAULT 0, "
+           "PRIMARY KEY (volume, frn))");
 
     // 3. 标签聚合索引表
     q.exec("CREATE TABLE IF NOT EXISTS tags ("
@@ -82,6 +89,7 @@ bool DatabaseManager::init(const QString& dbPath) {
 
     // 索引创建
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_path ON items(path)");
+    q.exec("CREATE INDEX IF NOT EXISTS idx_items_vol_frn ON items(volume, frn)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_path)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_rating ON items(rating)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_color ON items(color)");
@@ -99,9 +107,10 @@ void DatabaseManager::closeAndPack() { if(m_db.isOpen()) m_db.close(); }
 bool DatabaseManager::updateItemMeta(quint64 frn, const QVariantMap& meta) {
     QMutexLocker locker(&m_mutex);
     QSqlQuery q(m_db);
-    q.prepare("INSERT OR REPLACE INTO items (frn, path, type, rating, color, tags, pinned, note, encrypted, encrypt_salt, encrypt_verify_hash, original_name, parent_path) "
-              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    q.addBindValue(frn);
+    q.prepare("INSERT OR REPLACE INTO items (volume, frn, path, type, rating, color, tags, pinned, note, encrypted, encrypt_salt, encrypt_verify_hash, original_name, parent_path, ctime, mtime, atime, deleted) "
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    q.addBindValue(meta.value("volume", "C:").toString());
+    q.addBindValue(QString::number(frn, 16)); // 以 16 进制字符串存储，解决无符号溢出
     q.addBindValue(meta.value("path"));
     q.addBindValue(meta.value("type"));
     q.addBindValue(meta.value("rating", 0).toInt());
@@ -114,14 +123,19 @@ bool DatabaseManager::updateItemMeta(quint64 frn, const QVariantMap& meta) {
     q.addBindValue(meta.value("encrypt_verify_hash", "").toString());
     q.addBindValue(meta.value("original_name", "").toString());
     q.addBindValue(meta.value("parent_path", "").toString());
+    q.addBindValue(meta.value("ctime", 0).toDouble());
+    q.addBindValue(meta.value("mtime", 0).toDouble());
+    q.addBindValue(meta.value("atime", 0).toDouble());
+    q.addBindValue(meta.value("deleted", 0).toInt());
     return q.exec();
 }
 
-bool DatabaseManager::deleteItem(quint64 frn) {
+bool DatabaseManager::deleteItem(quint64 frn, const QString& volume) {
     QMutexLocker locker(&m_mutex);
     QSqlQuery q(m_db);
-    q.prepare("DELETE FROM items WHERE frn = ?");
-    q.addBindValue(frn);
+    q.prepare("DELETE FROM items WHERE volume = ? AND frn = ?");
+    q.addBindValue(volume);
+    q.addBindValue(QString::number(frn, 16));
     return q.exec();
 }
 
@@ -165,12 +179,33 @@ QList<QVariantMap> DatabaseManager::searchItems(const QString& key, int) {
     return res;
 }
 
-QVariantMap DatabaseManager::getItemById(int frn) {
-    QSqlQuery q(m_db); q.prepare("SELECT * FROM items WHERE frn=?"); q.addBindValue(frn); q.exec();
+QVariantMap DatabaseManager::getItemById(quint64 frn, const QString& volume) {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT * FROM items WHERE volume = ? AND frn = ?");
+    q.addBindValue(volume);
+    q.addBindValue(QString::number(frn, 16));
+    q.exec();
     if (q.next()) { QVariantMap m; QSqlRecord r = q.record(); for(int i=0; i<r.count(); ++i) m[r.fieldName(i)] = q.value(i); return m; }
     return {};
 }
 
-QVariantMap DatabaseManager::getCounts() { return {}; }
+QVariantMap DatabaseManager::getCounts() {
+    QVariantMap res;
+    QSqlQuery q(m_db);
+    // [UI_SYNC] 统计今日新增
+    double todayStart = QDateTime(QDate::currentDate(), QTime(0, 0)).toMSecsSinceEpoch() / 1000.0;
+    q.prepare("SELECT COUNT(*) FROM items WHERE mtime >= ? AND deleted = 0");
+    q.addBindValue(todayStart);
+    if (q.exec() && q.next()) res["today"] = q.value(0).toInt();
+    return res;
+}
+
+void DatabaseManager::fullScan() {
+    for (const QStorageInfo& s : QStorageInfo::mountedVolumes()) {
+        if (!s.isValid() || !s.isReady() || s.isReadOnly()) continue;
+        qDebug() << "[DatabaseManager] 全量扫描盘符:" << s.rootPath();
+        // 此处后续对接 MftReader 或 RecursiveIterator
+    }
+}
 void DatabaseManager::beginBatch() { m_db.transaction(); }
 void DatabaseManager::endBatch() { m_db.commit(); }

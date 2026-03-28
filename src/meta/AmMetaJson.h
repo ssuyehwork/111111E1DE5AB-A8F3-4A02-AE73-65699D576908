@@ -13,6 +13,7 @@
 #include <QVariant>
 #include <QList>
 #include <QDebug>
+#include <QCryptographicHash>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -20,6 +21,15 @@
 
 class AmMetaJson {
 public:
+    static quint64 generateVirtualFrn(const QString& path) {
+        // [DEGRADE] 降级方案：路径哈希作为虚拟 FRN
+        QByteArray hash = QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Sha256);
+        // 取前 8 字节作为 64 位整数
+        quint64 result = 0;
+        memcpy(&result, hash.constData(), 8);
+        return result;
+    }
+
     static void setHidden(const QString& path) {
 #ifdef Q_OS_WIN
         SetFileAttributesW((LPCWSTR)path.utf16(), FILE_ATTRIBUTE_HIDDEN);
