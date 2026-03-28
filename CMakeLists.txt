@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(KingPenguin VERSION 1.0.0 LANGUAGES CXX)
+project(ArcMeta VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -76,16 +76,16 @@ if(WIN32)
     list(APPEND SOURCES resources/app_icon.rc)
 endif()
 
-add_executable(KingPenguin ${SOURCES})
+add_executable(ArcMeta ${SOURCES})
 
 # 强制管理端宏定义
-target_compile_definitions(KingPenguin PRIVATE RAPID_MANAGER_TARGET)
+target_compile_definitions(ArcMeta PRIVATE RAPID_MANAGER_TARGET)
 
-target_link_libraries(KingPenguin PRIVATE
+target_link_libraries(ArcMeta PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Sql Qt6::Network Qt6::Concurrent Qt6::Svg
-    user32 shell32 psapi dwmapi windowsapp
+    ntdll ole32 bcrypt user32 shell32 psapi dwmapi windowsapp
 )
 
 if(WIN32)
-    set_target_properties(KingPenguin PROPERTIES WIN32_EXECUTABLE TRUE)
+    set_target_properties(ArcMeta PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()

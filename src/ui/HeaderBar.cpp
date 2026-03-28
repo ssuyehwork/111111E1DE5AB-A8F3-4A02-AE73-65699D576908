@@ -47,7 +47,7 @@ HeaderBar::HeaderBar(QWidget* parent) : QWidget(parent) {
         btn->setIcon(IconHelper::getIcon(icon, "#aaaaaa", 16));
         btn->setFixedSize(24, 24);
         btn->setStyleSheet("QPushButton { background: transparent; border: none; border-radius: 4px; } QPushButton:hover { background: rgba(255,255,255,0.1); }");
-        btn->setProperty("tooltipText", tip);
+        btn->setProperty("customToolTip", tip);
         btn->installEventFilter(this);
         return btn;
     };
@@ -131,4 +131,16 @@ void HeaderBar::focusSearch() { m_searchEdit->setFocus(); }
 void HeaderBar::mousePressEvent(QMouseEvent* e) { if (e->button() == Qt::LeftButton && window()->windowHandle()) window()->windowHandle()->startSystemMove(); }
 void HeaderBar::mouseMoveEvent(QMouseEvent* e) { QWidget::mouseMoveEvent(e); }
 void HeaderBar::mouseDoubleClickEvent(QMouseEvent* e) { if (e->button() == Qt::LeftButton) emit windowMaximize(); }
-bool HeaderBar::eventFilter(QObject* w, QEvent* e) { return QWidget::eventFilter(w, e); }
+bool HeaderBar::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::ToolTip) {
+        auto* btn = qobject_cast<QPushButton*>(watched);
+        if (btn) {
+            QString tip = btn->property("customToolTip").toString();
+            if (!tip.isEmpty()) {
+                ToolTipOverlay::instance().showTip(btn, tip, 2000);
+                return true; // 拦截原生 ToolTip
+            }
+        }
+    }
+    return QWidget::eventFilter(watched, event);
+}

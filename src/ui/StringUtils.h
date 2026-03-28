@@ -367,10 +367,10 @@ public:
      */
     static void recordRecentCategory(int catId) {
         if (catId <= 0) return;
-        // 2026-03-xx 按照用户要求：支持 KingPenguin 独立配置域
+        // 2026-03-xx：支持 ArcMeta 独立配置域
         QSettings settings;
 #ifdef RAPID_MANAGER_TARGET
-        settings.beginGroup("KingPenguin");
+        settings.beginGroup("ArcMeta");
 #else
         settings.beginGroup("QuickWindow");
 #endif
@@ -397,10 +397,10 @@ public:
      * @brief 获取最近访问或使用的分类 ID 列表
      */
     static QVariantList getRecentCategories() {
-        // 2026-03-xx 按照用户要求：支持 KingPenguin 独立配置域
+        // 2026-03-xx：支持 ArcMeta 独立配置域
         QSettings settings;
 #ifdef RAPID_MANAGER_TARGET
-        settings.beginGroup("KingPenguin");
+        settings.beginGroup("ArcMeta");
 #else
         settings.beginGroup("QuickWindow");
 #endif
