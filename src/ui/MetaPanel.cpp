@@ -185,6 +185,11 @@ MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
 }
 
 void MetaPanel::initUi() {
+    // 面板标题
+    QLabel* titleLabel = new QLabel("元数据详情", this);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #888; padding: 10px 12px; background: #252525;");
+    m_mainLayout->addWidget(titleLabel);
+
     m_scrollArea = new QScrollArea(this); 
     m_scrollArea->setWidgetResizable(true); 
     m_scrollArea->setStyleSheet("QScrollArea { border: none; background: transparent; }");

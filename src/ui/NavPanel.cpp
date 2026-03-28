@@ -24,6 +24,11 @@ NavPanel::NavPanel(QWidget* parent)
  * @brief 初始化 UI 组件
  */
 void NavPanel::initUi() {
+    // 面板标题
+    QLabel* titleLabel = new QLabel("本地目录", this);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #888; padding: 10px 12px; background: #252525;");
+    m_mainLayout->addWidget(titleLabel);
+
     m_treeView = new QTreeView(this);
     m_treeView->setHeaderHidden(true); // 隐藏表头
     m_treeView->setAnimated(true);

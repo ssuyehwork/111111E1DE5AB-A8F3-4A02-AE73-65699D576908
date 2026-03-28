@@ -13,6 +13,8 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QIcon>
+#include <QMouseEvent>
+#include <QApplication>
 
 namespace ArcMeta {
 
@@ -21,7 +23,70 @@ MainWindow::MainWindow(QWidget* parent)
     resize(1600, 900);
     setMinimumSize(1280, 720);
     setWindowTitle("ArcMeta");
-    setStyleSheet("QMainWindow { background-color: #1A1A1A; }");
+
+    // 设置无边框
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
+
+    // 应用全局样式（包括滚动条美化）
+    QString qss = R"(
+        QMainWindow { background-color: #1A1A1A; }
+
+        /* 全局滚动条美化 */
+        QScrollBar:vertical {
+            border: none;
+            background: #1E1E1E;
+            width: 8px;
+            margin: 0px 0px 0px 0px;
+        }
+        QScrollBar::handle:vertical {
+            background: #333333;
+            min-height: 20px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #444444;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            background: none;
+        }
+
+        QScrollBar:horizontal {
+            border: none;
+            background: #1E1E1E;
+            height: 8px;
+            margin: 0px 0px 0px 0px;
+        }
+        QScrollBar::handle:horizontal {
+            background: #333333;
+            min-width: 20px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:horizontal:hover {
+            background: #444444;
+        }
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+            width: 0px;
+        }
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+            background: none;
+        }
+
+        /* 统一输入框样式 */
+        QLineEdit {
+            background: #1A1A1A;
+            border: 1px solid #333333;
+            border-radius: 4px;
+            color: #EEEEEE;
+            padding-left: 8px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #378ADD;
+        }
+    )";
+    setStyleSheet(qss);
 
     initUi();
 }
@@ -98,11 +163,33 @@ void MainWindow::initUi() {
     });
 }
 
+void MainWindow::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        // 点击工具栏区域（前 40px）允许拖动窗口
+        if (event->pos().y() <= 40) {
+            m_isDragging = true;
+            m_dragPosition = event->globalPos() - frameGeometry().topLeft();
+            event->accept();
+        }
+    }
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent* event) {
+    if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
+        move(event->globalPos() - m_dragPosition);
+        event->accept();
+    }
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
+    m_isDragging = false;
+}
+
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
     m_toolbar->setFixedHeight(40);
     m_toolbar->setMovable(false);
-    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; }");
+    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
 
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
@@ -200,6 +287,14 @@ void MainWindow::setupCustomTitleBarButtons() {
     layout->addWidget(m_btnMin);
     layout->addWidget(m_btnMax);
     layout->addWidget(m_btnClose);
+
+    // 绑定基础逻辑
+    connect(m_btnMin, &QPushButton::clicked, this, &MainWindow::showMinimized);
+    connect(m_btnMax, &QPushButton::clicked, [this]() {
+        if (isMaximized()) showNormal();
+        else showMaximized();
+    });
+    connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
 
     // 将按钮组添加到工具栏最右侧 (QToolBar 不支持 addStretch，改用弹簧 Widget)
     QWidget* spacer = new QWidget(this);

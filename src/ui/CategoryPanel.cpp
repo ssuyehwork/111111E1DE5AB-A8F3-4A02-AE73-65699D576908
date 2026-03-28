@@ -31,6 +31,11 @@ CategoryPanel::CategoryPanel(QWidget* parent)
  * @brief 初始化整体 UI 结构
  */
 void CategoryPanel::initUi() {
+    // 面板标题
+    QLabel* titleLabel = new QLabel("灵感归档", this);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #888; padding: 10px 12px; background: #252525;");
+    m_mainLayout->addWidget(titleLabel);
+
     initTopStats();
     
     QFrame* line = new QFrame(this);
@@ -58,7 +63,7 @@ void CategoryPanel::initTopStats() {
     addStatItem("clock_history", "最近访问", 0);
     addStatItem("uncategorized", "未分类", 0);
     addStatItem("untagged", "未标签", 0);
-    addStatItem("pin", "收藏", 0);
+    addStatItem("star", "收藏", 0);
     addStatItem("trash", "回收站", 0);
 
     m_mainLayout->addWidget(m_statsWidget);

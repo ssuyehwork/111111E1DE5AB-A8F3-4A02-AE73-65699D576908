@@ -27,6 +27,11 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override = default;
 
+protected:
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+
 private:
     void initUi();
     void initToolbar();
@@ -56,6 +61,10 @@ private:
     QPushButton* m_btnMin = nullptr;
     QPushButton* m_btnMax = nullptr;
     QPushButton* m_btnClose = nullptr;
+
+    // 窗口拖动
+    bool m_isDragging = false;
+    QPoint m_dragPosition;
 };
 
 } // namespace ArcMeta

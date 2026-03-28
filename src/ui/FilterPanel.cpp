@@ -24,6 +24,11 @@ FilterPanel::FilterPanel(QWidget* parent)
  * @brief 初始化整体 UI 结构
  */
 void FilterPanel::initUi() {
+    // 面板标题
+    QLabel* titleLabel = new QLabel("智能筛选", this);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #888; padding: 10px 12px; background: #252525;");
+    m_mainLayout->addWidget(titleLabel);
+
     // 顶部清除按钮区
     QWidget* topBar = new QWidget(this);
     topBar->setFixedHeight(40);

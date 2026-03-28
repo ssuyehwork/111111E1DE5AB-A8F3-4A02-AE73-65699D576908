@@ -53,6 +53,11 @@ ContentPanel::ContentPanel(QWidget* parent)
  * @brief 初始化整体 UI 结构
  */
 void ContentPanel::initUi() {
+    // 面板标题
+    QLabel* titleLabel = new QLabel("灵感空间", this);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #888; padding: 10px 12px; background: #252525; border-bottom: 1px solid #333;");
+    m_mainLayout->addWidget(titleLabel);
+
     m_viewStack = new QStackedWidget(this);
     
     initGridView();

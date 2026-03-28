@@ -34,6 +34,11 @@ FavoritesPanel::FavoritesPanel(QWidget* parent)
  * @brief 初始化整体 UI 结构
  */
 void FavoritesPanel::initUi() {
+    // 面板标题
+    QLabel* titleLabel = new QLabel("快速收藏", this);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #888; padding: 10px 12px; background: #252525;");
+    m_mainLayout->addWidget(titleLabel);
+
     // 分组标题
     QLabel* groupHeader = new QLabel("收藏夹", this);
     groupHeader->setStyleSheet(

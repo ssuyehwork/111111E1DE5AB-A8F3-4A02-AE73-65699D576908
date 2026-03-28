@@ -30,8 +30,11 @@ file(GLOB_RECURSE SOURCES
     "src/*.h"
 )
 
-# 可执行文件
-add_executable(ArcMeta ${SOURCES} "ArcMeta.manifest")
+# 可执行文件 (添加 WIN32 属性以消除控制台黑框)
+add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest")
+
+# 优化输出目录，消除冗余路径
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
