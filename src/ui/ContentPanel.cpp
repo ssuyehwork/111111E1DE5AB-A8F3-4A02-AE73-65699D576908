@@ -80,7 +80,8 @@ void ContentPanel::initUi() {
     
     m_mainLayout->addLayout(contentWrapper);
     
-    m_gridView->viewport()->installEventFilter(this);
+    // 快捷键拦截提升至控件本身，而非 viewport()，确保焦点行为一致
+    m_gridView->installEventFilter(this);
 }
 
 void ContentPanel::updateGridSize() {
@@ -93,7 +94,7 @@ void ContentPanel::updateGridSize() {
 }
 
 bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
-    if (obj == m_gridView->viewport() && event->type() == QEvent::Wheel) {
+    if ((obj == m_gridView || obj == m_gridView->viewport()) && event->type() == QEvent::Wheel) {
         QWheelEvent* wEvent = static_cast<QWheelEvent*>(event);
         if (wEvent->modifiers() & Qt::ControlModifier) {
             int delta = wEvent->angleDelta().y();
@@ -110,11 +111,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         if (!view) view = qobject_cast<QAbstractItemView*>(obj->parent());
 
         if (view) {
-            int rating = -1;
-            if (keyEvent->key() == Qt::Key_0) rating = 0;
-            else if (keyEvent->key() >= Qt::Key_1 && keyEvent->key() <= Qt::Key_5) rating = keyEvent->key() - Qt::Key_0;
-            
-            if (rating != -1 && (keyEvent->modifiers() == Qt::NoModifier || keyEvent->modifiers() & Qt::ControlModifier)) {
+            // 1. Ctrl + 0..5 (星级)
+            if ((keyEvent->modifiers() & Qt::ControlModifier) &&
+                (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_5)) {
+
+                int rating = keyEvent->key() - Qt::Key_0;
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
@@ -132,7 +133,32 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 return true;
             }
 
-            if (keyEvent->modifiers() & Qt::AltModifier) {
+            // 2. Alt + D (置顶/取消置顶)
+            if (((keyEvent->modifiers() & Qt::AltModifier) || (keyEvent->modifiers() & (Qt::AltModifier | Qt::WindowShortcut))) &&
+                (keyEvent->key() == Qt::Key_D)) {
+                auto indexes = view->selectionModel()->selectedIndexes();
+                for (const QModelIndex& idx : indexes) {
+                    if (idx.column() == 0) {
+                        QString itemPath = idx.data(PathRole).toString();
+                        if (!itemPath.isEmpty()) {
+                            QFileInfo info(itemPath);
+                            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
+                            meta.load();
+                            bool current = meta.items()[info.fileName().toStdWString()].pinned;
+                            meta.items()[info.fileName().toStdWString()].pinned = !current;
+                            meta.save();
+                            // 同步模型显示 (IsLockedRole)
+                            m_model->setData(idx, !current, IsLockedRole);
+                        }
+                    }
+                }
+                return true;
+            }
+
+            // 3. Alt + 1..9 (颜色打标)
+            if ((keyEvent->modifiers() & Qt::AltModifier) &&
+                (keyEvent->key() >= Qt::Key_1 && keyEvent->key() <= Qt::Key_9)) {
+
                 QString color;
                 switch (keyEvent->key()) {
                     case Qt::Key_1: color = "red"; break;
@@ -145,23 +171,22 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     case Qt::Key_8: color = "gray"; break;
                     case Qt::Key_9: color = ""; break;
                 }
-                if (!color.isNull()) {
-                    auto indexes = view->selectionModel()->selectedIndexes();
-                    for (const auto& idx : indexes) {
-                        if (idx.column() == 0) {
-                            m_model->setData(idx, color, ColorRole);
-                            QString path = idx.data(PathRole).toString();
-                            if (!path.isEmpty()) {
-                                QFileInfo info(path);
-                                AmMetaJson meta(info.absolutePath().toStdWString());
-                                meta.load();
-                                meta.items()[info.fileName().toStdWString()].color = color.toStdWString();
-                                meta.save();
-                            }
+
+                auto indexes = view->selectionModel()->selectedIndexes();
+                for (const auto& idx : indexes) {
+                    if (idx.column() == 0) {
+                        m_model->setData(idx, color, ColorRole);
+                        QString path = idx.data(PathRole).toString();
+                        if (!path.isEmpty()) {
+                            QFileInfo info(path);
+                            AmMetaJson meta(info.absolutePath().toStdWString());
+                            meta.load();
+                            meta.items()[info.fileName().toStdWString()].color = color.toStdWString();
+                            meta.save();
                         }
                     }
-                    return true;
                 }
+                return true;
             }
 
             if (keyEvent->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier) && keyEvent->key() == Qt::Key_C) {
@@ -269,9 +294,15 @@ void ContentPanel::initGridView() {
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
 
+    // 禁用双击编辑，将双击权归还给“打开”操作
+    m_gridView->setEditTriggers(QAbstractItemView::EditKeyPressed | QAbstractItemView::SelectedClicked);
+
     m_gridView->setModel(m_model);
     m_gridView->setItemDelegate(new GridItemDelegate(this));
     m_gridView->viewport()->installEventFilter(this);
+
+    // 显式连接双击打开信号
+    connect(m_gridView, &QListView::doubleClicked, this, &ContentPanel::onDoubleClicked);
 
     m_gridView->setStyleSheet(
         "QListView { background-color: transparent; border: none; outline: none; }"

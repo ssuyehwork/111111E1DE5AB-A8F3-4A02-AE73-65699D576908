@@ -257,6 +257,25 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
     m_isDragging = false;
 }
 
+void MainWindow::keyPressEvent(QKeyEvent* event) {
+    // 1. Alt+Q: 切换窗口置顶状态
+    if (event->key() == Qt::Key_Q && (event->modifiers() & Qt::AltModifier)) {
+        m_btnPinTop->setChecked(!m_btnPinTop->isChecked());
+        event->accept();
+        return;
+    }
+
+    // 2. Ctrl+F: 聚焦搜索过滤框
+    if (event->key() == Qt::Key_F && (event->modifiers() & Qt::ControlModifier)) {
+        m_searchEdit->setFocus(Qt::ShortcutFocusReason);
+        m_searchEdit->selectAll();
+        event->accept();
+        return;
+    }
+
+    QMainWindow::keyPressEvent(event);
+}
+
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
     m_toolbar->setFixedHeight(36);
