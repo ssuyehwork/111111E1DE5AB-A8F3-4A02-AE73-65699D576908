@@ -1,4 +1,5 @@
 #include "MftReader.h"
+#include "PathBuilder.h"
 #include <winioctl.h>
 #include <filesystem>
 #include <iostream>
@@ -17,6 +18,7 @@ MftReader& MftReader::instance() {
  * @brief 扫描所有固定驱动器并构建索引
  */
 void MftReader::buildIndex() {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_index.clear();
     m_pathIndex.clear();
 
@@ -115,6 +117,7 @@ void MftReader::scanDirectoryFallback(const std::wstring& volumeName) {
  * @brief 获取指定目录下的子项列表
  */
 std::vector<FileEntry> MftReader::getChildren(const std::wstring& folderPath) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     std::vector<FileEntry> results;
     std::wstring vol = folderPath.length() >= 2 ? folderPath.substr(0, 2) : L"";
     if (vol.empty()) return results;
@@ -149,12 +152,12 @@ std::vector<FileEntry> MftReader::getChildren(const std::wstring& folderPath) {
 /**
  * @brief 根据路径逆向检索 FRN
  */
-#include "PathBuilder.h"
 
 /**
  * @brief 实现 O(1) 路径检索
  */
 DWORDLONG MftReader::getFrnFromPath(const std::wstring& folderPath) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     std::wstring vol = folderPath.length() >= 2 ? folderPath.substr(0, 2) : L"";
     if (vol.empty()) return 0;
 
@@ -184,13 +187,17 @@ std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::w
 
     // 1. 收集所有待搜索项的指针
     std::vector<const FileEntry*> pool;
-    if (!volume.empty()) {
-        if (m_index.count(volume)) {
-            for (auto& pair : m_index[volume]) pool.push_back(&pair.second);
-        }
-    } else {
-        for (auto& volPair : m_index) {
-            for (auto& pair : volPair.second) pool.push_back(&pair.second);
+    {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        if (!volume.empty()) {
+            auto it = m_index.find(volume);
+            if (it != m_index.end()) {
+                for (auto& pair : it->second) pool.push_back(&pair.second);
+            }
+        } else {
+            for (auto& volPair : m_index) {
+                for (auto& pair : volPair.second) pool.push_back(&pair.second);
+            }
         }
     }
 
@@ -213,6 +220,53 @@ std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::w
     });
 
     return results;
+}
+
+/**
+ * @brief USN 监听器更新内存索引，并同步维护反向索引 (红线修复)
+ */
+void MftReader::updateEntry(const FileEntry& entry) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
+    // 1. 维护主索引
+    auto& volIndex = m_index[entry.volume];
+    bool isNew = (volIndex.find(entry.frn) == volIndex.end());
+    DWORDLONG oldParentFrn = isNew ? 0 : volIndex[entry.frn].parentFrn;
+
+    volIndex[entry.frn] = entry;
+
+    // 2. 维护父子关系索引
+    if (!isNew && oldParentFrn != entry.parentFrn) {
+        // 如果移动了位置，从旧父节点移除
+        auto& oldChildren = m_parentToChildren[entry.volume][oldParentFrn];
+        oldChildren.erase(std::remove(oldChildren.begin(), oldChildren.end(), entry.frn), oldChildren.end());
+    }
+
+    if (isNew || oldParentFrn != entry.parentFrn) {
+        m_parentToChildren[entry.volume][entry.parentFrn].push_back(entry.frn);
+    }
+
+    // 3. 失效路径缓存 (USN 变更后路径已不可信)
+    m_pathToFrn[entry.volume].clear();
+}
+
+/**
+ * @brief USN 监听器移除记录
+ */
+void MftReader::removeEntry(const std::wstring& volume, DWORDLONG frn) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto& volIndex = m_index[volume];
+    auto it = volIndex.find(frn);
+    if (it != volIndex.end()) {
+        DWORDLONG parentFrn = it->second.parentFrn;
+        // 从主索引移除
+        volIndex.erase(it);
+        // 从父子索引移除
+        auto& children = m_parentToChildren[volume][parentFrn];
+        children.erase(std::remove(children.begin(), children.end(), frn), children.end());
+        // 清理路径缓存
+        m_pathToFrn[volume].clear();
+    }
 }
 
 } // namespace ArcMeta

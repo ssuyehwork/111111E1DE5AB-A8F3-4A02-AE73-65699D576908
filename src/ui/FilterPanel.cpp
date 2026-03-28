@@ -128,7 +128,7 @@ void FilterPanel::addCheckboxFilter(QVBoxLayout* layout, const QString& label, i
     QCheckBox* chk = new QCheckBox(r);
     chk->setCursor(Qt::PointingHandCursor);
     chk->setStyleSheet("QCheckBox::indicator { width: 14px; height: 14px; }");
-    connect(chk, &QCheckBox::stateChanged, this, &FilterPanel::filterChanged);
+    connect(chk, &QCheckBox::checkStateChanged, this, &FilterPanel::filterChanged);
 
     if (iconColor != Qt::transparent) {
         QLabel* d = new QLabel(r);

@@ -2,6 +2,8 @@
 #include "AmMetaJson.h"
 #include "../db/Database.h"
 #include "../db/FolderRepo.h"
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include "../db/ItemRepo.h"
 #include <vector>
 #include <QString>
@@ -75,17 +77,26 @@ bool SyncQueue::processBatch() {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (m_pendingPaths.empty()) return false;
-
-        // 一次性取出当前所有待处理路径进行批处理
         batch.assign(m_pendingPaths.begin(), m_pendingPaths.end());
         m_pendingPaths.clear();
     }
 
     if (batch.empty()) return false;
 
+    // 关键红线修复：QtSql 连接不能跨线程，为后台线程创建独立连接
+    QString connName = "SyncWorkerConnection";
+    QSqlDatabase db;
+    if (QSqlDatabase::contains(connName)) {
+        db = QSqlDatabase::database(connName);
+    } else {
+        db = QSqlDatabase::addDatabase("QSQLITE", connName);
+        db.setDatabaseName(QString::fromStdWString(Database::instance().getDbPath()));
+    }
+
+    if (!db.isOpen() && !db.open()) return false;
+
     try {
-        // 关键红线：使用事务批量提交
-        QSqlDatabase::database().transaction();
+        db.transaction();
 
         for (const auto& path : batch) {
             AmMetaJson meta(path);
@@ -100,10 +111,14 @@ bool SyncQueue::processBatch() {
             }
         }
 
-        QSqlDatabase::database().commit();
-        return true;
-    } catch (const std::exception& e) {
-        QSqlDatabase::database().rollback();
+        if (db.commit()) {
+            return true;
+        } else {
+            db.rollback();
+            return false;
+        }
+    } catch (...) {
+        db.rollback();
         return false;
     }
 }

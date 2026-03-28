@@ -14,6 +14,11 @@ public:
 
     bool init(const std::wstring& dbPath);
 
+    /**
+     * @brief 获取数据库文件路径，用于工作线程创建独立连接
+     */
+    std::wstring getDbPath() const;
+
 private:
     Database();
     ~Database();

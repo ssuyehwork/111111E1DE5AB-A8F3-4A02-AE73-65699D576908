@@ -36,6 +36,11 @@ public:
      */
     bool eventFilter(QObject* obj, QEvent* event) override;
 
+    /**
+     * @brief 获取渲染后的图标
+     */
+    static QIcon getSvgIcon(const QString& key, const QColor& color);
+
 signals:
     /**
      * @brief 请求 QuickLook 预览信号
@@ -83,12 +88,7 @@ private:
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
 
-    /**
-     * @brief 获取渲染后的图标
-     */
-    static QIcon getSvgIcon(const QString& key, const QColor& color);
-
-private slots:
+public slots:
     void onSelectionChanged();
     void onCustomContextMenuRequested(const QPoint& pos);
     void onDoubleClicked(const QModelIndex& index);

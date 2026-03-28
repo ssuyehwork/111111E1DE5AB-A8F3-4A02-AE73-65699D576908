@@ -201,8 +201,10 @@ void MainWindow::setupCustomTitleBarButtons() {
     layout->addWidget(m_btnMax);
     layout->addWidget(m_btnClose);
 
-    // 将按钮组添加到工具栏最右侧
-    m_toolbar->addStretch();
+    // 将按钮组添加到工具栏最右侧 (QToolBar 不支持 addStretch，改用弹簧 Widget)
+    QWidget* spacer = new QWidget(this);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_toolbar->addWidget(spacer);
     m_toolbar->addWidget(titleBarBtns);
 
     // 逻辑：置顶切换

@@ -9,6 +9,7 @@ namespace ArcMeta {
 
 struct Database::Impl {
     QSqlDatabase db;
+    std::wstring dbPath;
 };
 
 Database& Database::instance() {
@@ -20,6 +21,7 @@ Database::Database() : m_impl(std::make_unique<Impl>()) {}
 Database::~Database() = default;
 
 bool Database::init(const std::wstring& dbPath) {
+    m_impl->dbPath = dbPath;
     m_impl->db = QSqlDatabase::addDatabase("QSQLITE");
     m_impl->db.setDatabaseName(QString::fromStdWString(dbPath));
 
@@ -34,6 +36,10 @@ bool Database::init(const std::wstring& dbPath) {
     createTables();
     createIndexes();
     return true;
+}
+
+std::wstring Database::getDbPath() const {
+    return m_impl->dbPath;
 }
 
 void Database::createTables() {

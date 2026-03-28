@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <mutex>
 #include <windows.h>
 
 namespace ArcMeta {
@@ -49,8 +50,8 @@ public:
 private:
     MftReader() = default;
 
-    void buildIndexMft();
-    void buildIndexFallback(); // 降级模式
+    bool loadMftForVolume(const std::wstring& volumeName);
+    void scanDirectoryFallback(const std::wstring& volumeName);
 
     // volume -> (frn -> Entry)
     std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>> m_index;
@@ -75,11 +76,17 @@ public:
     const std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>>& getIndex() const { return m_index; }
 
     /**
-     * @brief USN 监听器更新内存索引
+     * @brief USN 监听器更新内存索引，并同步维护反向索引
      */
-    void updateEntry(const FileEntry& entry) {
-        m_index[entry.volume][entry.frn] = entry;
-    }
+    void updateEntry(const FileEntry& entry);
+
+    /**
+     * @brief USN 监听器移除记录
+     */
+    void removeEntry(const std::wstring& volume, DWORDLONG frn);
+
+private:
+    mutable std::recursive_mutex m_mutex; // 保护所有索引数据
 };
 
 } // namespace ArcMeta

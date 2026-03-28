@@ -1,5 +1,7 @@
 #include "PathBuilder.h"
 #include <algorithm>
+#include <unordered_set>
+#include <type_traits>
 
 namespace ArcMeta {
 

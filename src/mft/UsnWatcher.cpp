@@ -110,6 +110,7 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
 
     if (reason & USN_REASON_FILE_DELETE) {
         ItemRepo::markAsDeleted(m_volume, frnStr);
+        MftReader::instance().removeEntry(m_volume, pRecord->FileReferenceNumber);
         std::wstring fullPath = PathBuilder::getPath(m_volume, pRecord->FileReferenceNumber);
         if (!fullPath.empty()) {
             FolderRepo::remove(fullPath);
@@ -124,34 +125,35 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
 
         if (!newPath.empty() && oldPath != newPath) {
             // 2. 跨目录元数据迁移事务逻辑 (两阶段提交思想)
-            // 第一阶段：读取旧路径所在目录的 JSON
-            std::wstring oldParentDir = oldPath.substr(0, oldPath.find_last_of(L"\\/"));
-            AmMetaJson oldMetaJson(oldParentDir);
+            if (!oldPath.empty()) {
+                std::wstring oldParentDir = oldPath.substr(0, oldPath.find_last_of(L"\\/"));
+                AmMetaJson oldMetaJson(oldParentDir);
 
-            if (oldMetaJson.load()) {
-                std::wstring fileNameOnly = oldPath.substr(oldPath.find_last_of(L"\\/") + 1);
-                if (oldMetaJson.items().count(fileNameOnly)) {
-                    ItemMeta meta = oldMetaJson.items()[fileNameOnly];
+                if (oldMetaJson.load()) {
+                    std::wstring fileNameOnly = oldPath.substr(oldPath.find_last_of(L"\\/") + 1);
+                    auto& items = oldMetaJson.items();
+                    auto it = items.find(fileNameOnly);
+                    if (it != items.end()) {
+                        ItemMeta meta = it->second;
 
-                    // 第二阶段：物理迁移 JSON 记录到新目录
-                    AmMetaJson newMetaJson(newParentPath);
-                    newMetaJson.load();
-                    std::wstring newFileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
-                    newMetaJson.items()[newFileNameOnly] = meta;
+                        // 第二阶段：物理迁移 JSON 记录到新目录
+                        AmMetaJson newMetaJson(newParentPath);
+                        newMetaJson.load();
+                        std::wstring newFileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
+                        newMetaJson.items()[newFileNameOnly] = meta;
 
-                    if (newMetaJson.save()) {
-                        // 成功后删除旧位置记录并更新数据库
-                        oldMetaJson.items().erase(fileNameOnly);
-                        oldMetaJson.save();
-                        ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
+                        if (newMetaJson.save()) {
+                            // 成功后删除旧位置记录并更新数据库
+                            items.erase(it);
+                            oldMetaJson.save();
+                        }
                     }
-                } else {
-                    // 如果 JSON 中无记录，仅更新数据库路径
-                    ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
                 }
             }
+            // 无论 JSON 迁移与否，更新数据库路径与内存索引
+            ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
 
-            // 更新内存 MFT 索引
+            // 更新内存 MFT 索引 (同步维护反向索引)
             FileEntry entry;
             entry.volume = m_volume;
             entry.frn = pRecord->FileReferenceNumber;
