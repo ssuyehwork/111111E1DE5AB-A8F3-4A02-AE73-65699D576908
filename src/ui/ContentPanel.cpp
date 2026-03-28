@@ -80,21 +80,20 @@ void ContentPanel::initUi() {
     
     m_mainLayout->addLayout(contentWrapper);
     
-    // 快捷键拦截提升至控件本身，而非 viewport()，确保焦点行为一致
-    m_gridView->installEventFilter(this);
+    m_gridView->viewport()->installEventFilter(this);
 }
 
 void ContentPanel::updateGridSize() {
     m_zoomLevel = qBound(32, m_zoomLevel, 128);
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
-    int cardW = m_zoomLevel + 20; // 再次缩小 10px (30 -> 20)
-    int cardH = m_zoomLevel + 50;
+    int cardW = m_zoomLevel + 30; // 减小宽度 10px (40->30)
+    int cardH = m_zoomLevel + 60;
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
 
 bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
-    if ((obj == m_gridView || obj == m_gridView->viewport()) && event->type() == QEvent::Wheel) {
+    if (obj == m_gridView->viewport() && event->type() == QEvent::Wheel) {
         QWheelEvent* wEvent = static_cast<QWheelEvent*>(event);
         if (wEvent->modifiers() & Qt::ControlModifier) {
             int delta = wEvent->angleDelta().y();
@@ -111,11 +110,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         if (!view) view = qobject_cast<QAbstractItemView*>(obj->parent());
 
         if (view) {
-            // 1. Ctrl + 0..5 (星级)
-            if ((keyEvent->modifiers() & Qt::ControlModifier) &&
-                (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_5)) {
+            int rating = -1;
+            if (keyEvent->key() == Qt::Key_0) rating = 0;
+            else if (keyEvent->key() >= Qt::Key_1 && keyEvent->key() <= Qt::Key_5) rating = keyEvent->key() - Qt::Key_0;
 
-                int rating = keyEvent->key() - Qt::Key_0;
+            if (rating != -1 && (keyEvent->modifiers() == Qt::NoModifier || keyEvent->modifiers() & Qt::ControlModifier)) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
@@ -133,32 +132,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 return true;
             }
 
-            // 2. Alt + D (置顶/取消置顶)
-            if (((keyEvent->modifiers() & Qt::AltModifier) || (keyEvent->modifiers() & (Qt::AltModifier | Qt::WindowShortcut))) &&
-                (keyEvent->key() == Qt::Key_D)) {
-                auto indexes = view->selectionModel()->selectedIndexes();
-                for (const QModelIndex& idx : indexes) {
-                    if (idx.column() == 0) {
-                        QString itemPath = idx.data(PathRole).toString();
-                        if (!itemPath.isEmpty()) {
-                            QFileInfo info(itemPath);
-                            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            bool current = meta.items()[info.fileName().toStdWString()].pinned;
-                            meta.items()[info.fileName().toStdWString()].pinned = !current;
-                            meta.save();
-                            // 同步模型显示 (IsLockedRole)
-                            m_model->setData(idx, !current, IsLockedRole);
-                        }
-                    }
-                }
-                return true;
-            }
-
-            // 3. Alt + 1..9 (颜色打标)
-            if ((keyEvent->modifiers() & Qt::AltModifier) &&
-                (keyEvent->key() >= Qt::Key_1 && keyEvent->key() <= Qt::Key_9)) {
-
+            if (keyEvent->modifiers() & Qt::AltModifier) {
                 QString color;
                 switch (keyEvent->key()) {
                     case Qt::Key_1: color = "red"; break;
@@ -171,22 +145,23 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     case Qt::Key_8: color = "gray"; break;
                     case Qt::Key_9: color = ""; break;
                 }
-
-                auto indexes = view->selectionModel()->selectedIndexes();
-                for (const auto& idx : indexes) {
-                    if (idx.column() == 0) {
-                        m_model->setData(idx, color, ColorRole);
-                        QString path = idx.data(PathRole).toString();
-                        if (!path.isEmpty()) {
-                            QFileInfo info(path);
-                            AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            meta.items()[info.fileName().toStdWString()].color = color.toStdWString();
-                            meta.save();
+                if (!color.isNull()) {
+                    auto indexes = view->selectionModel()->selectedIndexes();
+                    for (const auto& idx : indexes) {
+                        if (idx.column() == 0) {
+                            m_model->setData(idx, color, ColorRole);
+                            QString path = idx.data(PathRole).toString();
+                            if (!path.isEmpty()) {
+                                QFileInfo info(path);
+                                AmMetaJson meta(info.absolutePath().toStdWString());
+                                meta.load();
+                                meta.items()[info.fileName().toStdWString()].color = color.toStdWString();
+                                meta.save();
+                            }
                         }
                     }
+                    return true;
                 }
-                return true;
             }
 
             if (keyEvent->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier) && keyEvent->key() == Qt::Key_C) {
@@ -248,7 +223,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
             }
             if (keyEvent->key() == Qt::Key_Backspace) {
                 QDir dir(m_currentPath);
-                if (dir.cdUp()) emit directorySelected(dir.absolutePath());
+                if (dir.cdUp()) loadDirectory(dir.absolutePath());
                 return true;
             }
             if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
@@ -289,20 +264,14 @@ void ContentPanel::initGridView() {
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
-    m_gridView->setGridSize(QSize(116, 146)); // 136 -> 126 -> 116 (缩小 20px)
+    m_gridView->setGridSize(QSize(126, 156)); // 此处 126 即 96+30
     m_gridView->setSpacing(10);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-    // 禁用双击编辑，将双击权归还给“打开”操作
-    m_gridView->setEditTriggers(QAbstractItemView::EditKeyPressed | QAbstractItemView::SelectedClicked);
-
     m_gridView->setModel(m_model);
     m_gridView->setItemDelegate(new GridItemDelegate(this));
     m_gridView->viewport()->installEventFilter(this);
-
-    // 显式连接双击打开信号
-    connect(m_gridView, &QListView::doubleClicked, this, &ContentPanel::onDoubleClicked);
 
     m_gridView->setStyleSheet(
         "QListView { background-color: transparent; border: none; outline: none; }"
@@ -458,6 +427,7 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
     QFileInfo info(path);
     if (info.isDir()) {
         emit directorySelected(path); 
+        loadDirectory(path);
     } else {
         QDesktopServices::openUrl(QUrl::fromLocalFile(path));
     }
@@ -468,11 +438,29 @@ void ContentPanel::loadDirectory(const QString& path) {
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
+    QFileIconProvider iconProvider;
+
+    // 逻辑：此电脑 (磁盘列表)
+    if (path.isEmpty() || path == "此电脑") {
+        QFileInfoList drives = QDir::drives();
+        for (const QFileInfo& drive : drives) {
+            QList<QStandardItem*> row;
+            auto* item = new QStandardItem(iconProvider.icon(drive), drive.absoluteFilePath());
+            item->setData(drive.absoluteFilePath(), PathRole);
+            item->setData("drive", Qt::UserRole);
+            row << item;
+            row << new QStandardItem("-");
+            row << new QStandardItem("本地磁盘");
+            row << new QStandardItem("-");
+            m_model->appendRow(row);
+        }
+        return;
+    }
+
     QDir dir(path);
     if (!dir.exists()) return;
 
     QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
-    QFileIconProvider iconProvider;
 
     // 预读当前目录的元数据配置图谱
     ArcMeta::AmMetaJson meta(m_currentPath.toStdWString());
@@ -584,9 +572,21 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
 
     QString path = index.data(PathRole).toString();
     QFileInfo info(path);
-    QString ext = info.isDir() ? "DIR" : info.suffix().toUpper();
-    if (ext.isEmpty()) ext = "FILE";
-    QColor badgeColor = UiHelper::getExtensionColor(ext);
+    QString ext = info.suffix().toUpper();
+    QColor badgeColor(60, 60, 60, 180);
+
+    if (info.isDir()) {
+        ext = "DIR";
+        badgeColor = QColor(45, 65, 85, 200);
+    } else if (ext == "AHK") {
+        badgeColor = QColor(100, 80, 40, 200);
+    } else if (ext == "JSON") {
+        badgeColor = QColor(120, 90, 30, 200);
+    } else if (ext == "CPP" || ext == "H") {
+        badgeColor = QColor(60, 100, 160, 200);
+    } else if (ext.isEmpty()) {
+        ext = "FILE";
+    }
 
     QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
     painter->setPen(Qt::NoPen);
@@ -609,7 +609,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int gap2 = 4;
     
     int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
+    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 5;
 
     QRect iconRect(cardRect.left() + (cardRect.width() - iconDrawSize) / 2, startY, iconDrawSize, iconDrawSize);
     QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
@@ -618,8 +618,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int ratingY = iconRect.bottom() + gap1;
     int rating = index.data(RatingRole).toInt();
     
-    int starSize = 12;
-    int starSpacing = 1; // 还原间距，不再脑补加宽
+    int starSize = 12; // 用户要求瘦身
+    int starSpacing = 2;
     int banW = 12;
     int banGap = 4;
     int infoTotalW = banW + banGap + (5 * starSize) + (4 * starSpacing);
@@ -686,16 +686,16 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
         if (mEvent->button() == Qt::LeftButton) {
             int baseIconSize = option.decorationSize.width();
             if (baseIconSize <= 0) baseIconSize = 64; 
-            int iconDrawSize = static_cast<int>(baseIconSize * 0.65);
+            int iconDrawSize = baseIconSize * 0.65;
             int ratingH = 12;
             int nameH = 16;
             int gap1 = 6;
             int gap2 = 4;
             int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-            int startY = option.rect.top() + (option.rect.height() - totalH) / 2 + 13;
+            int startY = option.rect.top() + (option.rect.height() - totalH) / 2 + 5;
             int ratingY = startY + iconDrawSize + gap1;
-            int starSize = 12;
-            int starSpacing = 1;
+            int starSize = 12; // 用户缩小要求
+            int starSpacing = 2;
             int banW = 12;
             int banGap = 4;
             int infoTotalW = banW + banGap + (5 * starSize + 4 * starSpacing);
@@ -794,23 +794,20 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
 void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const {
     Q_UNUSED(index);
     // 强制编辑器位置与 paint 中计算的文件名绘制区域 NameBox 重合
-    QRect cardRect = option.rect.adjusted(4, 4, -4, -4);
-    int baseIconSize = option.decorationSize.width();
-    if (baseIconSize <= 0) baseIconSize = 64;
-    int iconDrawSize = static_cast<int>(baseIconSize * 0.65);
-
+    QRect cardRect = option.rect.adjusted(2, 2, -2, -2);
+    int iconDrawSize = 64;
     int ratingH = 12;
     int nameH = 16;
     int gap1 = 6;
     int gap2 = 4;
     
     int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13;
+    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 5;
     int ratingY = startY + iconDrawSize + gap1;
     int nameY = ratingY + ratingH + gap2;
     
-    // 编辑框精准覆盖文件名区域，不遮挡星级
-    QRect nameBoxRect(cardRect.left() + 6, nameY, cardRect.width() - 12, nameH);
+    // 微微加高边框增强包围感
+    QRect nameBoxRect(cardRect.left() + 6, nameY - 2, cardRect.width() - 12, nameH + 4);
     editor->setGeometry(nameBoxRect);
 }
 

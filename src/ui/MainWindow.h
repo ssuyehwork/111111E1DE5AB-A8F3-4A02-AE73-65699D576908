@@ -31,16 +31,12 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;
 
 private slots:
     void onPinToggled(bool checked);
     void onBackClicked();
     void onForwardClicked();
     void onUpClicked();
-
-protected:
-    void closeEvent(QCloseEvent* event) override;
 
 private:
     void initUi();
@@ -75,9 +71,13 @@ private:
 
     // 状态管理
     bool m_isPinned = false;
-    QString m_currentPath;
     QStringList m_history;
     int m_historyIndex = -1;
+
+    // 状态栏组件
+    QWidget* m_statusBar = nullptr;
+    QLabel* m_statusLabel = nullptr;
+    QLabel* m_selectionLabel = nullptr;
 
     // 窗口拖动
     bool m_isDragging = false;

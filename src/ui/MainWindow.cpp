@@ -16,7 +16,6 @@
 #include <QMouseEvent>
 #include <QApplication>
 #include <QSettings>
-#include <QCloseEvent>
 #include "UiHelper.h"
 #include <QFileInfo>
 #include "../meta/AmMetaJson.h"
@@ -112,11 +111,6 @@ MainWindow::MainWindow(QWidget* parent)
     setStyleSheet(qss);
 
     initUi();
-
-    // 恢复最后一次打开的路径
-    QString lastPath = settings.value("MainWindow/LastPath", "C:/").toString();
-    if (!QDir(lastPath).exists()) lastPath = "C:/";
-    navigateTo(lastPath);
 }
 
 void MainWindow::initUi() {
@@ -131,12 +125,8 @@ void MainWindow::initUi() {
 
     // 核心红线：建立各面板间的信号联动 (Data Linkage)
     
-    // 1. 导航/收藏/内容面板 双击跳转 -> 统一路径调度
-    connect(m_navPanel, &NavPanel::directorySelected, this, [this](const QString& path) {
-        navigateTo(path);
-    });
-
-    connect(m_contentPanel, &ContentPanel::directorySelected, this, [this](const QString& path) {
+    // 1. 统一导航出口
+    connect(m_navPanel, &NavPanel::directorySelected, [this](const QString& path) {
         navigateTo(path);
     });
 
@@ -146,8 +136,10 @@ void MainWindow::initUi() {
         m_contentPanel->search(name); // 暂时通过 search 模拟分类展示
     });
 
-    // 2. 内容面板选中项改变 -> 元数据面板刷新
+    // 2. 内容面板选中项改变 -> 元数据面板刷新与状态栏更新
     connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
+        m_selectionLabel->setText(paths.isEmpty() ? "未选中项目" : QString("已选中 %1 个项目").arg(paths.size()));
+
         if (paths.isEmpty()) {
             m_metaPanel->updateInfo("-", "-", "-", "-", "-", "-", "-", false);
             m_metaPanel->setRating(0);
@@ -205,19 +197,13 @@ void MainWindow::initUi() {
 
     // 6. 工具栏路径跳转
     connect(m_pathEdit, &QLineEdit::returnPressed, [this]() {
-        QString input = m_pathEdit->text();
-        if (QDir(input).exists()) {
-            navigateTo(input);
-        } else {
-            // 如果路径无效，恢复为当前实际路径
-            m_pathEdit->setText(QDir::toNativeSeparators(m_currentPath));
-        }
+        navigateTo(m_pathEdit->text());
     });
 
     // 7. 工具栏极速搜索对接 (MFT 并行引擎)
     connect(m_searchEdit, &QLineEdit::textEdited, [this](const QString& text) {
         if (text.isEmpty()) {
-            m_contentPanel->loadDirectory(m_pathEdit->text());
+            m_contentPanel->loadDirectory(m_pathEdit->text() == "此电脑" ? "" : m_pathEdit->text());
         } else if (text.length() >= 2) {
             m_contentPanel->search(text);
         }
@@ -249,8 +235,8 @@ void MainWindow::initUi() {
 
 void MainWindow::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
-        // 点击工具栏区域（前 36px）允许拖动窗口
-        if (event->position().y() <= 36) {
+        // 点击工具栏区域（前 40px）允许拖动窗口
+        if (event->position().y() <= 40) {
             m_isDragging = true;
             m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
             event->accept();
@@ -270,30 +256,11 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
     m_isDragging = false;
 }
 
-void MainWindow::keyPressEvent(QKeyEvent* event) {
-    // 1. Alt+Q: 切换窗口置顶状态
-    if (event->key() == Qt::Key_Q && (event->modifiers() & Qt::AltModifier)) {
-        m_btnPinTop->setChecked(!m_btnPinTop->isChecked());
-        event->accept();
-        return;
-    }
-
-    // 2. Ctrl+F: 聚焦搜索过滤框
-    if (event->key() == Qt::Key_F && (event->modifiers() & Qt::ControlModifier)) {
-        m_searchEdit->setFocus(Qt::ShortcutFocusReason);
-        m_searchEdit->selectAll();
-        event->accept();
-        return;
-    }
-
-    QMainWindow::keyPressEvent(event);
-}
-
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
-    m_toolbar->setFixedHeight(36);
+    m_toolbar->setFixedHeight(36); // 根据①调整为36px
     m_toolbar->setMovable(false);
-    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
+    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 5px; border-bottom: 1px solid #333; }");
 
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
@@ -304,13 +271,7 @@ void MainWindow::initToolbar() {
         btn->setIconSize(QSize(18, 18));
         
         btn->setToolTip(tip);
-        // 极致精简样式：无边框，仅悬停可见背景
-        btn->setStyleSheet(
-            "QPushButton { background: transparent; border: none; border-radius: 4px; }"
-            "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
-            "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
-            "QPushButton:disabled { opacity: 0.3; }"
-        );
+        btn->setStyleSheet("QPushButton { background: #333333; border: 1px solid #444444; border-radius: 4px; } QPushButton:hover { background: #444444; }");
         return btn;
     };
 
@@ -339,14 +300,14 @@ void MainWindow::initToolbar() {
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 3, 0, 0); // 与自定义标题栏之间保持3像素的间距
-    mainL->setSpacing(3);
+    mainL->setContentsMargins(5, 5, 5, 5); // 统一 5px 间距
+    mainL->setSpacing(5);
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(40);
+    addressBar->setFixedHeight(40); // 根据③调整为40px
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
-    addrL->setContentsMargins(12, 0, 12, 0);
-    addrL->setSpacing(8);
+    addrL->setContentsMargins(5, 0, 5, 0); // 左右间距同步
+    addrL->setSpacing(5);
 
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);
@@ -355,7 +316,7 @@ void MainWindow::setupSplitters() {
     addrL->addWidget(m_searchEdit);
 
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(3);
+    m_mainSplitter->setHandleWidth(5); // 统一 5px
     m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #333333; }");
 
     m_categoryPanel = new CategoryPanel(this);
@@ -370,10 +331,30 @@ void MainWindow::setupSplitters() {
     m_mainSplitter->addWidget(m_metaPanel);
     m_mainSplitter->addWidget(m_filterPanel);
 
+    // 状态栏
+    m_statusBar = new QWidget(this);
+    m_statusBar->setFixedHeight(28);
+    m_statusBar->setStyleSheet("background-color: #252525; border-top: 1px solid #333;");
+    QHBoxLayout* statusL = new QHBoxLayout(m_statusBar);
+    statusL->setContentsMargins(10, 0, 10, 0);
+
+    m_statusLabel = new QLabel("正在初始化...", m_statusBar);
+    m_statusLabel->setStyleSheet("color: #B0B0B0; font-size: 11px;");
+    m_selectionLabel = new QLabel("未选中项目", m_statusBar);
+    m_selectionLabel->setStyleSheet("color: #B0B0B0; font-size: 11px;");
+
+    statusL->addWidget(m_statusLabel);
+    statusL->addStretch();
+    statusL->addWidget(m_selectionLabel);
+
     mainL->addWidget(addressBar);
     mainL->addWidget(m_mainSplitter, 1);
+    mainL->addWidget(m_statusBar);
 
     setCentralWidget(centralC);
+
+    // 初始跳转到此电脑
+    navigateTo("");
 }
 
 /**
@@ -437,11 +418,7 @@ void MainWindow::setupCustomTitleBarButtons() {
 }
 
 void MainWindow::navigateTo(const QString& path, bool record) {
-    if (path.isEmpty()) return;
-
     QString normPath = QDir::toNativeSeparators(path);
-    m_currentPath = normPath;
-
     if (record) {
         // 如果在历史中间进行跳转，清除之后的历史
         if (m_historyIndex < m_history.size() - 1) {
@@ -455,9 +432,12 @@ void MainWindow::navigateTo(const QString& path, bool record) {
         }
     }
 
-    m_pathEdit->setText(normPath);
+    m_pathEdit->setText(normPath.isEmpty() ? "此电脑" : normPath);
     m_contentPanel->loadDirectory(normPath);
     updateNavButtons();
+
+    int itemCount = m_contentPanel->model()->rowCount();
+    m_statusLabel->setText(normPath.isEmpty() ? QString("此电脑 - %1 个驱动器").arg(itemCount) : QString("%1 个项目").arg(itemCount));
 }
 
 void MainWindow::onBackClicked() {
@@ -475,9 +455,12 @@ void MainWindow::onForwardClicked() {
 }
 
 void MainWindow::onUpClicked() {
-    QDir dir(m_currentPath);
+    QDir dir(m_pathEdit->text());
     if (dir.cdUp()) {
         navigateTo(dir.absolutePath());
+    } else {
+        // 无法向上（如已经在 C:\），则退回此电脑
+        if (m_pathEdit->text() != "此电脑") navigateTo("");
     }
 }
 
@@ -485,8 +468,8 @@ void MainWindow::updateNavButtons() {
     m_btnBack->setEnabled(m_historyIndex > 0);
     m_btnForward->setEnabled(m_historyIndex < m_history.size() - 1);
 
-    QDir dir(m_currentPath);
-    m_btnUp->setEnabled(!dir.isRoot() && !m_currentPath.isEmpty());
+    QDir dir(m_pathEdit->text());
+    m_btnUp->setEnabled(!dir.isRoot());
 }
 
 void MainWindow::onPinToggled(bool checked) {
@@ -511,12 +494,6 @@ void MainWindow::onPinToggled(bool checked) {
     // 持久化存储
     QSettings settings("ArcMeta团队", "ArcMeta");
     settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
-}
-
-void MainWindow::closeEvent(QCloseEvent* event) {
-    QSettings settings("ArcMeta团队", "ArcMeta");
-    settings.setValue("MainWindow/LastPath", m_currentPath);
-    QMainWindow::closeEvent(event);
 }
 
 } // namespace ArcMeta
