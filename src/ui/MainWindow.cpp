@@ -236,8 +236,8 @@ void MainWindow::initUi() {
 
 void MainWindow::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
-        // 点击工具栏区域（前 40px）允许拖动窗口
-        if (event->position().y() <= 40) {
+        // 点击工具栏区域（前 36px）允许拖动窗口
+        if (event->position().y() <= 36) {
             m_isDragging = true;
             m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
             event->accept();
@@ -259,7 +259,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
 
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
-    m_toolbar->setFixedHeight(40);
+    m_toolbar->setFixedHeight(36);
     m_toolbar->setMovable(false);
     m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
 
@@ -302,7 +302,7 @@ void MainWindow::setupSplitters() {
     mainL->setSpacing(3);
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(36);
+    addressBar->setFixedHeight(40);
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(12, 0, 12, 0);
     addrL->setSpacing(8);
