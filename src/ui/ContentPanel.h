@@ -54,6 +54,11 @@ signals:
      */
     void directorySelected(const QString& path);
 
+    /**
+     * @brief 加载并显示目录内容
+     */
+    void loadDirectory(const QString& path);
+
 private:
     void initUi();
     void initGridView();

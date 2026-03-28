@@ -6,6 +6,7 @@
 #include "db/Database.h"
 #include "db/SyncEngine.h"
 #include "meta/SyncQueue.h"
+#include "mft/MftReader.h"
 
 /**
  * @brief 检查当前进程是否具有管理员权限
@@ -45,13 +46,16 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // 3. 启动异步同步队列
+    // 3. 初始化文件索引
+    ArcMeta::MftReader::instance().buildIndex();
+
+    // 4. 启动异步同步队列
     ArcMeta::SyncQueue::instance().start();
 
-    // 4. 执行增量同步（追平离线期间的物理变更）
+    // 5. 执行增量同步
     ArcMeta::SyncEngine::instance().runIncrementalSync();
 
-    // 5. 显示主窗口
+    // 6. 显示主窗口
     ArcMeta::MainWindow w;
     w.show();
 

@@ -40,7 +40,7 @@ void MainWindow::initUi() {
     // 1. 导航/收藏选择 -> 内容面板刷新
     connect(m_navPanel, &NavPanel::directorySelected, [this](const QString& path) {
         m_pathEdit->setText(path);
-        // m_contentPanel->loadDirectory(path); // 待文件索引层对接
+        m_contentPanel->loadDirectory(path);
     });
 
     connect(m_favoritesPanel, &FavoritesPanel::favoriteSelected, [this](const QString& path) {
@@ -69,6 +69,17 @@ void MainWindow::initUi() {
     // 5. 筛选面板变更 -> 内容面板过滤
     connect(m_filterPanel, &FilterPanel::filterChanged, [this]() {
         // m_contentPanel->applyFilters();
+    });
+
+    // 6. 工具栏路径跳转
+    connect(m_pathEdit, &QLineEdit::returnPressed, [this]() {
+        QString path = m_pathEdit->text();
+        m_contentPanel->loadDirectory(path);
+    });
+
+    // 7. 工具栏本地搜索过滤
+    connect(m_searchEdit, &QLineEdit::textChanged, [this](const QString& text) {
+        // m_contentPanel->setSearchFilter(text);
     });
 }
 

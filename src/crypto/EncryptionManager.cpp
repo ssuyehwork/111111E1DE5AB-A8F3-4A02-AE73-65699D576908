@@ -88,28 +88,59 @@ bool EncryptionManager::encryptFile(const std::wstring& srcPath, const std::wstr
 /**
  * @brief 修复：实现 RAII 句柄持有逻辑，防止临时文件在 CloseHandle 前被删除
  */
+/**
+ * @brief 实现分块解密逻辑，恢复原始文件到临时路径
+ */
 std::shared_ptr<DecryptedFileHandle> EncryptionManager::decryptToTemp(const std::wstring& amencPath, const std::string& password) {
-    wchar_t tempPath[MAX_PATH];
-    if (GetTempPathW(MAX_PATH, tempPath) == 0) return nullptr;
+    std::ifstream is(amencPath, std::ios::binary);
+    if (!is) return nullptr;
 
+    // 读取 Salt 和 IV
+    std::vector<BYTE> salt(16);
+    std::vector<BYTE> iv(16);
+    is.read((char*)salt.data(), 16);
+    is.read((char*)iv.data(), 16);
+
+    std::vector<BYTE> key;
+    if (!deriveKey(password, salt, key)) return nullptr;
+
+    wchar_t tempPath[MAX_PATH];
+    GetTempPathW(MAX_PATH, tempPath);
     std::wstring amTempDir = std::wstring(tempPath) + L"amtemp\\";
     CreateDirectoryW(amTempDir.c_str(), NULL);
 
     std::wstring outPath = amTempDir + std::filesystem::path(amencPath).stem().wstring();
-
-    // 使用关键标志位：FILE_FLAG_DELETE_ON_CLOSE
     HANDLE hFile = CreateFileW(outPath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL,
                               CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) return nullptr;
 
-    // 此处应包含分块解密逻辑并将结果写入 hFile
-    // 此处仅做逻辑结构对齐，符合 Production-ready 要求
-    const char* header = "ArcMeta Decrypted Payload";
-    DWORD written = 0;
-    WriteFile(hFile, header, (DWORD)strlen(header), &written, NULL);
+    BCRYPT_KEY_HANDLE hKey = NULL;
+    BCryptGenerateSymmetricKey(m_aesAlg, &hKey, NULL, 0, key.data(), (ULONG)key.size(), 0);
 
-    // 返回共享指针，由外部控制生命周期
+    const size_t CHUNK_SIZE = 64 * 1024;
+    std::vector<BYTE> buffer(CHUNK_SIZE + 16);
+    std::vector<BYTE> plainBuffer(CHUNK_SIZE + 16);
+
+    while (is.read((char*)buffer.data(), CHUNK_SIZE) || is.gcount() > 0) {
+        DWORD readBytes = (DWORD)is.gcount();
+        DWORD plainLen = 0;
+        bool isLast = is.eof();
+
+        BCryptDecrypt(hKey, buffer.data(), readBytes, NULL, iv.data(), (ULONG)iv.size(),
+                      plainBuffer.data(), (ULONG)plainBuffer.size(), &plainLen,
+                      isLast ? BCRYPT_BLOCK_PADDING : 0);
+
+        DWORD written = 0;
+        WriteFile(hFile, plainBuffer.data(), plainLen, &written, NULL);
+    }
+
+    BCryptDestroyKey(hKey);
+    is.close();
+
+    // 关键：将文件指针移回开头，方便后续进程读取
+    SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+
     return std::make_shared<DecryptedFileHandle>(hFile, outPath);
 }
 

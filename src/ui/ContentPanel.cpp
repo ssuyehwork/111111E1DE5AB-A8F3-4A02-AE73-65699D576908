@@ -17,6 +17,8 @@
 #include <QFileInfo>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QFileIconProvider>
+#include "../mft/MftReader.h"
 
 namespace ArcMeta {
 
@@ -214,11 +216,39 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
 
     QFileInfo info(path);
     if (info.isDir()) {
-        // 如果是目录，发出信号请求主窗口切换路径
         emit directorySelected(path);
+        loadDirectory(path); // 钻取目录
     } else {
-        // 如果是文件，调用系统默认关联程序打开
         QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    }
+}
+
+/**
+ * @brief 实现目录加载逻辑（开箱即用：调用 MftReader 索引层）
+ */
+void ContentPanel::loadDirectory(const QString& path) {
+    m_model->clear();
+    m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
+
+    auto entries = MftReader::instance().getChildren(path.toStdWString());
+    QFileIconProvider iconProvider;
+
+    for (const auto& entry : entries) {
+        QString fileName = QString::fromStdWString(entry.name);
+        QString fullPath = path + "/" + fileName;
+        QFileInfo info(fullPath);
+
+        QList<QStandardItem*> row;
+        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
+        nameItem->setData(fullPath, PathRole);
+        nameItem->setData(entry.isDir() ? "folder" : "file", Qt::UserRole); // 模拟 type
+
+        row << nameItem;
+        row << new QStandardItem(entry.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
+        row << new QStandardItem(entry.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
+        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
+
+        m_model->appendRow(row);
     }
 }
 
