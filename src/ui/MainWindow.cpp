@@ -209,8 +209,8 @@ void MainWindow::initUi() {
         });
 
     // 5b. FilterPanel 勾选变化 -> 内容面板过滤
-    connect(m_filterPanel, &FilterPanel::filterChanged, [this](const FilterState&) {
-        m_contentPanel->applyFilters();
+    connect(m_filterPanel, &FilterPanel::filterChanged, [this](const FilterState& state) {
+        m_contentPanel->applyFilters(state);
     });
 
     // 6. 工具栏路径跳转
@@ -237,7 +237,7 @@ void MainWindow::initUi() {
     connect(m_metaPanel, &MetaPanel::metadataChanged, [this](int rating, const std::wstring& color) {
         auto indexes = m_contentPanel->getSelectedIndexes();
         for (const auto& idx : indexes) {
-            QString path = idx.data(Qt::UserRole + 3 /* PathRole */).toString(); // 根据 ContentPanel.h Role 确定
+            QString path = idx.data(PathRole).toString();
             if(path.isEmpty()) continue;
             
             QFileInfo info(path);
@@ -245,11 +245,11 @@ void MainWindow::initUi() {
             meta.load();
 
             if (rating != -1) {
-                m_contentPanel->model()->setData(idx, rating, Qt::UserRole + 1 /* RatingRole */);
+                m_contentPanel->model()->setData(idx, rating, RatingRole);
                 meta.items()[info.fileName().toStdWString()].rating = rating;
             }
             if (color != L"__NO_CHANGE__") {
-                m_contentPanel->model()->setData(idx, QString::fromStdWString(color), Qt::UserRole + 2 /* ColorRole */);
+                m_contentPanel->model()->setData(idx, QString::fromStdWString(color), ColorRole);
                 meta.items()[info.fileName().toStdWString()].color = color;
             }
             meta.save();

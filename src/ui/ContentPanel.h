@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
 #include <QMap>
+#include "FilterPanel.h"
 
 namespace ArcMeta {
 
@@ -20,7 +21,8 @@ enum ItemRole {
     PinnedRole,
     EncryptedRole,
     PathRole,
-    IsLockedRole
+    IsLockedRole,
+    TagsRole
 };
 
 /**
@@ -96,9 +98,20 @@ private:
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
 
+    FilterState m_currentFilter;
+
     int m_zoomLevel = 64;
     QString m_currentPath;
     void updateGridSize();
+
+    void addItemsFromDirectory(const QString& path, bool recursive,
+                               QMap<int, int>& ratingCounts,
+                               QMap<QString, int>& colorCounts,
+                               QMap<QString, int>& tagCounts,
+                               QMap<QString, int>& typeCounts,
+                               QMap<QString, int>& createDateCounts,
+                               QMap<QString, int>& modifyDateCounts,
+                               int& noTagCount);
 
 public slots:
     void onSelectionChanged();
@@ -108,7 +121,7 @@ public slots:
     /**
      * @brief 加载并显示目录内容
      */
-    void loadDirectory(const QString& path);
+    void loadDirectory(const QString& path, bool recursive = false);
 
     /**
      * @brief 全局/本地搜索
@@ -118,7 +131,8 @@ public slots:
     /**
      * @brief 应用当前筛选器
      */
-    void applyFilters();
+    void applyFilters(const FilterState& state);
+    void applyFilters(); // 使用保存的状态重新应用
 
 protected:
     void wheelEvent(QWheelEvent* event) override;

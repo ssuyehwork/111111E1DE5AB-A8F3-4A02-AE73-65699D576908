@@ -60,9 +60,35 @@ ContentPanel::ContentPanel(QWidget* parent)
 }
 
 void ContentPanel::initUi() {
-    QLabel* titleLabel = new QLabel("内容（文件夹 / 文件）", this);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526; border-bottom: 1px solid #333;");
-    m_mainLayout->addWidget(titleLabel);
+    QWidget* titleBar = new QWidget(this);
+    titleBar->setStyleSheet("background: #252526; border-bottom: 1px solid #333;");
+    titleBar->setFixedHeight(38);
+    QHBoxLayout* titleL = new QHBoxLayout(titleBar);
+    titleL->setContentsMargins(12, 0, 12, 0);
+
+    QLabel* titleLabel = new QLabel("内容（文件夹 / 文件）", titleBar);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; border: none;");
+
+    QPushButton* btnLayers = new QPushButton(titleBar);
+    btnLayers->setFixedSize(24, 24);
+    btnLayers->setIcon(UiHelper::getIcon("layers", QColor("#B0B0B0"), 18));
+    btnLayers->setToolTip("递归显示子目录所有文件");
+    btnLayers->setStyleSheet(
+        "QPushButton { background: transparent; border: none; border-radius: 4px; }"
+        "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
+        "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
+    );
+    connect(btnLayers, &QPushButton::clicked, [this]() {
+        if (!m_currentPath.isEmpty() && m_currentPath != "computer://") {
+            loadDirectory(m_currentPath, true);
+        }
+    });
+
+    titleL->addWidget(titleLabel);
+    titleL->addStretch();
+    titleL->addWidget(btnLayers);
+
+    m_mainLayout->addWidget(titleBar);
 
     m_viewStack = new QStackedWidget(this);
     
@@ -463,13 +489,13 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
     }
 }
 
-void ContentPanel::loadDirectory(const QString& path) {
+void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
     // 空路径 → 展示此电脑（所有驱动器）
-    if (path.isEmpty()) {
-        m_currentPath = "";
+    if (path.isEmpty() || path == "computer://") {
+        m_currentPath = "computer://";
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
         for (const QFileInfo& drive : drives) {
@@ -487,18 +513,7 @@ void ContentPanel::loadDirectory(const QString& path) {
     }
 
     m_currentPath = path;
-    QDir dir(path);
-    if (!dir.exists()) return;
 
-    QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
-    QFileIconProvider iconProvider;
-
-    // 预读当前目录的元数据配置图谱
-    ArcMeta::AmMetaJson meta(m_currentPath.toStdWString());
-    meta.load();
-    const auto& metaItems = meta.items();
-
-    // --- 边建模型边统计（用于 FilterPanel） ---
     QMap<int, int>     ratingCounts;
     QMap<QString, int> colorCounts;
     QMap<QString, int> tagCounts;
@@ -506,6 +521,35 @@ void ContentPanel::loadDirectory(const QString& path) {
     QMap<QString, int> createDateCounts;
     QMap<QString, int> modifyDateCounts;
     int noTagCount = 0;
+
+    addItemsFromDirectory(path, recursive, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
+
+    applyFilters();
+
+    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
+    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
+                              createDateCounts, modifyDateCounts);
+}
+
+void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
+                                       QMap<int, int>& ratingCounts,
+                                       QMap<QString, int>& colorCounts,
+                                       QMap<QString, int>& tagCounts,
+                                       QMap<QString, int>& typeCounts,
+                                       QMap<QString, int>& createDateCounts,
+                                       QMap<QString, int>& modifyDateCounts,
+                                       int& noTagCount)
+{
+    QDir dir(path);
+    if (!dir.exists()) return;
+
+    QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
+    QFileIconProvider iconProvider;
+
+    // 预读当前目录的元数据配置图谱
+    ArcMeta::AmMetaJson meta(path.toStdWString());
+    meta.load();
+    const auto& metaItems = meta.items();
 
     QDate today    = QDate::currentDate();
     QDate yesterday = today.addDays(-1);
@@ -530,6 +574,7 @@ void ContentPanel::loadDirectory(const QString& path) {
         int     itemRating = 0;
         QString itemColor;
         bool    hasTags = false;
+        QStringList itemTags;
 
         auto it = metaItems.find(fileName.toStdWString());
         if (it != metaItems.end()) {
@@ -539,8 +584,12 @@ void ContentPanel::loadDirectory(const QString& path) {
             nameItem->setData(itemColor, ColorRole);
             nameItem->setData(it->second.pinned, IsLockedRole);
             hasTags = !it->second.tags.empty();
-            for (const auto& tag : it->second.tags)
-                tagCounts[QString::fromStdWString(tag)]++;
+            for (const auto& tag : it->second.tags) {
+                QString t = QString::fromStdWString(tag);
+                itemTags << t;
+                tagCounts[t]++;
+            }
+            nameItem->setData(itemTags, TagsRole);
         }
 
         // 评级统计
@@ -561,11 +610,11 @@ void ContentPanel::loadDirectory(const QString& path) {
         row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
         row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
         m_model->appendRow(row);
-    }
 
-    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
-    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                              createDateCounts, modifyDateCounts);
+        if (recursive && info.isDir()) {
+            addItemsFromDirectory(fullPath, true, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
+        }
+    }
 }
 
 
@@ -618,14 +667,94 @@ void ContentPanel::search(const QString& query) {
     }
 }
 
+void ContentPanel::applyFilters(const FilterState& state) {
+    m_currentFilter = state;
+    applyFilters();
+}
+
 void ContentPanel::applyFilters() {
-    // 配合 FilterPanel 信号触发的实时过滤
-    // 此处实现基础的模型行隐藏逻辑，确保非空占位且逻辑闭环
     for (int i = 0; i < m_model->rowCount(); ++i) {
+        QStandardItem* item = m_model->item(i, 0);
+        if (!item) continue;
+
         bool visible = true;
-        // 未来此处将对接 FilterPanel 的过滤参数集合
-        m_viewStack->currentWidget() == m_gridView ? 
-            m_gridView->setRowHidden(i, !visible) : 
+
+        // 1. 评级过滤
+        if (!m_currentFilter.ratings.isEmpty()) {
+            int r = item->data(RatingRole).toInt();
+            if (!m_currentFilter.ratings.contains(r)) visible = false;
+        }
+
+        // 2. 颜色过滤
+        if (visible && !m_currentFilter.colors.isEmpty()) {
+            QString c = item->data(ColorRole).toString();
+            if (!m_currentFilter.colors.contains(c)) visible = false;
+        }
+
+        // 3. 标签过滤 - 优化：从模型 Role 中直接读取，避免大量磁盘 I/O
+        if (visible && !m_currentFilter.tags.isEmpty()) {
+            QStringList itemTags = item->data(TagsRole).toStringList();
+
+            bool matchTag = false;
+            for (const QString& fTag : m_currentFilter.tags) {
+                if (fTag == "__none__") {
+                    if (itemTags.isEmpty()) { matchTag = true; break; }
+                } else {
+                    if (itemTags.contains(fTag)) { matchTag = true; break; }
+                }
+            }
+            if (!matchTag) visible = false;
+        }
+
+        // 4. 类型过滤
+        if (visible && !m_currentFilter.types.isEmpty()) {
+            QString type = item->data(Qt::UserRole).toString(); // "folder" or "file"
+            QString ext = QFileInfo(item->data(PathRole).toString()).suffix().toUpper();
+
+            bool matchType = false;
+            for (const QString& fType : m_currentFilter.types) {
+                if (fType == "folder") {
+                    if (type == "folder") { matchType = true; break; }
+                } else {
+                    if (ext == fType.toUpper()) { matchType = true; break; }
+                }
+            }
+            if (!matchType) visible = false;
+        }
+
+        // 5. 日期过滤 (创建日期)
+        if (visible && !m_currentFilter.createDates.isEmpty()) {
+            QDate d = QFileInfo(item->data(PathRole).toString()).birthTime().date();
+            QDate today = QDate::currentDate();
+            QString dStr = d.toString("yyyy-MM-dd");
+
+            bool matchDate = false;
+            for (const QString& fDate : m_currentFilter.createDates) {
+                if (fDate == "today" && d == today) { matchDate = true; break; }
+                if (fDate == "yesterday" && d == today.addDays(-1)) { matchDate = true; break; }
+                if (fDate == dStr) { matchDate = true; break; }
+            }
+            if (!matchDate) visible = false;
+        }
+
+        // 6. 日期过滤 (修改日期)
+        if (visible && !m_currentFilter.modifyDates.isEmpty()) {
+            QDate d = QFileInfo(item->data(PathRole).toString()).lastModified().date();
+            QDate today = QDate::currentDate();
+            QString dStr = d.toString("yyyy-MM-dd");
+
+            bool matchDate = false;
+            for (const QString& fDate : m_currentFilter.modifyDates) {
+                if (fDate == "today" && d == today) { matchDate = true; break; }
+                if (fDate == "yesterday" && d == today.addDays(-1)) { matchDate = true; break; }
+                if (fDate == dStr) { matchDate = true; break; }
+            }
+            if (!matchDate) visible = false;
+        }
+
+        if (m_viewStack->currentWidget() == m_gridView)
+            m_gridView->setRowHidden(i, !visible);
+        else
             m_treeView->setRowHidden(i, m_treeView->rootIndex(), !visible);
     }
 }
