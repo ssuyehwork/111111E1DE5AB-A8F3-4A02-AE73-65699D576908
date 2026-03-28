@@ -35,9 +35,14 @@ protected:
 
 private slots:
     void onPinToggled(bool checked);
+    void onBackClicked();
+    void onForwardClicked();
+    void onUpClicked();
 
 private:
     void initUi();
+    void updateNavButtons();
+    void navigateTo(const QString& path, bool record = true);
     void initToolbar();
     void setupSplitters();
     void setupCustomTitleBarButtons();
@@ -67,6 +72,8 @@ private:
 
     // 状态管理
     bool m_isPinned = false;
+    QStringList m_history;
+    int m_historyIndex = -1;
 
     // 窗口拖动
     bool m_isDragging = false;

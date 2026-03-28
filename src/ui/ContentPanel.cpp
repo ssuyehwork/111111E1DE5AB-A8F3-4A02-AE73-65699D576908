@@ -88,7 +88,7 @@ void ContentPanel::updateGridSize() {
     m_zoomLevel = qBound(32, m_zoomLevel, 128);
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
-    int cardW = m_zoomLevel + 40; // 拓宽 10px 提供呼吸感
+    int cardW = m_zoomLevel + 30; // 缩小 10px (40 -> 30)
     int cardH = m_zoomLevel + 50;
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
@@ -289,7 +289,7 @@ void ContentPanel::initGridView() {
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
-    m_gridView->setGridSize(QSize(126, 146));
+    m_gridView->setGridSize(QSize(116, 146)); // 126 -> 116 (缩小 10px)
     m_gridView->setSpacing(10);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -619,8 +619,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int ratingY = iconRect.bottom() + gap1;
     int rating = index.data(RatingRole).toInt();
     
-    int starSize = 12; // 用户要求瘦身
-    int starSpacing = 2;
+    int starSize = 12;
+    int starSpacing = 1; // 还原间距，不再脑补加宽
     int banW = 12;
     int banGap = 4;
     int infoTotalW = banW + banGap + (5 * starSize) + (4 * starSpacing);
@@ -687,16 +687,16 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
         if (mEvent->button() == Qt::LeftButton) {
             int baseIconSize = option.decorationSize.width();
             if (baseIconSize <= 0) baseIconSize = 64; 
-            int iconDrawSize = baseIconSize * 0.65; 
+            int iconDrawSize = static_cast<int>(baseIconSize * 0.65);
             int ratingH = 12;
             int nameH = 16;
             int gap1 = 6;
             int gap2 = 4;
             int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-            int startY = option.rect.top() + (option.rect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
+            int startY = option.rect.top() + (option.rect.height() - totalH) / 2 + 13;
             int ratingY = startY + iconDrawSize + gap1;
-            int starSize = 12; // 用户缩小要求
-            int starSpacing = 2;
+            int starSize = 12;
+            int starSpacing = 1;
             int banW = 12;
             int banGap = 4;
             int infoTotalW = banW + banGap + (5 * starSize + 4 * starSpacing);
@@ -795,20 +795,23 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
 void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const {
     Q_UNUSED(index);
     // 强制编辑器位置与 paint 中计算的文件名绘制区域 NameBox 重合
-    QRect cardRect = option.rect.adjusted(2, 2, -2, -2);
-    int iconDrawSize = 64;
+    QRect cardRect = option.rect.adjusted(4, 4, -4, -4);
+    int baseIconSize = option.decorationSize.width();
+    if (baseIconSize <= 0) baseIconSize = 64;
+    int iconDrawSize = static_cast<int>(baseIconSize * 0.65);
+
     int ratingH = 12;
     int nameH = 16;
     int gap1 = 6;
     int gap2 = 4;
     
     int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
+    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13;
     int ratingY = startY + iconDrawSize + gap1;
     int nameY = ratingY + ratingH + gap2;
     
-    // 微微加高边框增强包围感
-    QRect nameBoxRect(cardRect.left() + 6, nameY - 2, cardRect.width() - 12, nameH + 4);
+    // 编辑框精准覆盖文件名区域，不遮挡星级
+    QRect nameBoxRect(cardRect.left() + 6, nameY, cardRect.width() - 12, nameH);
     editor->setGeometry(nameBoxRect);
 }
 

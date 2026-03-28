@@ -126,10 +126,8 @@ void MainWindow::initUi() {
     // 核心红线：建立各面板间的信号联动 (Data Linkage)
     
     // 1. 导航/收藏选择 -> 内容面板刷新
-    // 1. 导航/收藏选择 -> 内容面板刷新
     connect(m_navPanel, &NavPanel::directorySelected, [this](const QString& path) {
-        m_pathEdit->setText(path);
-        m_contentPanel->loadDirectory(path);
+        navigateTo(path);
     });
 
     // 1a. 分类选择 -> 内容面板执行检索或筛选
@@ -197,8 +195,7 @@ void MainWindow::initUi() {
 
     // 6. 工具栏路径跳转
     connect(m_pathEdit, &QLineEdit::returnPressed, [this]() {
-        QString path = m_pathEdit->text();
-        m_contentPanel->loadDirectory(path);
+        navigateTo(m_pathEdit->text());
     });
 
     // 7. 工具栏极速搜索对接 (MFT 并行引擎)
@@ -284,21 +281,30 @@ void MainWindow::initToolbar() {
 
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
-        btn->setFixedSize(60, 28);
+        btn->setFixedSize(32, 28); // 极致精简宽度
         
-        // 使用 UiHelper 优化图标渲染，消除冗余的 replace 逻辑
         QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
         btn->setIcon(icon);
         btn->setIconSize(QSize(18, 18));
         
         btn->setToolTip(tip);
-        btn->setStyleSheet("QPushButton { background: #333333; border: 1px solid #444444; border-radius: 4px; } QPushButton:hover { background: #444444; }");
+        // 极致精简样式：无边框，仅悬停可见背景
+        btn->setStyleSheet(
+            "QPushButton { background: transparent; border: none; border-radius: 4px; }"
+            "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
+            "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
+            "QPushButton:disabled { opacity: 0.3; }"
+        );
         return btn;
     };
 
     m_btnBack = createBtn("nav_prev", "后退");
     m_btnForward = createBtn("nav_next", "前进");
     m_btnUp = createBtn("arrow_up", "上级");
+
+    connect(m_btnBack, &QPushButton::clicked, this, &MainWindow::onBackClicked);
+    connect(m_btnForward, &QPushButton::clicked, this, &MainWindow::onForwardClicked);
+    connect(m_btnUp, &QPushButton::clicked, this, &MainWindow::onUpClicked);
 
     m_pathEdit = new QLineEdit(this);
     m_pathEdit->setPlaceholderText("输入路径...");
@@ -412,6 +418,57 @@ void MainWindow::setupCustomTitleBarButtons() {
 
     // 逻辑：置顶切换
     connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);
+}
+
+void MainWindow::navigateTo(const QString& path, bool record) {
+    if (path.isEmpty()) return;
+
+    QString normPath = QDir::toNativeSeparators(path);
+    if (record) {
+        // 如果在历史中间进行跳转，清除之后的历史
+        if (m_historyIndex < m_history.size() - 1) {
+            m_history = m_history.mid(0, m_historyIndex + 1);
+        }
+
+        // 避免重复记录相同路径
+        if (m_history.isEmpty() || m_history.last() != normPath) {
+            m_history.append(normPath);
+            m_historyIndex = m_history.size() - 1;
+        }
+    }
+
+    m_pathEdit->setText(normPath);
+    m_contentPanel->loadDirectory(normPath);
+    updateNavButtons();
+}
+
+void MainWindow::onBackClicked() {
+    if (m_historyIndex > 0) {
+        m_historyIndex--;
+        navigateTo(m_history[m_historyIndex], false);
+    }
+}
+
+void MainWindow::onForwardClicked() {
+    if (m_historyIndex < m_history.size() - 1) {
+        m_historyIndex++;
+        navigateTo(m_history[m_historyIndex], false);
+    }
+}
+
+void MainWindow::onUpClicked() {
+    QDir dir(m_pathEdit->text());
+    if (dir.cdUp()) {
+        navigateTo(dir.absolutePath());
+    }
+}
+
+void MainWindow::updateNavButtons() {
+    m_btnBack->setEnabled(m_historyIndex > 0);
+    m_btnForward->setEnabled(m_historyIndex < m_history.size() - 1);
+
+    QDir dir(m_pathEdit->text());
+    m_btnUp->setEnabled(!dir.isRoot());
 }
 
 void MainWindow::onPinToggled(bool checked) {
