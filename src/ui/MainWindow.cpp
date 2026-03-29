@@ -27,6 +27,8 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
 #endif
 
 namespace ArcMeta {
@@ -44,15 +46,23 @@ MainWindow::MainWindow(QWidget* parent)
     // 设置基础窗口标志 (保持无边框)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    // 2026-03-xx 按照用户要求优化启动置顶逻辑：强制同步 Qt 标志位并使用高性能 WinAPI 标志
+    // 2026-03-xx 按照用户要求优化启动置顶逻辑：使用原生 WinAPI 托管，避免启动瞬间重绘压力
     if (m_isPinned) {
+        // 初始启动允许同步 Qt Flag 以建立正确状态
         setWindowFlag(Qt::WindowStaysOnTopHint, true);
 #ifdef Q_OS_WIN
+        // 警告：setWindowFlag 可能导致窗口重建，必须重新获取 winId()
         HWND hwnd = (HWND)winId();
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #endif
     }
+
+#ifdef Q_OS_WIN
+    // 2026-03-xx 按照宪法 5.6 要求：开启 Windows 11 原生圆角 (Attr: 33, Value: 2)
+    int cornerPreference = 2;
+    DwmSetWindowAttribute((HWND)winId(), 33, &cornerPreference, sizeof(cornerPreference));
+#endif
 
     // 应用全局样式（包括滚动条美化）
     QString qss = R"(
@@ -674,21 +684,21 @@ void MainWindow::updateStatusBar() {
 }
 
 void MainWindow::onPinToggled(bool checked) {
-    // 2026-03-xx 按照用户要求优化置顶逻辑：
-    // 强制同步 Qt 标志位与 WinAPI 状态，并配合高性能标志位消灭卡顿
+    // 2026-03-xx 终极优化：在 Windows 下禁绝动态 setWindowFlag 以避免窗口重建导致的闪退。
+    // 仅使用原生 WinAPI 独占托管置顶状态，移除危险的 SWP_NOREDRAW，确保渲染链稳健。
     if (m_isPinned == checked) return;
     m_isPinned = checked;
 
-    // 2026-03-xx 核心优化：首先同步 Qt 内部框架标志位，防止重绘冲突与状态撕裂
-    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
-
 #ifdef Q_OS_WIN
     HWND hwnd = (HWND)winId();
-    // 使用 SWP_NOSENDCHANGING | SWP_NOREDRAW 极速完成系统层级切换，不干扰 UI 线程消息循环
-    SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_NOREDRAW);
+    if (IsWindow(hwnd)) {
+        // 使用安全标志位组合：拦截消息风暴，不改变尺寸，不激活，不重建
+        SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+    }
 #else
-    show(); // 非 Windows 平台修改 Flag 后通常需要重新显示
+    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
+    show(); // 非 Windows 平台常规处理
 #endif
 
     // 2026-03-xx 按照宪法 5.7 要求：置顶态使用垂直图标 (pin_vertical)，非置顶使用 pin_tilted
