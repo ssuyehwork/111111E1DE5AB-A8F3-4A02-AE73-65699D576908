@@ -956,7 +956,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    int nameH = 16;
+    // 2026-03-xx 按照用户要求：文件名背景块高度由 16px 调整为 18px
+    int nameH = 18;
     int gap1 = 6;
     int gap2 = 4;
     
@@ -1066,7 +1067,8 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             if (baseIconSize <= 0) baseIconSize = 64; 
             int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
             int ratingH = 12;
-            int nameH = 16;
+            // 2026-03-xx 按照用户要求：点击判定基准高度同步调整为 18px
+            int nameH = 18;
             int gap1 = 6;
             int gap2 = 4;
             int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
@@ -1185,7 +1187,8 @@ void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionV
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    int nameH = 16;
+    // 2026-03-xx 按照用户要求：编辑器高度同步调整为 18px
+    int nameH = 18;
     int gap1 = 6;
     int gap2 = 4;
     
