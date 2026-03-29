@@ -43,7 +43,7 @@ list(APPEND SOURCES
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
 add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest")
 
-# 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
+# 链接库 (文档红线列表: ntdll, ole32, bcrypt + dwmapi + QtSql)
 target_link_libraries(ArcMeta PRIVATE
     Qt6::Widgets
     Qt6::Svg
@@ -51,6 +51,7 @@ target_link_libraries(ArcMeta PRIVATE
     ntdll
     ole32
     bcrypt
+    dwmapi
 )
 
 # 声明管理员权限 Manifest (现代 CMake 方式通过直接将 ArcMeta.manifest 加入 add_executable 处理)
