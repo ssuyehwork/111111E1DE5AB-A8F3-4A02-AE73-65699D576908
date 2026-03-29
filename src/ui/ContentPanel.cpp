@@ -496,7 +496,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QMenu menu(this);
     menu.setStyleSheet(
         "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 6px; }"
-        "QMenu::item { height: 26px; padding: 0 10px 0 10px; border-radius: 3px; font-size: 12px; }"
+        "QMenu::item { height: 24px; padding: 0 10px 0 10px; border-radius: 3px; font-size: 12px; }"
         "QMenu::item:selected { background-color: #505050; }"
         "QMenu::separator { height: 1px; background: #444444; margin: 4px 8px 4px 8px; }"
         "QMenu::right-arrow { image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRUVFRUVFIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iOSAxOCAxNSAxMiA5IDYiPjwvcG9seWxpbmU+PC9zdmc+); width: 12px; height: 12px; right: 8px; }"
@@ -942,7 +942,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
     painter->setPen(Qt::NoPen);
     painter->setBrush(badgeColor);
-    painter->drawRoundedRect(extRect, 4, 4);
+    // 2026-03-xx 按照用户要求：卡片内圆角由 4px 统一调整为 2px
+    painter->drawRoundedRect(extRect, 2, 2);
     painter->setPen(QColor("#FFFFFF"));
     QFont extFont = painter->font();
     extFont.setPointSize(8);
@@ -1006,7 +1007,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         if (dotC.isValid()) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(dotC);
-            painter->drawRoundedRect(nameRect, 4, 4);
+            // 2026-03-xx 按照用户要求：卡片内圆角由 4px 统一调整为 2px
+            painter->drawRoundedRect(nameRect, 2, 2);
             painter->setPen(dotC.lightness() > 180 ? Qt::black : Qt::white);
         } else {
             painter->setPen(QColor("#CCCCCC"));
@@ -1134,7 +1136,7 @@ QWidget* GridItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewI
     QString textColor = tagColorStr.isEmpty() ? "#FFFFFF" : "#000000";
 
     editor->setStyleSheet(
-        QString("QLineEdit { background-color: %1; color: %2; border-radius: 4px; "
+        QString("QLineEdit { background-color: %1; color: %2; border-radius: 2px; "
                 "border: 2px solid #3498db; font-weight: bold; font-size: 8pt; padding: 0px; }")
         .arg(bgColor, textColor)
     );
