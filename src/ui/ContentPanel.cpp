@@ -494,12 +494,6 @@ void ContentPanel::initListView() {
 
 void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QMenu menu(this);
-    menu.setStyleSheet(
-        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 4px; }"
-        "QMenu::item { height: 22px; padding: 0 10px 0 10px; border-radius: 3px; font-size: 12px; }"
-        "QMenu::item:selected { background-color: #378ADD; }"
-        "QMenu::separator { height: 1px; background: #444444; margin: 4px 8px 4px 8px; }"
-    );
 
     menu.addAction("打开");
     menu.addAction("用系统默认程序打开");
