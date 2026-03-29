@@ -21,6 +21,7 @@
 #include <QApplication>
 #include <QSettings>
 #include <QCloseEvent>
+#include <QTimer>
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>
@@ -719,9 +720,17 @@ void MainWindow::onPinToggled(bool checked) {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_tilted", QColor("#EEEEEE")));
     }
 
-    // 持久化存储
-    QSettings settings("ArcMeta团队", "ArcMeta");
-    settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
+    // 持久化存储：2026-03-xx 性能优化，由同步阻塞改为延迟持久化，避免注册表 IO 阻塞 UI 线程
+    static QTimer* saveTimer = nullptr;
+    if (!saveTimer) {
+        saveTimer = new QTimer(this);
+        saveTimer->setSingleShot(true);
+        connect(saveTimer, &QTimer::timeout, [this]() {
+            QSettings settings("ArcMeta团队", "ArcMeta");
+            settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
+        });
+    }
+    saveTimer->start(1000); // 1秒后执行持久化，合并频繁操作
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {

@@ -185,21 +185,20 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
         }
     } else if (role == Qt::DecorationRole && index.column() == 0) {
         static QFileIconProvider provider;
-        if (item.isDrive) {
-            if (!m_iconCache.contains("__DRIVE__")) {
-                m_iconCache["__DRIVE__"] = provider.icon(QFileIconProvider::Drive);
-            }
-            return m_iconCache["__DRIVE__"];
-        }
+        if (item.isDrive) return provider.icon(QFileIconProvider::Drive);
 
         // 极致性能：针对常见后缀使用后缀缓存，减少 QFileInfo 的系统调用
-        QString cacheKey = item.isDir ? "__DIR__" : item.extension.toLower();
+        // 2026-03-xx 修复：文件夹图标可能因 Desktop.ini 个性化。为保证原生多样性，文件夹图标使用路径作为缓存键。
+        QString cacheKey = item.isDir ? item.fullPath : item.extension.toLower();
         if (m_iconCache.contains(cacheKey)) return m_iconCache[cacheKey];
 
         QIcon icon = provider.icon(QFileInfo(item.fullPath));
-        // 只缓存文件夹和常见后缀图标，特殊文件（如 .exe）不缓存以保证原生准确性
-        if (item.isDir || (!item.extension.isEmpty() && item.extension.toLower() != "exe" && item.extension.toLower() != "lnk")) {
-            m_iconCache[cacheKey] = icon;
+        // 普通文件或文件夹，限制缓存总量
+        if (m_iconCache.size() < 1000) {
+            // 只缓存通用图标（普通文件夹或无特殊性质的文件）
+            if (!item.isDir || item.fullPath.length() > 3) {
+                m_iconCache[cacheKey] = icon;
+            }
         }
         return icon;
     } else if (role == PathRole)      return item.fullPath;
@@ -213,7 +212,7 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
     else if (role == MTimeRawRole)  return item.mtime;
     else if (role == CTimeRawRole)  return item.ctime;
     else if (role == IsDirRole)     return item.isDir;
-    else if (role == Qt::UserRole + 100) return item.isDrive; // 临时角色用于识别驱动器
+    else if (role == IsDriveRole)   return item.isDrive;
 
     return QVariant();
 }
@@ -225,7 +224,10 @@ bool FileModel::setData(const QModelIndex& index, const QVariant& value, int rol
     if (role == RatingRole)    item.rating = value.toInt();
     else if (role == ColorRole)     item.color = value.toString();
     else if (role == IsLockedRole)  item.pinned = value.toBool();
-    else if (role == Qt::EditRole)   item.name = value.toString();
+    else if (role == Qt::EditRole) {
+        item.name = value.toString();
+        emit dataChanged(index, index, {Qt::DisplayRole}); // 名称改变必须触发显示刷新
+    }
     else if (role == PathRole)      item.fullPath = value.toString();
     else return false;
 
@@ -471,8 +473,14 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 return true;
             }
             if (keyEvent->key() == Qt::Key_Backspace) {
-                QDir dir(m_currentPath);
-                if (dir.cdUp()) emit directorySelected(dir.absolutePath());
+                if (!m_currentPath.isEmpty() && m_currentPath != "computer://") {
+                    QDir dir(m_currentPath);
+                    if (dir.isRoot() || m_currentPath.length() <= 3) {
+                        emit directorySelected("computer://");
+                    } else if (dir.cdUp()) {
+                        emit directorySelected(dir.absolutePath());
+                    }
+                }
                 return true;
             }
             if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
@@ -717,6 +725,9 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
 }
 
 void ContentPanel::loadDirectory(const QString& path, bool recursive) {
+    // 2026-03-xx 极致性能重构：切换目录时清空搜索缓存，确保元数据一致性
+    m_searchMetaCache.clear();
+
     // 2026-03-xx 极致性能重构：彻底废除 QStandardItem 堆分配
     QList<FileItem> items;
     if (path.isEmpty() || path == "computer://") {
@@ -909,19 +920,20 @@ void ContentPanel::search(const QString& query) {
         fi.extension = info.suffix().toUpper();
         fi.sizeStr = fullPath; // 在搜索模式下，第二列展示路径
         fi.typeStr = fi.isDir ? "文件夹" : (fi.extension.isEmpty() ? "文件" : fi.extension + " 文件");
-
-        // --- 搜索模式下元数据对接：2026-03-xx 极致性能重构：采用数据库批量缓存，消除同步磁盘探针 ---
-        static QString lastDir;
-        static std::map<std::wstring, ItemMeta> cachedMetaBatch;
         
-        QString parentDir = info.absolutePath();
-        if (parentDir != lastDir) {
-            cachedMetaBatch = ItemRepo::getMetadataBatch(parentDir.toStdWString());
-            lastDir = parentDir;
+        // --- 搜索模式下元数据对接：2026-03-xx 极致性能重构：采用数据库批量缓存，消除同步磁盘探针 ---
+        // 优化：使用成员缓存池处理交错的搜索结果，并在 loadDirectory 时重置，解决一致性 Bug
+        std::wstring parentWDir = info.absolutePath().toStdWString();
+
+        auto itBatch = m_searchMetaCache.find(parentWDir);
+        if (itBatch == m_searchMetaCache.end()) {
+            // 缓存未命中，从数据库加载整个目录的元数据批次
+            m_searchMetaCache[parentWDir] = ItemRepo::getMetadataBatch(parentWDir);
+            itBatch = m_searchMetaCache.find(parentWDir);
         }
 
-        auto it = cachedMetaBatch.find(fileName.toStdWString());
-        if (it != cachedMetaBatch.end()) {
+        auto it = itBatch->second.find(fileName.toStdWString());
+        if (it != itBatch->second.end()) {
             fi.rating = it->second.rating;
             fi.color = QString::fromStdWString(it->second.color);
             fi.pinned = it->second.pinned;
@@ -1024,7 +1036,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     painter->drawRoundedRect(cardRect, 8, 8);
 
     QString path = index.data(PathRole).toString();
-    bool isDrive = index.data(Qt::UserRole + 100).toBool();
+    bool isDrive = index.data(IsDriveRole).toBool();
 
     if (!isDrive) {
         QFileInfo info(path);

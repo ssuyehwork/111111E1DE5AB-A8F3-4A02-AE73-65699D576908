@@ -9,7 +9,11 @@
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
 #include <QMap>
+#include <unordered_map>
+#include <map>
+#include <string>
 #include "FilterPanel.h"
+#include "../meta/AmMetaJson.h"
 
 namespace ArcMeta {
 
@@ -19,16 +23,16 @@ namespace ArcMeta {
 enum ItemRole {
     RatingRole = Qt::UserRole + 1,
     ColorRole,
-    PinnedRole,
     EncryptedRole,
     PathRole,
-    IsLockedRole,
+    IsLockedRole, // 对应置顶/Lock 状态
     TagsRole,
     TypeRole,
     SizeRawRole,
     MTimeRawRole,
     CTimeRawRole,
-    IsDirRole
+    IsDirRole,
+    IsDriveRole
 };
 
 /**
@@ -156,6 +160,9 @@ private:
     QTreeView* m_treeView = nullptr;
     FileModel* m_model = nullptr; // 2026-03-xx 极致性能重构：切换至自定义享元模型
     QSortFilterProxyModel* m_proxyModel = nullptr;
+
+    // 2026-03-xx 极致性能：搜索专用元数据缓存池 (多目录分批)
+    std::unordered_map<std::wstring, std::map<std::wstring, ItemMeta>> m_searchMetaCache;
 
     FilterState m_currentFilter;
 

@@ -107,49 +107,59 @@ bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
  * @brief 极致性能：使用非递归 BFS 一次性建立全量路径索引
  */
 void MftReader::precomputePaths(const std::wstring& volume) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    auto& volIndex = m_index[volume];
-    auto& childrenMap = m_parentToChildren[volume];
-    auto& pathMap = m_pathToFrn[volume];
-    auto& frnMap = m_frnToPath[volume];
+    // 2026-03-xx 极致性能与并发安全重构：影子构建模式
+    // 在不加锁的情况下构建临时索引表，避免长时间占用互斥锁导致 UI 阻塞
+    std::unordered_map<std::wstring, DWORDLONG> tempPathToFrn;
+    std::unordered_map<DWORDLONG, std::wstring> tempFrnToPath;
 
-    pathMap.clear();
-    frnMap.clear();
+    {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        auto& volIndex = m_index[volume];
+        auto& childrenMap = m_parentToChildren[volume];
 
-    // BFS 核心循环：使用非递归方式避免栈溢出并达到 O(N) 建立全量索引
-    struct Node { DWORDLONG frn; std::wstring path; };
-    std::vector<Node> bfsQueue;
-    bfsQueue.reserve(volIndex.size());
+        // BFS 核心循环：使用非递归方式避免栈溢出并达到 O(N) 建立全量索引
+        struct Node { DWORDLONG frn; std::wstring path; };
+        std::vector<Node> bfsQueue;
+        bfsQueue.reserve(volIndex.size());
 
-    // 1. 初始化根目录子项 (FRN=5 为根)
-    if (childrenMap.count(5)) {
-        for (DWORDLONG childFrn : childrenMap[5]) {
-            if (volIndex.count(childFrn)) {
-                FileEntry& fe = volIndex[childFrn];
-                std::wstring path = volume + L"\\" + fe.name;
-                pathMap[path] = childFrn;
-                frnMap[childFrn] = path;
-                if (fe.isDir()) bfsQueue.push_back({childFrn, path});
+        // 1. 初始化根目录子项 (FRN=5 为根)
+        if (childrenMap.count(5)) {
+            for (DWORDLONG childFrn : childrenMap[5]) {
+                auto it = volIndex.find(childFrn);
+                if (it != volIndex.end()) {
+                    const FileEntry& fe = it->second;
+                    std::wstring path = volume + L"\\" + fe.name;
+                    tempPathToFrn[path] = childFrn;
+                    tempFrnToPath[childFrn] = path;
+                    if (fe.isDir()) bfsQueue.push_back({childFrn, path});
+                }
             }
         }
-    }
 
-    // 2. 层序遍历
-    size_t head = 0;
-    while (head < bfsQueue.size()) {
-        Node parent = bfsQueue[head++];
-        if (childrenMap.count(parent.frn)) {
-            for (DWORDLONG childFrn : childrenMap[parent.frn]) {
-                if (volIndex.count(childFrn)) {
-                    FileEntry& fe = volIndex[childFrn];
-                    std::wstring fullPath = parent.path + L"\\" + fe.name;
-                    pathMap[fullPath] = childFrn;
-                    frnMap[childFrn] = fullPath;
-                    if (fe.isDir()) bfsQueue.push_back({childFrn, fullPath});
+        // 2. 层序遍历
+        size_t head = 0;
+        while (head < bfsQueue.size()) {
+            Node parent = bfsQueue[head++];
+            auto itChildren = childrenMap.find(parent.frn);
+            if (itChildren != childrenMap.end()) {
+                for (DWORDLONG childFrn : itChildren->second) {
+                    auto it = volIndex.find(childFrn);
+                    if (it != volIndex.end()) {
+                        const FileEntry& fe = it->second;
+                        std::wstring fullPath = parent.path + L"\\" + fe.name;
+                        tempPathToFrn[fullPath] = childFrn;
+                        tempFrnToPath[childFrn] = fullPath;
+                        if (fe.isDir()) bfsQueue.push_back({childFrn, fullPath});
+                    }
                 }
             }
         }
     }
+
+    // 3. 原子交换：在互斥锁保护下快速切换索引指针
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    m_pathToFrn[volume] = std::move(tempPathToFrn);
+    m_frnToPath[volume] = std::move(tempFrnToPath);
 }
 
 /**
@@ -355,8 +365,9 @@ void MftReader::removeEntry(const std::wstring& volume, DWORDLONG frn) {
         // 从父子索引移除
         auto& children = m_parentToChildren[volume][parentFrn];
         children.erase(std::remove(children.begin(), children.end(), frn), children.end());
-        // 清理路径缓存
-        m_pathToFrn[volume].clear();
+        // 2026-03-xx 极致性能与并发安全：移除 clear() 以防止索引“真空期”
+        // 触发异步延迟路径刷新，利用影子构建机制在后台重建索引
+        triggerPathRefresh(volume);
     }
 }
 
