@@ -43,7 +43,7 @@ void BreadcrumbBar::setPath(const QString& path) {
         }
     }
 
-    for (int i = 0; i < parts.size(); ++i) {
+    for (qsizetype i = 0; i < parts.size(); ++i) {
         // 添加箭头/分隔符
         QLabel* sep = new QLabel(">", this);
         sep->setStyleSheet("color: #555; font-size: 10px; padding: 0 2px;");

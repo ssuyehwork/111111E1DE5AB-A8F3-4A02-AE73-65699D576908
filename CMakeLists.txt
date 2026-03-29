@@ -34,6 +34,11 @@ file(GLOB_RECURSE SOURCES
     "src/*.cpp"
     "src/*.h"
 )
+# 修复：显式包含新添加的文件，防止 CMake 缓存导致 GLOB 滞后
+list(APPEND SOURCES
+    "src/ui/BreadcrumbBar.h"
+    "src/ui/BreadcrumbBar.cpp"
+)
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
 add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest")
