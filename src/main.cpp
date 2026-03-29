@@ -7,6 +7,7 @@
 #include "db/SyncEngine.h"
 #include "meta/SyncQueue.h"
 #include "mft/MftReader.h"
+#include "core/CoreController.h"
 
 /**
  * @brief 检查当前进程是否具有管理员权限
@@ -39,23 +40,18 @@ int main(int argc, char *argv[]) {
         // 文档规定：无权限时执行降级方案，但启动基础 UI 仍需进行
     }
 
-    // 2. 初始化核心底层
+    // 2. 初始化数据库 (仅核心表结构，必须同步完成)
     std::wstring dbPath = L"arcmeta.db";
     if (!ArcMeta::Database::instance().init(dbPath)) {
         QMessageBox::critical(nullptr, "错误", "无法初始化数据库，程序即将退出。");
         return -1;
     }
 
-    // 3. 初始化文件索引
-    ArcMeta::MftReader::instance().buildIndex();
+    // 3. 启动异步初始化中控
+    // 2026-03-xx 架构重构：将原本阻塞在 main 的 MFT 扫描和增量同步移至后台线程
+    ArcMeta::CoreController::instance().startSystem();
 
-    // 4. 启动异步同步队列
-    ArcMeta::SyncQueue::instance().start();
-
-    // 5. 执行增量同步
-    ArcMeta::SyncEngine::instance().runIncrementalSync();
-
-    // 6. 显示主窗口
+    // 4. 秒开主窗口
     ArcMeta::MainWindow w;
     w.show();
 

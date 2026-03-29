@@ -38,6 +38,10 @@ file(GLOB_RECURSE SOURCES
 list(APPEND SOURCES 
     "src/ui/BreadcrumbBar.h"
     "src/ui/BreadcrumbBar.cpp"
+    "src/core/CoreController.h"
+    "src/core/CoreController.cpp"
+    "src/meta/MetadataManager.h"
+    "src/meta/MetadataManager.cpp"
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)

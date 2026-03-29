@@ -37,6 +37,7 @@
 #include "../mft/MftReader.h"
 #include "../mft/PathBuilder.h"
 #include "../meta/AmMetaJson.h"
+#include "../meta/MetadataManager.h"
 #include "UiHelper.h"
 
 namespace ArcMeta {
@@ -262,14 +263,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
-                        m_proxyModel->setData(idx, rating, RatingRole);
                         QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
-                            QFileInfo info(path);
-                            AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            meta.items()[info.fileName().toStdWString()].rating = rating;
-                            meta.save();
+                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
+                        MetadataManager::instance().setRating(path.toStdWString(), rating);
+                        m_proxyModel->setData(idx, rating, RatingRole);
                         }
                     }
                 }
@@ -284,13 +282,9 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     if (idx.column() == 0) {
                         QString itemPath = idx.data(PathRole).toString();
                         if (!itemPath.isEmpty()) {
-                            QFileInfo info(itemPath);
-                            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            bool current = meta.items()[info.fileName().toStdWString()].pinned;
-                            meta.items()[info.fileName().toStdWString()].pinned = !current;
-                            meta.save();
-                            // 同步模型显示 (IsLockedRole)
+                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
+                        bool current = idx.data(IsLockedRole).toBool();
+                        MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
                             m_proxyModel->setData(idx, !current, IsLockedRole);
                         }
                     }
@@ -318,14 +312,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
-                        m_proxyModel->setData(idx, color, ColorRole);
                         QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
-                            QFileInfo info(path);
-                            AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            meta.items()[info.fileName().toStdWString()].color = color.toStdWString();
-                            meta.save();
+                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
+                        MetadataManager::instance().setColor(path.toStdWString(), color.toStdWString());
+                        m_proxyModel->setData(idx, color, ColorRole);
                         }
                     }
                 }
@@ -701,11 +692,7 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
     QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
     QFileIconProvider iconProvider;
 
-    // 预读当前目录的元数据配置图谱
-    ArcMeta::AmMetaJson meta(path.toStdWString());
-    meta.load();
-    const auto& metaItems = meta.items();
-
+    // 2026-03-xx 重构：彻底抛弃单目录 AmMetaJson 加载，改为从 MetadataManager 内存镜像读取
     QDate today    = QDate::currentDate();
     QDate yesterday = today.addDays(-1);
 
@@ -725,27 +712,22 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         nameItem->setData(fullPath, PathRole);
         nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
 
-        // 元数据反填 + 统计
-        int     itemRating = 0;
-        QString itemColor;
-        bool    hasTags = false;
-        QStringList itemTags;
+        // 元数据反填 + 统计 (接入 L1 缓存)
+        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
 
-        auto it = metaItems.find(fileName.toStdWString());
-        if (it != metaItems.end()) {
-            itemRating = it->second.rating;
-            itemColor  = QString::fromStdWString(it->second.color);
-            nameItem->setData(itemRating, RatingRole);
-            nameItem->setData(itemColor, ColorRole);
-            nameItem->setData(it->second.pinned, IsLockedRole);
-            nameItem->setData(it->second.encrypted, EncryptedRole); // 2026-03-xx 完善加密角色填充
-            hasTags = !it->second.tags.empty();
-            for (const auto& tag : it->second.tags) {
-                QString t = QString::fromStdWString(tag);
-                itemTags << t;
-                tagCounts[t]++;
-            }
-            nameItem->setData(itemTags, TagsRole);
+        int     itemRating = runtimeMeta.rating;
+        QString itemColor  = QString::fromStdWString(runtimeMeta.color);
+        QStringList itemTags = runtimeMeta.tags;
+        bool    hasTags = !itemTags.isEmpty();
+
+        nameItem->setData(itemRating, RatingRole);
+        nameItem->setData(itemColor, ColorRole);
+        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
+        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
+        nameItem->setData(itemTags, TagsRole);
+
+        for (const auto& t : itemTags) {
+            tagCounts[t]++;
         }
 
         // 评级统计
@@ -818,31 +800,22 @@ void ContentPanel::search(const QString& query) {
         nameItem->setData(fullPath, PathRole); 
         nameItem->setData(entry.isDir() ? "folder" : "file", TypeRole);
         
-        int     itemRating = 0;
-        QString itemColor;
-        bool    hasTags = false;
+        // 2026-03-xx 重构：彻底消除搜索时的 IO 轰炸，接入 MetadataManager 内存镜像
+        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
 
-        // --- 搜索模式下单体探针：由于不在同一目录，需单体读取所属父目录元数据 ---
-        QString parentDir = info.absolutePath();
-        ArcMeta::AmMetaJson meta(parentDir.toStdWString());
-        meta.load();
-        auto it = meta.items().find(fileName.toStdWString());
-        if (it != meta.items().end()) {
-            itemRating = it->second.rating;
-            itemColor  = QString::fromStdWString(it->second.color);
-            nameItem->setData(itemRating, RatingRole);
-            nameItem->setData(itemColor, ColorRole);
-            nameItem->setData(it->second.pinned, IsLockedRole);
-            nameItem->setData(it->second.encrypted, EncryptedRole); // 2026-03-xx 完善加密角色填充
-            
-            hasTags = !it->second.tags.empty();
-            QStringList tgs;
-            for (const auto& t : it->second.tags) {
-                QString ts = QString::fromStdWString(t);
-                tgs << ts;
-                tagCounts[ts]++;
-            }
-            nameItem->setData(tgs, TagsRole);
+        int     itemRating = runtimeMeta.rating;
+        QString itemColor  = QString::fromStdWString(runtimeMeta.color);
+        QStringList itemTags = runtimeMeta.tags;
+        bool    hasTags = !itemTags.isEmpty();
+
+        nameItem->setData(itemRating, RatingRole);
+        nameItem->setData(itemColor, ColorRole);
+        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
+        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
+        nameItem->setData(itemTags, TagsRole);
+
+        for (const auto& t : itemTags) {
+            tagCounts[t]++;
         }
 
         // 统计累加
@@ -1084,15 +1057,11 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             // 1. 判定“清除”图标
             QRect banRect(infoStartX, ratingY + (ratingH - 14) / 2, 14, 14);
             if (banRect.contains(mEvent->pos())) {
-                // 此处的 model 已经是 View 关联的 ProxyModel
-                model->setData(index, 0, RatingRole);
                 QString path = index.data(PathRole).toString();
                 if (!path.isEmpty()) {
-                    QFileInfo info(path);
-                    AmMetaJson meta(info.absolutePath().toStdWString());
-                    meta.load();
-                    meta.items()[info.fileName().toStdWString()].rating = 0;
-                    meta.save();
+                    // 2026-03-xx 重构：接入 MetadataManager 统一更新
+                    MetadataManager::instance().setRating(path.toStdWString(), 0);
+                    model->setData(index, 0, RatingRole);
                 }
                 return true;
             }
@@ -1103,14 +1072,11 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
                 QRect starRect(starsStartX + i * (starSize + starSpacing), ratingY + (ratingH - starSize) / 2, starSize, starSize);
                 if (starRect.contains(mEvent->pos())) {
                     int r = i + 1;
-                    model->setData(index, r, RatingRole);
                     QString path = index.data(PathRole).toString();
                     if (!path.isEmpty()) {
-                        QFileInfo info(path);
-                        AmMetaJson meta(info.absolutePath().toStdWString());
-                        meta.load();
-                        meta.items()[info.fileName().toStdWString()].rating = r;
-                        meta.save();
+                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
+                        MetadataManager::instance().setRating(path.toStdWString(), r);
+                        model->setData(index, r, RatingRole);
                     }
                     return true;
                 }

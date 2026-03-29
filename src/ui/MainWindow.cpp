@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "../core/CoreController.h"
 #include "BreadcrumbBar.h"
 #include "CategoryPanel.h"
 #include "NavPanel.h"
@@ -469,6 +470,23 @@ void MainWindow::setupSplitters() {
 
     m_statusLeft = new QLabel("就绪中...", statusBar);
     m_statusLeft->setStyleSheet("font-size: 11px; color: #B0B0B0; background: transparent;");
+
+    // 绑定 CoreController 状态到状态栏
+    auto updateStatus = [this](const QString& text) {
+        m_statusLeft->setText(text);
+        // 如果正在索引，改变颜色提示
+        if (CoreController::instance().isIndexing()) {
+            m_statusLeft->setStyleSheet("font-size: 11px; color: #4FACFE; background: transparent; font-weight: bold;");
+        } else {
+            m_statusLeft->setStyleSheet("font-size: 11px; color: #B0B0B0; background: transparent;");
+        }
+    };
+    connect(&CoreController::instance(), &CoreController::statusTextChanged, this, updateStatus);
+    connect(&CoreController::instance(), &CoreController::isIndexingChanged, this, [this, updateStatus]() {
+        updateStatus(CoreController::instance().statusText());
+    });
+    // 初始状态同步
+    updateStatus(CoreController::instance().statusText());
 
     m_statusCenter = new QLabel("", statusBar);
     m_statusCenter->setAlignment(Qt::AlignCenter);
