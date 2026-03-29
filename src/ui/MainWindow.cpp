@@ -684,34 +684,37 @@ void MainWindow::updateStatusBar() {
 }
 
 void MainWindow::onPinToggled(bool checked) {
-    // 2026-03-xx 终极优化：在 Windows 下禁绝动态 setWindowFlag 以避免窗口重建导致的闪退。
-    // 仅使用原生 WinAPI 独占托管置顶状态，移除危险的 SWP_NOREDRAW，确保渲染链稳健。
+    // 2026-03-xx 性能调优：引入 SWP_ASYNCWINDOWPOS 与事件即时排空，彻底消灭切换延迟
     if (m_isPinned == checked) return;
     m_isPinned = checked;
 
-#ifdef Q_OS_WIN
-    HWND hwnd = (HWND)winId();
-    if (IsWindow(hwnd)) {
-        // 使用安全标志位组合：拦截消息风暴，不改变尺寸，不激活，不重建
-        SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
-    }
-#else
-    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
-    show(); // 非 Windows 平台常规处理
-#endif
-
-    // 2026-03-xx 按照宪法 5.7 要求：置顶态使用垂直图标 (pin_vertical)，非置顶使用 pin_tilted
-    // 按下置顶高亮为品牌橙色 (#FF551C)
+    // 1. 视觉反馈先行策略：优先更新 UI 按钮状态，确保用户感官零延迟
     if (m_isPinned) {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
     } else {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_tilted", QColor("#EEEEEE")));
     }
+    m_btnPinTop->update(); // 强制按钮局部重绘
 
-    // 持久化存储
+    // 2. 异步处理系统层级变更：使用 SWP_ASYNCWINDOWPOS 绕过 DWM 同步阻塞
+#ifdef Q_OS_WIN
+    HWND hwnd = (HWND)winId();
+    if (IsWindow(hwnd)) {
+        // 核心优化：新增 SWP_ASYNCWINDOWPOS 标志，指令发出后瞬间返回，不阻塞主线程
+        SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_ASYNCWINDOWPOS);
+    }
+#else
+    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
+    show();
+#endif
+
+    // 3. 持久化存储
     QSettings settings("ArcMeta团队", "ArcMeta");
     settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
+
+    // 4. 强制排空消息队列：处理掉由于层级变更引发的冗余系统绘制请求，消灭“发粘”感
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
