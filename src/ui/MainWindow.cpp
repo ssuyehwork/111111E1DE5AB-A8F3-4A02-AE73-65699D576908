@@ -303,6 +303,18 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
     QMainWindow::keyPressEvent(event);
 }
 
+bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::HoverEnter) {
+        QString text = watched->property("tooltipText").toString();
+        if (!text.isEmpty()) {
+            ToolTipOverlay::instance()->showText(QCursor::pos(), text);
+        }
+    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
+        ToolTipOverlay::hideTip();
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
     m_toolbar->setFixedHeight(36);
@@ -328,9 +340,17 @@ void MainWindow::initToolbar() {
         return btn;
     };
 
-    m_btnBack = createBtn("nav_prev", "后退");
-    m_btnForward = createBtn("nav_next", "前进");
-    m_btnUp = createBtn("arrow_up", "上级");
+    m_btnBack = createBtn("nav_prev", "");
+    m_btnBack->setProperty("tooltipText", "后退");
+    m_btnBack->installEventFilter(this);
+
+    m_btnForward = createBtn("nav_next", "");
+    m_btnForward->setProperty("tooltipText", "前进");
+    m_btnForward->installEventFilter(this);
+
+    m_btnUp = createBtn("arrow_up", "");
+    m_btnUp->setProperty("tooltipText", "上级");
+    m_btnUp->installEventFilter(this);
 
     connect(m_btnBack, &QPushButton::clicked, this, &MainWindow::onBackClicked);
     connect(m_btnForward, &QPushButton::clicked, this, &MainWindow::onForwardClicked);
@@ -338,7 +358,7 @@ void MainWindow::initToolbar() {
 
     // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
     m_pathStack = new QStackedWidget(this);
-    m_pathStack->setFixedHeight(40); // 2026-03-xx 按照规范要求：地址栏高度统一设定为 40px
+    m_pathStack->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
     m_pathStack->setMinimumWidth(300);
     m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
 
@@ -375,7 +395,7 @@ void MainWindow::initToolbar() {
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setFixedWidth(200);
-    m_searchEdit->setFixedHeight(40); // 2026-03-xx 按照规范要求：地址栏高度统一设定为 40px
+    m_searchEdit->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
     m_searchEdit->setStyleSheet(
         "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"
@@ -392,7 +412,7 @@ void MainWindow::setupSplitters() {
     mainL->setSpacing(5); // 各元素垂直间距统一 5px
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(40); // 2026-03-xx 按照规范要求：地址栏高度统一设定为 40px
+    addressBar->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);
@@ -477,8 +497,8 @@ void MainWindow::setupCustomTitleBarButtons() {
         return btn;
     };
 
-    m_btnCreate = createTitleBtn("ruler_spacing");
-    m_btnCreate->setToolTip("新建...");
+    m_btnCreate = createTitleBtn("add"); // 2026-03-xx 规范化：“+”按钮图标修正
+    m_btnCreate->setProperty("tooltipText", "新建...");
     QMenu* createMenu = new QMenu(m_btnCreate);
     createMenu->setStyleSheet(
         "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 4px; }"
@@ -505,6 +525,8 @@ void MainWindow::setupCustomTitleBarButtons() {
     connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
 
     m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
+    m_btnPinTop->setProperty("tooltipText", "置顶窗口");
+    m_btnPinTop->installEventFilter(this);
     m_btnPinTop->setCheckable(true);
     m_btnPinTop->setChecked(m_isPinned);
     if (m_isPinned) {
@@ -512,9 +534,18 @@ void MainWindow::setupCustomTitleBarButtons() {
     }
 
     m_btnMin = createTitleBtn("minimize");
-    m_btnMax = createTitleBtn("maximize");
-    m_btnClose = createTitleBtn("close", "#e81123"); // 关闭按钮悬停红色
+    m_btnMin->setProperty("tooltipText", "最小化");
+    m_btnMin->installEventFilter(this);
 
+    m_btnMax = createTitleBtn("maximize");
+    m_btnMax->setProperty("tooltipText", "最大化/还原");
+    m_btnMax->installEventFilter(this);
+
+    m_btnClose = createTitleBtn("close", "#e81123"); // 关闭按钮悬停红色
+    m_btnClose->setProperty("tooltipText", "关闭项目");
+    m_btnClose->installEventFilter(this);
+
+    m_btnCreate->installEventFilter(this);
     layout->addWidget(m_btnCreate);
     layout->addWidget(m_btnPinTop);
     layout->addWidget(m_btnMin);

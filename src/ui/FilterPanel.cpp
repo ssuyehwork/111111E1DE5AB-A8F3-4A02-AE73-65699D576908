@@ -89,6 +89,8 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
 
     m_btnClearAll = new QPushButton("清除", topBar);
     m_btnClearAll->setFixedSize(42, 22);
+    m_btnClearAll->setProperty("tooltipText", "重置所有筛选条件");
+    m_btnClearAll->installEventFilter(this);
     m_btnClearAll->setStyleSheet(
         "QPushButton { background: #2A2A2A; border: 1px solid #444; border-radius: 3px;"
         "              color: #AAAAAA; font-size: 11px; }"
@@ -114,6 +116,18 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
 
     m_scrollArea->setWidget(m_container);
     m_mainLayout->addWidget(m_scrollArea, 1);
+}
+
+bool FilterPanel::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::HoverEnter) {
+        QString text = watched->property("tooltipText").toString();
+        if (!text.isEmpty()) {
+            ToolTipOverlay::instance()->showText(QCursor::pos(), text);
+        }
+    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
+        ToolTipOverlay::hideTip();
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 // ─── populate ─────────────────────────────────────────────────────
@@ -333,7 +347,8 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     hdr->setFixedHeight(24);
     hdr->setStyleSheet(
         "QToolButton { background: #252525; border: none; border-top: 1px solid #333;"
-        "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; }"
+        "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
+        "              padding-left: 10px; }"
         "QToolButton:hover { color: #EEEEEE; }");
 
     QWidget* content = new QWidget(wrapper);

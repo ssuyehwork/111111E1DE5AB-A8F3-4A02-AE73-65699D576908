@@ -1,93 +1,130 @@
 #include "ToolTipOverlay.h"
-#include <QVBoxLayout>
-#include <QScreen>
-#include <QGuiApplication>
-#include <QStyleOption>
-#include <QPainter>
 
 namespace ArcMeta {
 
-ToolTipOverlay& ToolTipOverlay::instance() {
-    static ToolTipOverlay inst;
-    return inst;
-}
-
 ToolTipOverlay::ToolTipOverlay() : QWidget(nullptr) {
-    // 关键属性设置（红线：无边框、顶层、不占焦点、鼠标穿透、无阴影）
+    // [CRITICAL] 彻底弃用 Qt::ToolTip，防止 OS 动画残留
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | 
-                   Qt::WindowTransparentForInput | Qt::NoDropShadowWindowHint | 
-                   Qt::WindowDoesNotAcceptFocus);
+                  Qt::WindowTransparentForInput | Qt::NoDropShadowWindowHint | Qt::WindowDoesNotAcceptFocus);
+    setObjectName("ToolTipOverlay");
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
 
-    // 视觉表现（文档规范）
-    // 背景色: #2B2B2B, 边框: 1px #B0B0B0, 圆角: 4px
-    // 内边距: 水平 12px, 垂直 8px
-    m_label = new QLabel(this);
-    m_label->setWordWrap(true);
-    m_label->setContentsMargins(12, 8, 12, 8);
-    m_label->setMaximumWidth(450); // 最大宽度 450px
-    m_label->setStyleSheet(
-        "QLabel { "
-        "  background-color: #2B2B2B; "
-        "  color: #EEEEEE; "
-        "  border: 1px solid #B0B0B0; "
-        "  border-radius: 4px; "
-        "  font-family: 'Microsoft YaHei', 'Segoe UI'; "
-        "  font-size: 9pt; "
-        "}"
-    );
+    m_doc.setUndoRedoEnabled(false);
+    // [ULTIMATE FIX] 强制锁定调色板颜色
+    QPalette pal = palette();
+    pal.setColor(QPalette::WindowText, QColor("#EEEEEE"));
+    pal.setColor(QPalette::Text, QColor("#EEEEEE"));
+    pal.setColor(QPalette::ButtonText, QColor("#EEEEEE"));
+    setPalette(pal);
 
-    QVBoxLayout* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(m_label);
+    m_doc.setDefaultStyleSheet("body, div, p, span, b, i { color: #EEEEEE !important; font-family: 'Microsoft YaHei', 'Segoe UI'; }");
+    setStyleSheet("QWidget { color: #EEEEEE !important; background: transparent; }");
 
-    m_timer = new QTimer(this);
-    m_timer->setSingleShot(true);
-    connect(m_timer, &QTimer::timeout, this, &ToolTipOverlay::hideTip);
-}
+    QFont f = font();
+    f.setPointSize(9);
+    m_doc.setDefaultFont(f);
 
-void ToolTipOverlay::showTip(const QString& text, const QPoint& pos, int timeout) {
-    m_timer->stop();
-    m_label->setText(text);
-    
-    // 强制布局调整以计算 size
-    adjustSize();
-    
-    updatePosition(pos);
-    
-    show();
-    if (timeout > 0) {
-        m_timer->start(timeout);
-    }
-}
+    m_hideTimer.setSingleShot(true);
+    connect(&m_hideTimer, &QTimer::timeout, this, &QWidget::hide);
 
-void ToolTipOverlay::hideTip() {
     hide();
 }
 
-/**
- * @brief 边缘保护：内置 QScreen 屏幕边界检测，防止提示框溢出
- */
-void ToolTipOverlay::updatePosition(const QPoint& pos) {
-    QPoint targetPos = pos + QPoint(15, 15); // 偏移坐标
+void ToolTipOverlay::showText(const QPoint& globalPos, const QString& text, int timeout, const QColor& borderColor) {
+    // [THREAD SAFE] 强制确保在主线程执行
+    if (thread() != QThread::currentThread()) {
+        QMetaObject::invokeMethod(this, [=, this]() { showText(globalPos, text, timeout, borderColor); });
+        return;
+    }
+
+    if (text.isEmpty()) { hide(); return; }
     
-    QScreen* screen = QGuiApplication::screenAt(pos);
+    if (timeout > 0) {
+        timeout = qBound(500, timeout, 60000);
+    }
+
+    m_currentBorderColor = borderColor;
+
+    QString htmlBody;
+    if (text.contains("<") && text.contains(">")) {
+        htmlBody = text;
+    } else {
+        htmlBody = text.toHtmlEscaped().replace("\n", "<br>");
+    }
+
+    m_text = QString(
+        "<html><head><style>div, p, span, body { color: #EEEEEE !important; }</style></head>"
+        "<body style='margin:0; padding:0; color:#EEEEEE; font-family:\"Microsoft YaHei\",\"Segoe UI\",sans-serif;'>"
+        "<div style='color:#EEEEEE !important;'>%1</div>"
+        "</body></html>"
+    ).arg(htmlBody);
+    
+    m_doc.setHtml(m_text);
+    m_doc.setDocumentMargin(0);
+    
+    m_doc.setTextWidth(-1);
+    qreal idealW = m_doc.idealWidth();
+    
+    if (idealW > 450) {
+        m_doc.setTextWidth(450);
+    } else {
+        m_doc.setTextWidth(idealW);
+    }
+    
+    QSize textSize = m_doc.size().toSize();
+
+    int padX = 12;
+    int padY = 8;
+
+    int w = textSize.width() + padX * 2;
+    int h = textSize.height() + padY * 2;
+
+    w = qMax(w, 40);
+    h = qMax(h, 24);
+
+    resize(w, h);
+
+    QPoint pos = globalPos + QPoint(15, 15);
+
+    QScreen* screen = QGuiApplication::screenAt(globalPos);
     if (!screen) screen = QGuiApplication::primaryScreen();
-    
-    QRect screenRect = screen->availableGeometry();
-    
-    // 检查右边缘
-    if (targetPos.x() + width() > screenRect.right()) {
-        targetPos.setX(pos.x() - width() - 5);
+    if (screen) {
+        QRect screenGeom = screen->geometry();
+        if (pos.x() + width() > screenGeom.right()) {
+            pos.setX(globalPos.x() - width() - 15);
+        }
+        if (pos.y() + height() > screenGeom.bottom()) {
+            pos.setY(globalPos.y() - height() - 15);
+        }
     }
-    
-    // 检查下边缘
-    if (targetPos.y() + height() > screenRect.bottom()) {
-        targetPos.setY(pos.y() - height() - 5);
+
+    move(pos);
+    show();
+    raise();
+    update();
+
+    if (timeout > 0) {
+        m_hideTimer.start(timeout);
+    } else {
+        m_hideTimer.stop();
     }
+}
+
+void ToolTipOverlay::paintEvent(QPaintEvent*) {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+
+    QRectF rectF(0.5, 0.5, width() - 1, height() - 1);
+
+    p.setPen(QPen(m_currentBorderColor, 1));
+    p.setBrush(QColor("#2B2B2B"));
+    p.drawRoundedRect(rectF, 4, 4);
     
-    move(targetPos);
+    p.save();
+    p.translate(12, 8);
+    m_doc.drawContents(&p);
+    p.restore();
 }
 
 } // namespace ArcMeta

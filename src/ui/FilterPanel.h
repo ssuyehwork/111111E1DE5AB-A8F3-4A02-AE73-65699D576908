@@ -45,6 +45,9 @@ public:
 
     FilterState currentFilter() const { return m_filter; }
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 signals:
     void filterChanged(const FilterState& state);
 
