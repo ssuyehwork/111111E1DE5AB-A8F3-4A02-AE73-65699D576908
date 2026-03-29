@@ -1,4 +1,5 @@
 #include "SyncQueue.h"
+#include <QFileInfo>
 #include "AmMetaJson.h"
 #include "../db/Database.h"
 #include "../db/FolderRepo.h"

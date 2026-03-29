@@ -1,4 +1,5 @@
 #include "ItemRepo.h"
+#include <QFileInfo>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>

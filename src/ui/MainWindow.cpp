@@ -180,8 +180,8 @@ void MainWindow::initUi() {
             
             // 2026-03-xx 极致性能优化：Zero-IO UI，所有属性直接从模型 Role 读取，彻底禁绝 QFileInfo 系统调用
             bool isDir = idx.data(IsDirRole).toBool();
-            QString name = info.fileName().isEmpty() ? path : info.fileName();
-            QString typeStr = isDir ? "文件夹" : info.suffix().toUpper() + " 文件";
+            QString name = idx.data(Qt::DisplayRole).toString();
+            QString typeStr = idx.data(TypeRole).toString() == "folder" ? "文件夹" : QFileInfo(path).suffix().toUpper() + " 文件";
             qlonglong sizeRaw = idx.data(SizeRawRole).toLongLong();
             QString sizeStr = isDir ? "-" : QString::number(sizeRaw / 1024) + " KB";
 
