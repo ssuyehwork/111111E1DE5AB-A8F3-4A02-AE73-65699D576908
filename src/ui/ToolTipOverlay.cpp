@@ -34,7 +34,9 @@ ToolTipOverlay::ToolTipOverlay() : QWidget(nullptr) {
 void ToolTipOverlay::showText(const QPoint& globalPos, const QString& text, int timeout, const QColor& borderColor) {
     // [THREAD SAFE] 强制确保在主线程执行
     if (thread() != QThread::currentThread()) {
-        QMetaObject::invokeMethod(this, [=, this]() { showText(globalPos, text, timeout, borderColor); });
+        QMetaObject::invokeMethod(this, [this, globalPos, text, timeout, borderColor]() {
+            showText(globalPos, text, timeout, borderColor);
+        });
         return;
     }
 
