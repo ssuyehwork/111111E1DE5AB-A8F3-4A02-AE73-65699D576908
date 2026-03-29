@@ -2,7 +2,8 @@
 
 #include <QWidget>
 #include <QTreeView>
-#include <QFileSystemModel>
+#include <QStandardItemModel>
+#include <QStandardItem>
 #include <QVBoxLayout>
 
 namespace ArcMeta {

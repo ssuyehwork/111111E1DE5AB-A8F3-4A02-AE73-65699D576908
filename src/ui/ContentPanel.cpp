@@ -248,8 +248,8 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         QAbstractItemView* view = qobject_cast<QAbstractItemView*>(obj);
         if (!view) view = qobject_cast<QAbstractItemView*>(obj->parent());
 
-        // 核心红线：如果当前正在编辑（重命名），直接放行，不干扰原生输入控件的方向键行为
-        if (view && view->state() == QAbstractItemView::EditingState) {
+        // 核心红线：如果焦点在 QLineEdit 上，说明正在重命名，直接放行
+        if (qobject_cast<QLineEdit*>(QApplication::focusWidget())) {
             return false;
         }
 
