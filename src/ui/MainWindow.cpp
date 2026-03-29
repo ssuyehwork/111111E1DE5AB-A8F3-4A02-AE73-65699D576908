@@ -101,7 +101,7 @@ MainWindow::MainWindow(QWidget* parent)
             background: none;
         }
 
-        /* 统一复选框样式 */
+        /* 统一复选框样式：2026-03-xx 按照用户要求，仅保留蓝色勾选标记，背景保持深色 */
         QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
         QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1A1A1A; }
         QCheckBox::indicator:hover { border: 1px solid #666; }

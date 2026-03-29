@@ -342,7 +342,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     wl->setSpacing(0);
 
     QToolButton* hdr = new QToolButton(wrapper);
-    hdr->setText("  " + title);
+    hdr->setText(title); // 2026-03-xx 按照用户要求，移除硬编码空格，统一使用 QSS 边距控制
     hdr->setCheckable(true);
     hdr->setChecked(true);
     // hdr->setArrowType(Qt::DownArrow); // 核心红线：禁止使用或显示三角形
@@ -375,7 +375,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
 // ─── addFilterRow ─────────────────────────────────────────────────
 QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, int count, const QColor& dotColor) {
     QCheckBox* cb = new QCheckBox();
-    // 2026-03-xx 修正 QCheckBox 样式：采用更清晰的蓝色勾选标记并适当放大 indicator
+    // 2026-03-xx 按照用户要求，仅保留蓝色勾选标记 (#378ADD)，背景保持深色
     cb->setStyleSheet(
         "QCheckBox { spacing: 0px; }"
         "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444;"
