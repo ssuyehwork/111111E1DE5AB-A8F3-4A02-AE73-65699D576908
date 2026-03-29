@@ -15,6 +15,8 @@
 #include <QPainter>
 #include <QIcon>
 #include <QMouseEvent>
+#include <QKeyEvent>
+#include <QCursor>
 #include <QApplication>
 #include <QSettings>
 #include <QCloseEvent>
@@ -148,6 +150,7 @@ void MainWindow::initUi() {
     });
 
     // 2. 内容面板选中项改变 -> 元数据面板刷新
+    // 2026-03-xx 按照高性能要求，优先从模型 Role 读取元数据缓存，避免频繁磁盘 IO
     connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
         if (paths.isEmpty()) {
             m_metaPanel->updateInfo("-", "-", "-", "-", "-", "-", "-", false);
@@ -304,10 +307,12 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
     QMainWindow::keyPressEvent(event);
 }
 
+// 2026-03-xx 按照用户要求：物理拦截事件以实现自定义 ToolTipOverlay 的显隐控制
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     if (event->type() == QEvent::HoverEnter) {
         QString text = watched->property("tooltipText").toString();
         if (!text.isEmpty()) {
+            // 物理级别禁绝原生 ToolTip，强制调用 ToolTipOverlay
             ToolTipOverlay::instance()->showText(QCursor::pos(), text);
         }
     } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
@@ -359,7 +364,8 @@ void MainWindow::initToolbar() {
 
     // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
     m_pathStack = new QStackedWidget(this);
-    m_pathStack->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
+    // 2026-03-xx 按照用户最新要求：地址栏高度由 40px 调整为更紧凑的 38px
+    m_pathStack->setFixedHeight(38);
     m_pathStack->setMinimumWidth(300);
     m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
 
@@ -396,7 +402,8 @@ void MainWindow::initToolbar() {
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setFixedWidth(200);
-    m_searchEdit->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
+    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度也调整为 38px
+    m_searchEdit->setFixedHeight(38);
     m_searchEdit->setStyleSheet(
         "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"

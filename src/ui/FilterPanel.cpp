@@ -2,6 +2,7 @@
 #include "ToolTipOverlay.h"
 #include <QToolButton>
 #include <QMouseEvent>
+#include <QCursor>
 
 namespace ArcMeta {
 
@@ -119,10 +120,12 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     m_mainLayout->addWidget(m_scrollArea, 1);
 }
 
+// 2026-03-xx 按照用户要求：物理拦截事件以实现自定义 ToolTipOverlay 的显隐控制
 bool FilterPanel::eventFilter(QObject* watched, QEvent* event) {
     if (event->type() == QEvent::HoverEnter) {
         QString text = watched->property("tooltipText").toString();
         if (!text.isEmpty()) {
+            // 物理级别禁绝原生 ToolTip，强制调用 ToolTipOverlay
             ToolTipOverlay::instance()->showText(QCursor::pos(), text);
         }
     } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
