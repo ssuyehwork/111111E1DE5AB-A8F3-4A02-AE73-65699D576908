@@ -529,11 +529,11 @@ void MainWindow::setupCustomTitleBarButtons() {
     QAction* actNewMd     = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建 Markdown");
     QAction* actNewTxt    = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)");
     
-    m_btnCreate->setMenu(createMenu);
-    // 禁止显示三角形/下拉箭头 (通过样式控制，并直接关联点击)
-    m_btnCreate->setStyleSheet(m_btnCreate->styleSheet() + "QPushButton::menu-indicator { image: none; }");
-    connect(m_btnCreate, &QPushButton::clicked, [this]() {
-        m_btnCreate->showMenu();
+    // 2026-03-xx 按照用户要求修正居中对齐：
+    // 不再使用 setMenu，避免按钮进入“菜单模式”从而为指示器预留空间导致图标偏左。
+    // 采用手动 popup 方式展示菜单。
+    connect(m_btnCreate, &QPushButton::clicked, [this, createMenu]() {
+        createMenu->popup(m_btnCreate->mapToGlobal(QPoint(0, m_btnCreate->height())));
     });
 
     auto handleCreate = [this](const QString& type) {
@@ -673,12 +673,16 @@ void MainWindow::updateStatusBar() {
 }
 
 void MainWindow::onPinToggled(bool checked) {
+    // 2026-03-xx 按照用户要求优化置顶逻辑：
+    // 避免重复调用导致卡顿，并优化 WinAPI 标志位以减少冗余消息推送
+    if (m_isPinned == checked) return;
     m_isPinned = checked;
 
 #ifdef Q_OS_WIN
     HWND hwnd = (HWND)winId();
+    // 使用 SWP_NOSENDCHANGING 拦截冗余消息，SWP_NOREDRAW 避免不必要的闪烁
     SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #else
     setWindowFlag(Qt::WindowStaysOnTopHint, checked);
     show(); // 非 Windows 平台修改 Flag 后通常需要重新显示
