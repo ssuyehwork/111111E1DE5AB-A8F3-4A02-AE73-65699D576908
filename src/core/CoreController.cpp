@@ -5,6 +5,7 @@
 #include "../meta/MetadataManager.h"
 #include "../mft/MftReader.h"
 #include <QtConcurrent>
+#include <QThreadPool>
 #include <QDebug>
 
 namespace ArcMeta {
@@ -20,7 +21,8 @@ CoreController::~CoreController() {}
 
 void CoreController::startSystem() {
     // 异步链式初始化
-    QtConcurrent::run([this]() {
+    // 2026-03-xx 按照编译器建议：对于无需返回值的异步任务，使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告
+    QThreadPool::globalInstance()->start([this]() {
         // 1. 初始化数据库元数据内存镜像 (关键：消除 UI 启动后的 IO 抖动)
         setStatus("正在载入元数据缓存...", true);
         MetadataManager::instance().initFromDatabase();

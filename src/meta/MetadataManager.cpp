@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QFileInfo>
 #include <QtConcurrent>
+#include <QThreadPool>
 
 namespace ArcMeta {
 
@@ -89,7 +90,8 @@ void MetadataManager::setTags(const std::wstring& path, const QStringList& tags)
 
 void MetadataManager::persistAsync(const std::wstring& path) {
     // 异步链式持久化逻辑
-    QtConcurrent::run([this, path]() {
+    // 2026-03-xx 按照编译器建议：使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告
+    QThreadPool::globalInstance()->start([this, path]() {
         RuntimeMeta meta = getMeta(path);
         QFileInfo info(QString::fromStdWString(path));
         std::wstring parentDir = info.absolutePath().toStdWString();
