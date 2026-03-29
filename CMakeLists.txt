@@ -17,7 +17,7 @@ if(MSVC)
 endif()
 
 # Qt 6 基础组件
-find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql Concurrent)
 
 # 优化输出目录，生成的 exe 将位于 build 目录下
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
@@ -52,6 +52,7 @@ target_link_libraries(ArcMeta PRIVATE
     Qt6::Widgets
     Qt6::Svg
     Qt6::Sql
+    Qt6::Concurrent
     ntdll
     ole32
     bcrypt
