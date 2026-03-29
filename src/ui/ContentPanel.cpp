@@ -227,7 +227,7 @@ void ContentPanel::updateGridSize() {
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
     int cardW = m_zoomLevel + 30; // 用户指定: zoomLevel+30
-    int cardH = m_zoomLevel + 50;
+    int cardH = m_zoomLevel + 60; // 遵循规范: zoomLevel+60
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
 
@@ -438,7 +438,7 @@ void ContentPanel::initGridView() {
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
-    m_gridView->setGridSize(QSize(116, 146)); // 136 -> 126 -> 116 (缩小 20px)
+    m_gridView->setGridSize(QSize(126, 156)); // 遵循规范: W=96+30, H=96+60
     m_gridView->setSpacing(10);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);

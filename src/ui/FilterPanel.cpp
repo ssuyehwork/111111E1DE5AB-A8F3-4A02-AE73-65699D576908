@@ -359,7 +359,10 @@ QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, 
         "QCheckBox { spacing: 0px; }"
         "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555;"
         "                       border-radius: 2px; background: #1E1E1E; }"
-        "QCheckBox::indicator:checked { background: #378ADD; border-color: #378ADD; }"
+        "QCheckBox::indicator:checked { "
+        "   border-color: #378ADD; "
+        "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjAgNiA5IDE3IDQgMTIiPjwvcG9seWxpbmU+PC9zdmc+);"
+        "}"
     );
 
     // 整行可点击容器

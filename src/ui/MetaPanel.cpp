@@ -228,7 +228,14 @@ void MetaPanel::initUi() {
     m_containerLayout->addWidget(createSeparator());
 
     chkPinned = new QCheckBox("置顶条目", m_container); 
-    chkPinned->setStyleSheet("font-size: 11px; color: #5F5E5A;"); 
+    chkPinned->setStyleSheet(
+        "QCheckBox { font-size: 11px; color: #5F5E5A; spacing: 5px; }"
+        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: #1E1E1E; }"
+        "QCheckBox::indicator:checked { "
+        "   border-color: #378ADD; "
+        "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjAgNiA5IDE3IDQgMTIiPjwvcG9seWxpbmU+PC9zdmc+);"
+        "}"
+    );
     m_containerLayout->addWidget(chkPinned);
 
     QLabel* lR = new QLabel("星级", m_container); 
