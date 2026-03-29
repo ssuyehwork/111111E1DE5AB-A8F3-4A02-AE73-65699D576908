@@ -27,6 +27,8 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
 #endif
 
 namespace ArcMeta {
@@ -44,15 +46,23 @@ MainWindow::MainWindow(QWidget* parent)
     // 设置基础窗口标志 (保持无边框)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    // 初始应用置顶 (WinAPI)
+    // 2026-03-xx 按照用户要求优化启动置顶逻辑：使用原生 WinAPI 托管，避免启动瞬间重绘压力
     if (m_isPinned) {
-#ifdef Q_OS_WIN
-        HWND hwnd = (HWND)winId();
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-#else
+        // 初始启动允许同步 Qt Flag 以建立正确状态
         setWindowFlag(Qt::WindowStaysOnTopHint, true);
+#ifdef Q_OS_WIN
+        // 警告：setWindowFlag 可能导致窗口重建，必须重新获取 winId()
+        HWND hwnd = (HWND)winId();
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #endif
     }
+
+#ifdef Q_OS_WIN
+    // 2026-03-xx 按照宪法 5.6 要求：开启 Windows 11 原生圆角 (Attr: 33, Value: 2)
+    int cornerPreference = 2;
+    DwmSetWindowAttribute((HWND)winId(), 33, &cornerPreference, sizeof(cornerPreference));
+#endif
 
     // 应用全局样式（包括滚动条美化）
     QString qss = R"(
@@ -543,6 +553,7 @@ void MainWindow::setupCustomTitleBarButtons() {
     connect(actNewMd,     &QAction::triggered, [handleCreate](){ handleCreate("md"); });
     connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
 
+    // 2026-03-xx 按照宪法 5.7 要求：置顶态使用垂直图标，非置顶使用 pin_tilted
     m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
     m_btnPinTop->setProperty("tooltipText", "置顶窗口");
     m_btnPinTop->installEventFilter(this);
@@ -673,31 +684,37 @@ void MainWindow::updateStatusBar() {
 }
 
 void MainWindow::onPinToggled(bool checked) {
-    // 2026-03-xx 按照用户要求优化置顶逻辑：
-    // 避免重复调用导致卡顿，并优化 WinAPI 标志位以减少冗余消息推送
+    // 2026-03-xx 性能调优：引入 SWP_ASYNCWINDOWPOS 与事件即时排空，彻底消灭切换延迟
     if (m_isPinned == checked) return;
     m_isPinned = checked;
 
-#ifdef Q_OS_WIN
-    HWND hwnd = (HWND)winId();
-    // 使用 SWP_NOSENDCHANGING 拦截冗余消息，减少 UI 线程的消息风暴，从而解决卡顿
-    SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
-#else
-    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
-    show(); // 非 Windows 平台修改 Flag 后通常需要重新显示
-#endif
-
-    // 更新图标和颜色 (按下置顶为品牌橙色)
+    // 1. 视觉反馈先行策略：优先更新 UI 按钮状态，确保用户感官零延迟
     if (m_isPinned) {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
     } else {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_tilted", QColor("#EEEEEE")));
     }
+    m_btnPinTop->update(); // 强制按钮局部重绘
 
-    // 持久化存储
+    // 2. 异步处理系统层级变更：使用 SWP_ASYNCWINDOWPOS 绕过 DWM 同步阻塞
+#ifdef Q_OS_WIN
+    HWND hwnd = (HWND)winId();
+    if (IsWindow(hwnd)) {
+        // 核心优化：新增 SWP_ASYNCWINDOWPOS 标志，指令发出后瞬间返回，不阻塞主线程
+        SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_ASYNCWINDOWPOS);
+    }
+#else
+    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
+    show();
+#endif
+
+    // 3. 持久化存储
     QSettings settings("ArcMeta团队", "ArcMeta");
     settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
+
+    // 4. 强制排空消息队列：处理掉由于层级变更引发的冗余系统绘制请求，消灭“发粘”感
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
