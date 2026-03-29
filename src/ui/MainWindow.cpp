@@ -6,6 +6,7 @@
 #include "MetaPanel.h"
 #include "FilterPanel.h"
 #include "QuickLookWindow.h"
+#include "ToolTipOverlay.h"
 #include "../../SvgIcons.h"
 
 #include <QVBoxLayout>

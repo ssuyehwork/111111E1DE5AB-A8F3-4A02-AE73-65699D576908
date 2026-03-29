@@ -1,4 +1,5 @@
 #include "FilterPanel.h"
+#include "ToolTipOverlay.h"
 #include <QToolButton>
 #include <QMouseEvent>
 
