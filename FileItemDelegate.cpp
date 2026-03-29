@@ -46,7 +46,7 @@ void FileItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         QRect badgeRect(rect.left() + 8, rect.top() + 8, 32, 18);
         painter->setPen(Qt::NoPen);
         painter->setBrush(badgeColor);
-        painter->drawRoundedRect(badgeRect, 4, 4);
+        painter->drawRoundedRect(badgeRect, 6, 6);
         
         painter->setPen(badgeColor.lightness() > 180 ? Qt::black : Qt::white);
         QFont badgeFont = painter->font();
@@ -106,10 +106,10 @@ void FileItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QRect nameBoxRect(rect.left() + 6, metaRect.bottom() + 2, rect.width() - 12, 20);
     
     if (!tagColorStr.isEmpty()) {
-        // 仅当设定了颜色标签时才显示背景色块 (圆角由 6px 修改成 4px)
+        // 仅当设定了颜色标签时才显示背景色块 (统一修改为 6px)
         painter->setPen(Qt::NoPen);
         painter->setBrush(QColor(tagColorStr));
-        painter->drawRoundedRect(nameBoxRect, 4, 4);
+        painter->drawRoundedRect(nameBoxRect, 6, 6);
         painter->setPen(Qt::black); // 有背景时用黑色文字
     } else {
         painter->setPen(QColor("#CCCCCC")); // 无背景时用亮灰色文字
@@ -143,9 +143,9 @@ QWidget* FileItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewI
     QString bgColor = tagColorStr.isEmpty() ? "#3E3E42" : tagColorStr;
     QString textColor = tagColorStr.isEmpty() ? "#FFFFFF" : "#000000";
 
-    // 2026-03-xx 行内编辑器（F2 重命名框）：圆角由 6px 修改成 4px
+    // 2026-03-xx 行内编辑器（F2 重命名框）：统一修改为 6px
     editor->setStyleSheet(
-        QString("QLineEdit { background-color: %1; color: %2; border-radius: 4px; "
+        QString("QLineEdit { background-color: %1; color: %2; border-radius: 6px; "
                 "border: 2px solid #3498db; font-weight: bold; font-size: 9pt; padding: 0px; }")
         .arg(bgColor, textColor)
     );

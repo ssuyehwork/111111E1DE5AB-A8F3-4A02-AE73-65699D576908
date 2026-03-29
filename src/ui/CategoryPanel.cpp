@@ -171,7 +171,7 @@ void CategoryPanel::initBottomToolbar() {
     m_searchEdit->setPlaceholderText("搜索分类...");
     m_searchEdit->setFixedHeight(24);
     m_searchEdit->setStyleSheet(
-        "QLineEdit { background: #1E1E1E; border: 1px solid #333333; border-radius: 4px; padding-left: 6px; font-size: 11px; color: #EEEEEE; }"
+        "QLineEdit { background: #1E1E1E; border: 1px solid #333333; border-radius: 6px; padding-left: 6px; font-size: 11px; color: #EEEEEE; }"
         "QLineEdit:focus { border: 1px solid #378ADD; }"
     );
     m_addCategoryBtn = new QPushButton(this);
@@ -246,7 +246,7 @@ void CategoryPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QMenu menu(this);
     menu.setStyleSheet(
         "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 6px; }"
-        "QMenu::item { height: 22px; padding: 0 10px 0 10px; border-radius: 3px; font-size: 12px; }"
+        "QMenu::item { height: 22px; padding: 0 10px 0 10px; border-radius: 6px; font-size: 12px; }"
         "QMenu::item:selected { background-color: #505050; }"
         "QMenu::separator { height: 1px; background: #444444; margin: 4px 8px 4px 8px; }"
         "QMenu::right-arrow { image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRUVFRUVFIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iOSAxOCAxNSAxMiA5IDYiPjwvcG9seWxpbmU+PC9zdmc+); width: 12px; height: 12px; right: 8px; }"

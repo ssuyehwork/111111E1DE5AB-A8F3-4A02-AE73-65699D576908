@@ -262,7 +262,7 @@ void MetaPanel::initUi() {
     m_tagEdit = new QLineEdit(m_container); 
     m_tagEdit->setPlaceholderText("添加标签按 Enter..."); 
     m_tagEdit->setFixedHeight(24); 
-    m_tagEdit->setStyleSheet("QLineEdit { background: #2B2B2B; border: 1px solid #333333; border-radius: 4px; padding-left: 6px; font-size: 12px; color: #EEEEEE; }");
+    m_tagEdit->setStyleSheet("QLineEdit { background: #2B2B2B; border: 1px solid #333333; border-radius: 6px; padding-left: 6px; font-size: 12px; color: #EEEEEE; }");
     connect(m_tagEdit, &QLineEdit::returnPressed, this, &MetaPanel::onTagAdded);
     m_containerLayout->addWidget(m_tagEdit);
 
@@ -272,7 +272,7 @@ void MetaPanel::initUi() {
     m_noteEdit = new QPlainTextEdit(m_container); 
     m_noteEdit->setMinimumHeight(80); 
     m_noteEdit->setMaximumHeight(160); 
-    m_noteEdit->setStyleSheet("QPlainTextEdit { background: #2B2B2B; border: 1px solid #333333; border-radius: 4px; font-size: 12px; padding: 6px; color: #EEEEEE; }");
+    m_noteEdit->setStyleSheet("QPlainTextEdit { background: #2B2B2B; border: 1px solid #333333; border-radius: 6px; font-size: 12px; padding: 6px; color: #EEEEEE; }");
     m_containerLayout->addWidget(m_noteEdit);
 
     m_containerLayout->addWidget(createSeparator());

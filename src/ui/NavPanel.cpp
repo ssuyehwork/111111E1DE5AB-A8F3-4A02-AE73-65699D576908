@@ -89,7 +89,7 @@ void NavPanel::initUi() {
     // 滚动条样式
     m_treeView->verticalScrollBar()->setStyleSheet(
         "QScrollBar:vertical { background: transparent; width: 4px; }"
-        "QScrollBar::handle:vertical { background: #444444; border-radius: 2px; }"
+        "QScrollBar::handle:vertical { background: #444444; border-radius: 4px; }"
     );
 
     connect(m_treeView, &QTreeView::clicked, this, &NavPanel::onTreeClicked);

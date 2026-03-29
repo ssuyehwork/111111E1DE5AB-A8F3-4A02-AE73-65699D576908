@@ -94,7 +94,7 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     m_btnClearAll->setProperty("tooltipText", "重置所有筛选条件");
     m_btnClearAll->installEventFilter(this);
     m_btnClearAll->setStyleSheet(
-        "QPushButton { background: #2A2A2A; border: 1px solid #444; border-radius: 3px;"
+        "QPushButton { background: #2A2A2A; border: 1px solid #444; border-radius: 6px;"
         "              color: #AAAAAA; font-size: 11px; }"
         "QPushButton:hover { background: #3A3A3A; color: #EEEEEE; }");
     connect(m_btnClearAll, &QPushButton::clicked, this, &FilterPanel::clearAllFilters);

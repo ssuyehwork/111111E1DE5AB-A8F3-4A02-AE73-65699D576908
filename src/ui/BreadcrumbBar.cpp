@@ -77,7 +77,7 @@ void BreadcrumbBar::addLevel(const QString& name, const QString& fullPath) {
     
     // 面包屑按钮样式：扁平化，仅悬停可见背景
     btn->setStyleSheet(
-        "QPushButton { background: transparent; border: none; border-radius: 4px; "
+        "QPushButton { background: transparent; border: none; border-radius: 6px; "
         "              color: #EEEEEE; font-size: 12px; padding: 0 6px; }"
         "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
         "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
