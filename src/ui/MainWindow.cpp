@@ -101,6 +101,16 @@ MainWindow::MainWindow(QWidget* parent)
             background: none;
         }
 
+        /* 统一复选框样式 */
+        QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
+        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1A1A1A; }
+        QCheckBox::indicator:hover { border: 1px solid #666; }
+        QCheckBox::indicator:checked {
+            border: 1px solid #378ADD;
+            background: #1A1A1A;
+            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
+        }
+
         /* 统一输入框样式 */
         QLineEdit {
             background: #1A1A1A;

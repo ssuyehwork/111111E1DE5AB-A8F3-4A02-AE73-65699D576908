@@ -346,14 +346,15 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     hdr->setCheckable(true);
     hdr->setChecked(true);
     // hdr->setArrowType(Qt::DownArrow); // 核心红线：禁止使用或显示三角形
-    hdr->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    hdr->setToolButtonStyle(Qt::ToolButtonTextOnly); // 2026-03-xx 强制仅文本，防止图标空间干扰左对齐
     hdr->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     hdr->setFixedHeight(24);
     hdr->setStyleSheet(
         "QToolButton { background: #252525; border: none; border-top: 1px solid #333;"
         "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
-        "              padding-left: 10px; }"
-        "QToolButton:hover { color: #EEEEEE; }");
+        "              padding-left: 12px; } "
+        "QToolButton:hover { color: #EEEEEE; } "
+        "QToolButton::menu-indicator { image: none; }"); // 彻底移除可能的菜单箭头占位
 
     QWidget* content = new QWidget(wrapper);
     content->setStyleSheet("QWidget { background: transparent; }");
@@ -374,13 +375,15 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
 // ─── addFilterRow ─────────────────────────────────────────────────
 QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, int count, const QColor& dotColor) {
     QCheckBox* cb = new QCheckBox();
+    // 2026-03-xx 修正 QCheckBox 样式：采用更清晰的蓝色勾选标记并适当放大 indicator
     cb->setStyleSheet(
         "QCheckBox { spacing: 0px; }"
-        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555;"
-        "                       border-radius: 2px; background: #1E1E1E; }"
+        "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444;"
+        "                       border-radius: 2px; background: #1A1A1A; }"
+        "QCheckBox::indicator:hover { border: 1px solid #666; }"
         "QCheckBox::indicator:checked { "
         "   border: 1px solid #378ADD; "
-        "   background: #1E1E1E; "
+        "   background: #1A1A1A; "
         "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
         "}"
     );
