@@ -35,7 +35,10 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <functional>
+#include <QStringList>
+#include <QDateTime>
 #include "../mft/MftReader.h"
+#include "../db/ItemRepo.h"
 #include "../mft/PathBuilder.h"
 #include "../meta/AmMetaJson.h"
 #include "UiHelper.h"
@@ -330,15 +333,15 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 std::map<std::wstring, std::vector<std::pair<QModelIndex, std::wstring>>> groups;
                 for (const auto& idx : indexes) {
                     if (idx.column() != 0) continue;
-                    QString path = idx.data(PathRole).toString();
-                    if (path.isEmpty()) continue;
-                    QFileInfo info(path);
+                    QString p = idx.data(PathRole).toString();
+                    if (p.isEmpty()) continue;
+                    QFileInfo info(p);
                     groups[info.absolutePath().toStdWString()].push_back({idx, info.fileName().toStdWString()});
                 }
-                for (auto& [folder, items] : groups) {
+                for (auto& [folder, itemPairs] : groups) {
                     AmMetaJson meta(folder);
                     meta.load();
-                    for (auto& item : items) updater(meta, item.second, item.first);
+                    for (auto& item : itemPairs) updater(meta, item.second, item.first);
                     meta.save();
                 }
             };
@@ -645,10 +648,10 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
             QFileInfo info(p);
             groups[info.absolutePath().toStdWString()].push_back({idx, info.fileName().toStdWString()});
         }
-        for (auto& [folder, items] : groups) {
+        for (auto& [folder, itemPairs] : groups) {
             AmMetaJson meta(folder);
             meta.load();
-            for (auto& item : items) {
+            for (auto& item : itemPairs) {
                 bool cur = meta.items()[item.second].pinned;
                 meta.items()[item.second].pinned = !cur;
                 m_proxyModel->setData(item.first, !cur, IsLockedRole);

@@ -72,11 +72,6 @@ private:
     DWORDLONG getFrnFromPath(const std::wstring& folderPath);
 
     /**
-     * @brief 根据 FRN 获取全路径 ($O(1)$ 复杂度)
-     */
-    std::wstring getPathFromFrn(const std::wstring& volume, DWORDLONG frn);
-
-    /**
      * @brief 极致性能：预计算全量路径映射
      */
     void precomputePaths(const std::wstring& volume);
@@ -89,6 +84,11 @@ private:
 public:
     const std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>>& getIndex() const { return m_index; }
     
+    /**
+     * @brief 根据 FRN 获取全路径 ($O(1)$ 复杂度)
+     */
+    std::wstring getPathFromFrn(const std::wstring& volume, DWORDLONG frn);
+
     /**
      * @brief USN 监听器更新内存索引，并同步维护反向索引
      */

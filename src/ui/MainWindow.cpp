@@ -4,6 +4,7 @@
 #include "NavPanel.h"
 #include "ContentPanel.h"
 #include "MetaPanel.h"
+#include "../db/ItemRepo.h"
 #include "FilterPanel.h"
 #include "QuickLookWindow.h"
 #include "ToolTipOverlay.h"
@@ -23,7 +24,9 @@
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>
+#include <QDateTime>
 #include "../meta/AmMetaJson.h"
+#include "../db/ItemRepo.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -179,14 +182,14 @@ void MainWindow::initUi() {
             QFileInfo info(path);
             
             // 2026-03-xx 极致性能优化：Zero-IO UI，所有属性直接从模型 Role 读取，彻底禁绝 QFileInfo 系统调用
-            bool isDir = idx.data(IsDirRole).toBool();
+            bool isDir = idx.data(ArcMeta::IsDirRole).toBool();
             QString name = idx.data(Qt::DisplayRole).toString();
-            QString typeStr = idx.data(TypeRole).toString() == "folder" ? "文件夹" : QFileInfo(path).suffix().toUpper() + " 文件";
-            qlonglong sizeRaw = idx.data(SizeRawRole).toLongLong();
+            QString typeStr = idx.data(ArcMeta::TypeRole).toString() == "folder" ? "文件夹" : QFileInfo(path).suffix().toUpper() + " 文件";
+            qlonglong sizeRaw = idx.data(ArcMeta::SizeRawRole).toLongLong();
             QString sizeStr = isDir ? "-" : QString::number(sizeRaw / 1024) + " KB";
 
-            QString ctimeStr = QDateTime::fromMSecsSinceEpoch((qint64)idx.data(CTimeRawRole).toDouble()).toString("yyyy-MM-dd");
-            QString mtimeStr = QDateTime::fromMSecsSinceEpoch((qint64)idx.data(MTimeRawRole).toDouble()).toString("yyyy-MM-dd");
+            QString ctimeStr = QDateTime::fromMSecsSinceEpoch((qint64)idx.data(ArcMeta::CTimeRawRole).toDouble()).toString("yyyy-MM-dd");
+            QString mtimeStr = QDateTime::fromMSecsSinceEpoch((qint64)idx.data(ArcMeta::MTimeRawRole).toDouble()).toString("yyyy-MM-dd");
 
             m_metaPanel->updateInfo(
                 name, typeStr, sizeStr, ctimeStr, mtimeStr, mtimeStr, path,
@@ -194,10 +197,10 @@ void MainWindow::initUi() {
             );
 
             // 应用缓存中的元数据状态
-            m_metaPanel->setRating(idx.data(RatingRole).toInt());
-            m_metaPanel->setColor(idx.data(ColorRole).toString().toStdWString());
-            m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
-            m_metaPanel->setTags(idx.data(TagsRole).toStringList());
+            m_metaPanel->setRating(idx.data(ArcMeta::RatingRole).toInt());
+            m_metaPanel->setColor(idx.data(ArcMeta::ColorRole).toString().toStdWString());
+            m_metaPanel->setPinned(idx.data(ArcMeta::IsLockedRole).toBool());
+            m_metaPanel->setTags(idx.data(ArcMeta::TagsRole).toStringList());
         }
         // 状态栏右侧显示已选数量
         if (m_statusRight) {
