@@ -51,7 +51,7 @@ public:
     FilterState currentFilter;
 
     void updateFilter() {
-        invalidateFilter();
+        invalidate();
     }
 
 protected:
