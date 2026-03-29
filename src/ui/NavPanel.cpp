@@ -105,6 +105,17 @@ void NavPanel::setRootPath(const QString& path) {
     // 由于改为扁平化快捷入口列表，不再支持 setRootPath 的树深度同步
 }
 
+void NavPanel::selectPath(const QString& path) {
+    for (int i = 0; i < m_model->rowCount(); ++i) {
+        QStandardItem* item = m_model->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == path) {
+            m_treeView->setCurrentIndex(item->index());
+            m_treeView->setFocus();
+            break;
+        }
+    }
+}
+
 /**
  * @brief 当用户点击目录时，发出信号告知外部组件（如内容面板）
  */

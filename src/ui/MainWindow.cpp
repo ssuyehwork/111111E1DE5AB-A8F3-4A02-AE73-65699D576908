@@ -130,6 +130,12 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 启动时和顶级目录均显示“此电脑”（磁盘分区列表）
     navigateTo("computer://");
+
+    // 2026-03-xx 按照用户要求：启动后将定焦到“此电脑”导航项，而非搜索框
+    // 使用 QTimer 确保在窗口完全显示后执行定焦，防止被其他组件抢占
+    QTimer::singleShot(100, [this]() {
+        m_navPanel->selectPath("computer://");
+    });
 }
 
 void MainWindow::initUi() {

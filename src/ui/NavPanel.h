@@ -26,6 +26,11 @@ public:
      */
     void setRootPath(const QString& path);
 
+    /**
+     * @brief 在树中选中指定路径对应的项
+     */
+    void selectPath(const QString& path);
+
 private slots:
     void onItemExpanded(const QModelIndex& index);
 
