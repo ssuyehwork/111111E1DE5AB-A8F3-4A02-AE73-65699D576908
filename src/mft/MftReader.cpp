@@ -15,13 +15,16 @@ MftReader& MftReader::instance() {
 }
 
 /**
- * @brief 扫描所有固定驱动器并构建索引
+ * @brief 构建全盘索引 (2026-03-xx 重构：双缓冲无锁扫描，解决 UI 假死)
+ * 扫描过程不持有全局锁，仅在最终交换数据时进行极短时间锁定。
  */
 void MftReader::buildIndex() {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    m_index.clear();
-    m_pathIndex.clear();
-    
+    // 1. 创建局部临时容器 (局部 Buffer)
+    std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>> localIndex;
+    std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, std::vector<DWORDLONG>>> localParentToChildren;
+    std::unordered_map<std::wstring, FileEntry> localPathIndex;
+    bool usingMft = false;
+
     DWORD drives = GetLogicalDrives();
     for (int i = 0; i < 26; ++i) {
         if (drives & (1 << i)) {
@@ -30,20 +33,36 @@ void MftReader::buildIndex() {
             
             wchar_t driveRoot[] = { driveLetter, L':', L'\\', L'\0' };
             if (GetDriveTypeW(driveRoot) == DRIVE_FIXED) {
-                // 尝试 MFT 读取
-                if (!loadMftForVolume(volumeName)) {
-                    // 如果 MFT 失败（无权限等），执行降级扫描
-                    scanDirectoryFallback(volumeName);
+                // 尝试 MFT 读取，传入局部容器引用
+                if (loadMftForVolumeInternal(volumeName, localIndex, localParentToChildren)) {
+                    usingMft = true;
+                } else {
+                    // 如果 MFT 失败，执行降级扫描，存入局部路径索引
+                    scanDirectoryFallbackInternal(volumeName, localPathIndex);
                 }
             }
         }
     }
+
+    // 2. 极速原子化数据交换 (仅锁定几微秒)
+    {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        m_index = std::move(localIndex);
+        m_parentToChildren = std::move(localParentToChildren);
+        m_pathIndex = std::move(localPathIndex);
+        m_isUsingMft = usingMft;
+        // 清理旧的路径缓存，因为数据已更新
+        m_pathToFrn.clear();
+    }
 }
 
 /**
- * @brief 使用 DeviceIoControl 枚举 MFT 记录
+ * @brief 内部方法：读取 MFT 并填充指定容器
  */
-bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
+bool MftReader::loadMftForVolumeInternal(const std::wstring& volumeName,
+    std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>>& outIndex,
+    std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, std::vector<DWORDLONG>>>& outParentToChildren) {
+
     std::wstring path = L"\\\\.\\" + volumeName;
     HANDLE hVol = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     
@@ -61,11 +80,12 @@ bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
     enumData.LowUsn = 0;
     enumData.HighUsn = journalData.NextUsn;
 
-    const int BUF_SIZE = 64 * 1024; // 64KB 缓冲区
+    const int BUF_SIZE = 64 * 1024;
     std::vector<BYTE> buffer(BUF_SIZE);
     
-    auto& volumeIndex = m_index[volumeName];
-    volumeIndex.reserve(1000000); // 预分配防止 rehash
+    auto& volumeIndex = outIndex[volumeName];
+    volumeIndex.reserve(1000000);
+    auto& childrenMap = outParentToChildren[volumeName];
 
     while (DeviceIoControl(hVol, FSCTL_ENUM_USN_DATA, &enumData, sizeof(enumData), buffer.data(), BUF_SIZE, &cb, NULL)) {
         BYTE* pData = buffer.data() + sizeof(USN);
@@ -80,8 +100,7 @@ bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
             entry.name = std::wstring(pRecord->FileName, pRecord->FileNameLength / sizeof(wchar_t));
             
             volumeIndex[entry.frn] = entry;
-            // 建立父子索引
-            m_parentToChildren[volumeName][entry.parentFrn].push_back(entry.frn);
+            childrenMap[entry.parentFrn].push_back(entry.frn);
 
             pData += pRecord->RecordLength;
         }
@@ -89,32 +108,28 @@ bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
     }
 
     CloseHandle(hVol);
-    m_isUsingMft = true;
     return true;
 }
 
 /**
- * @brief 降级扫描实现
+ * @brief 内部方法：降级扫描并填充路径索引
  */
-/**
- * @brief 优化：仅扫描顶层目录以防止启动过慢，深度扫描由 UI 驱动或后台按需进行
- */
-void MftReader::scanDirectoryFallback(const std::wstring& volumeName) {
+void MftReader::scanDirectoryFallbackInternal(const std::wstring& volumeName,
+    std::unordered_map<std::wstring, FileEntry>& outPathIndex) {
     try {
         std::wstring rootPath = volumeName + L"\\";
-        // 仅迭代一级目录
         for (const auto& entry : std::filesystem::directory_iterator(rootPath, std::filesystem::directory_options::skip_permission_denied)) {
             FileEntry fe;
             fe.volume = volumeName;
             fe.name = entry.path().filename().wstring();
             fe.attributes = entry.is_directory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
-            m_pathIndex[entry.path().wstring()] = fe;
+            outPathIndex[entry.path().wstring()] = fe;
         }
     } catch (...) {}
 }
 
 /**
- * @brief 获取指定目录下的子项列表
+ * @brief 获取指定目录下的子项列表 (2026-03-xx 优化：实时降级逻辑，防止索引未就绪时白屏)
  */
 std::vector<FileEntry> MftReader::getChildren(const std::wstring& folderPath) {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -122,52 +137,64 @@ std::vector<FileEntry> MftReader::getChildren(const std::wstring& folderPath) {
     std::wstring vol = folderPath.length() >= 2 ? folderPath.substr(0, 2) : L"";
     if (vol.empty()) return results;
 
+    // 1. 如果 MFT 索引已就绪，使用极速内存查询
     if (m_isUsingMft) {
         DWORDLONG parentFrn = getFrnFromPath(folderPath);
-        if (parentFrn == 0) return results;
-
-        auto& childrenMap = m_parentToChildren[vol];
-        if (childrenMap.count(parentFrn)) {
-            auto& entries = m_index[vol];
-            for (DWORDLONG childFrn : childrenMap[parentFrn]) {
-                if (entries.count(childFrn)) results.push_back(entries[childFrn]);
+        if (parentFrn != 0) {
+            auto itVol = m_parentToChildren.find(vol);
+            if (itVol != m_parentToChildren.end()) {
+                auto itParent = itVol->second.find(parentFrn);
+                if (itParent != itVol->second.end()) {
+                    auto& entries = m_index[vol];
+                    for (DWORDLONG childFrn : itParent->second) {
+                        auto itEntry = entries.find(childFrn);
+                        if (itEntry != entries.end()) results.push_back(itEntry->second);
+                    }
+                    return results;
+                }
             }
         }
-    } else {
-        // 2. 降级模式：直接扫描文件系统
-        try {
-            std::filesystem::path p(folderPath);
+    }
+
+    // 2. 降级/兜底逻辑：如果索引未就绪或未找到，直接通过操作系统实时读取
+    // 这保证了即便后台正在构建全量索引，用户点击目录依然能“秒开”看到内容
+    try {
+        std::filesystem::path p(folderPath);
+        if (std::filesystem::exists(p) && std::filesystem::is_directory(p)) {
             for (const auto& entry : std::filesystem::directory_iterator(p, std::filesystem::directory_options::skip_permission_denied)) {
                 FileEntry fe;
-                fe.volume = folderPath.substr(0, 2);
+                fe.volume = vol;
                 fe.name = entry.path().filename().wstring();
                 fe.attributes = entry.is_directory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
                 results.push_back(fe);
             }
-        } catch (...) {}
-    }
+        }
+    } catch (...) {}
+
     return results;
 }
 
 /**
- * @brief 根据路径逆向检索 FRN
- */
-
-/**
- * @brief 实现 O(1) 路径检索
+ * @brief 根据路径获取对应的 FRN
  */
 DWORDLONG MftReader::getFrnFromPath(const std::wstring& folderPath) {
+    // getChildren 已经加锁了，但 getFrnFromPath 是公有的或被其他公有方法调用，需自保
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     std::wstring vol = folderPath.length() >= 2 ? folderPath.substr(0, 2) : L"";
     if (vol.empty()) return 0;
     
-    const auto& volPathMap = m_pathToFrn[vol];
+    // 处理根目录特例 (一般根目录 FRN 为 5，但通过路径匹配更稳健)
+    if (folderPath.length() <= 3) { // e.g., "C:\" 或 "C:"
+        return 5; // NTFS 规范根目录 FRN 恒为 5
+    }
+
+    auto& volPathMap = m_pathToFrn[vol];
     auto it = volPathMap.find(folderPath);
     if (it != volPathMap.end()) {
         return it->second;
     }
     
-    // 备选逻辑：如果映射表未填充，则全量匹配并缓存（仅在特殊初始化阶段发生）
+    // 如果缓存没有，全量反向构建一次（仅对目录）
     auto& entries = m_index[vol];
     for (const auto& [frn, entry] : entries) {
         if (entry.isDir()) {
@@ -185,7 +212,6 @@ DWORDLONG MftReader::getFrnFromPath(const std::wstring& folderPath) {
 std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::wstring& volume) {
     if (query.empty()) return {};
 
-    // 1. 收集所有待搜索项的指针
     std::vector<const FileEntry*> pool;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -201,11 +227,12 @@ std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::w
         }
     }
 
-    // 2. 将 query 转换为小写，支持大小写不敏感匹配
+    // 如果索引为空（构建中），搜索直接返回空，后续可以扩展实时流式搜索
+    if (pool.empty()) return {};
+
     std::wstring lQuery = query;
     std::transform(lQuery.begin(), lQuery.end(), lQuery.begin(), ::towlower);
 
-    // 3. 并行过滤
     std::vector<FileEntry> results;
     std::mutex resultsMutex;
 
@@ -223,21 +250,18 @@ std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::w
 }
 
 /**
- * @brief USN 监听器更新内存索引，并同步维护反向索引 (红线修复)
+ * @brief USN 监听器更新内存索引
  */
 void MftReader::updateEntry(const FileEntry& entry) {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     
-    // 1. 维护主索引
     auto& volIndex = m_index[entry.volume];
     bool isNew = (volIndex.find(entry.frn) == volIndex.end());
     DWORDLONG oldParentFrn = isNew ? 0 : volIndex[entry.frn].parentFrn;
     
     volIndex[entry.frn] = entry;
 
-    // 2. 维护父子关系索引
     if (!isNew && oldParentFrn != entry.parentFrn) {
-        // 如果移动了位置，从旧父节点移除
         auto& oldChildren = m_parentToChildren[entry.volume][oldParentFrn];
         oldChildren.erase(std::remove(oldChildren.begin(), oldChildren.end(), entry.frn), oldChildren.end());
     }
@@ -246,7 +270,6 @@ void MftReader::updateEntry(const FileEntry& entry) {
         m_parentToChildren[entry.volume][entry.parentFrn].push_back(entry.frn);
     }
 
-    // 3. 失效路径缓存 (USN 变更后路径已不可信)
     m_pathToFrn[entry.volume].clear();
 }
 
@@ -259,12 +282,9 @@ void MftReader::removeEntry(const std::wstring& volume, DWORDLONG frn) {
     auto it = volIndex.find(frn);
     if (it != volIndex.end()) {
         DWORDLONG parentFrn = it->second.parentFrn;
-        // 从主索引移除
         volIndex.erase(it);
-        // 从父子索引移除
         auto& children = m_parentToChildren[volume][parentFrn];
         children.erase(std::remove(children.begin(), children.end(), frn), children.end());
-        // 清理路径缓存
         m_pathToFrn[volume].clear();
     }
 }

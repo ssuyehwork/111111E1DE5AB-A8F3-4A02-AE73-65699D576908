@@ -50,8 +50,13 @@ public:
 private:
     MftReader() = default;
     
-    bool loadMftForVolume(const std::wstring& volumeName);
-    void scanDirectoryFallback(const std::wstring& volumeName);
+    // 2026-03-xx 按照重构方案：改为私有内部方法，支持局部变量填充以实现无锁扫描
+    bool loadMftForVolumeInternal(const std::wstring& volumeName,
+        std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>>& outIndex,
+        std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, std::vector<DWORDLONG>>>& outParentToChildren);
+
+    void scanDirectoryFallbackInternal(const std::wstring& volumeName,
+        std::unordered_map<std::wstring, FileEntry>& outPathIndex);
 
     // volume -> (frn -> Entry)
     std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, FileEntry>> m_index;
