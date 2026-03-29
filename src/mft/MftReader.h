@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <atomic>
+#include <cwctype>
 #include <windows.h>
 
 namespace ArcMeta {
@@ -108,7 +109,7 @@ public:
 
 private:
     mutable std::recursive_mutex m_mutex; // 保护所有索引数据
-    std::unordered_map<std::wstring, std::atomic<bool>> m_refreshPending;
+    std::unordered_map<std::wstring, bool> m_refreshPending;
 };
 
 } // namespace ArcMeta

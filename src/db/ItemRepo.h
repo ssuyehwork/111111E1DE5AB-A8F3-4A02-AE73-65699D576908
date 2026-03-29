@@ -4,6 +4,7 @@
 #include "../meta/AmMetaJson.h"
 #include <string>
 #include <vector>
+#include <map>
 #include <QSqlDatabase>
 
 namespace ArcMeta {

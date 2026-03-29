@@ -39,6 +39,7 @@ struct FileItem {
     QString fullPath;
     QString extension;
     bool isDir = false;
+    bool isDrive = false;
 
     // 系统属性 (从 DB 预取)
     long long size = 0;
@@ -78,6 +79,7 @@ public:
 
 private:
     QList<FileItem> m_items;
+    mutable QMap<QString, QIcon> m_iconCache;
 };
 
 /**

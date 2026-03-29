@@ -167,6 +167,8 @@ int FileModel::columnCount(const QModelIndex&) const { return 4; }
 void FileModel::setItems(const QList<FileItem>& items) {
     beginResetModel();
     m_items = items;
+    // 换目录时清理图标缓存，防止内存无限增长
+    m_iconCache.clear();
     endResetModel();
 }
 
@@ -182,9 +184,24 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
             case 3: return item.timeStr;
         }
     } else if (role == Qt::DecorationRole && index.column() == 0) {
-        // 后续可接入图标缓存以进一步优化性能
         static QFileIconProvider provider;
-        return provider.icon(item.isDir ? QFileIconProvider::Folder : QFileIconProvider::File);
+        if (item.isDrive) {
+            if (!m_iconCache.contains("__DRIVE__")) {
+                m_iconCache["__DRIVE__"] = provider.icon(QFileIconProvider::Drive);
+            }
+            return m_iconCache["__DRIVE__"];
+        }
+
+        // 极致性能：针对常见后缀使用后缀缓存，减少 QFileInfo 的系统调用
+        QString cacheKey = item.isDir ? "__DIR__" : item.extension.toLower();
+        if (m_iconCache.contains(cacheKey)) return m_iconCache[cacheKey];
+
+        QIcon icon = provider.icon(QFileInfo(item.fullPath));
+        // 只缓存文件夹和常见后缀图标，特殊文件（如 .exe）不缓存以保证原生准确性
+        if (item.isDir || (!item.extension.isEmpty() && item.extension.toLower() != "exe" && item.extension.toLower() != "lnk")) {
+            m_iconCache[cacheKey] = icon;
+        }
+        return icon;
     } else if (role == PathRole)      return item.fullPath;
     else if (role == RatingRole)    return item.rating;
     else if (role == ColorRole)     return item.color;
@@ -196,6 +213,7 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
     else if (role == MTimeRawRole)  return item.mtime;
     else if (role == CTimeRawRole)  return item.ctime;
     else if (role == IsDirRole)     return item.isDir;
+    else if (role == Qt::UserRole + 100) return item.isDrive; // 临时角色用于识别驱动器
 
     return QVariant();
 }
@@ -208,6 +226,7 @@ bool FileModel::setData(const QModelIndex& index, const QVariant& value, int rol
     else if (role == ColorRole)     item.color = value.toString();
     else if (role == IsLockedRole)  item.pinned = value.toBool();
     else if (role == Qt::EditRole)   item.name = value.toString();
+    else if (role == PathRole)      item.fullPath = value.toString();
     else return false;
 
     emit dataChanged(index, index, {role});
@@ -717,6 +736,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             fi.name = drivePath;
             fi.fullPath = drivePath;
             fi.isDir = true;
+            fi.isDrive = true;
             fi.typeStr = "磁盘分区";
             fi.sizeStr = "-";
             fi.timeStr = "-";
@@ -786,6 +806,7 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         fi.name = fileName;
         fi.fullPath = info.absoluteFilePath();
         fi.isDir = info.isDir();
+        fi.isDrive = fi.isDir && (fi.fullPath.length() <= 3 && fi.fullPath.endsWith(":\\"));
         fi.extension = info.suffix().toUpper();
 
         // 2026-03-xx 极致性能重构：元数据反填 (Flyweight + DB-First Zero IO)
@@ -884,6 +905,7 @@ void ContentPanel::search(const QString& query) {
         fi.name = fileName;
         fi.fullPath = fullPath;
         fi.isDir = entry.isDir();
+        fi.isDrive = fi.isDir && (fullPath.length() <= 3 && fullPath.endsWith(":\\"));
         fi.extension = info.suffix().toUpper();
         fi.sizeStr = fullPath; // 在搜索模式下，第二列展示路径
         fi.typeStr = fi.isDir ? "文件夹" : (fi.extension.isEmpty() ? "文件" : fi.extension + " 文件");
@@ -1002,22 +1024,26 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     painter->drawRoundedRect(cardRect, 8, 8);
 
     QString path = index.data(PathRole).toString();
-    QFileInfo info(path);
-    QString ext = info.isDir() ? "DIR" : info.suffix().toUpper();
-    if (ext.isEmpty()) ext = "FILE";
-    QColor badgeColor = UiHelper::getExtensionColor(ext);
+    bool isDrive = index.data(Qt::UserRole + 100).toBool();
 
-    QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(badgeColor);
-    // 2026-03-xx 按照用户要求：卡片内圆角由 4px 统一调整为 2px
-    painter->drawRoundedRect(extRect, 2, 2);
-    painter->setPen(QColor("#FFFFFF"));
-    QFont extFont = painter->font();
-    extFont.setPointSize(8);
-    extFont.setBold(true);
-    painter->setFont(extFont);
-    painter->drawText(extRect, Qt::AlignCenter, ext);
+    if (!isDrive) {
+        QFileInfo info(path);
+        QString ext = info.isDir() ? "DIR" : info.suffix().toUpper();
+        if (ext.isEmpty()) ext = "FILE";
+        QColor badgeColor = UiHelper::getExtensionColor(ext);
+
+        QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(badgeColor);
+        // 2026-03-xx 按照用户要求：卡片内圆角由 4px 统一调整为 2px
+        painter->drawRoundedRect(extRect, 2, 2);
+        painter->setPen(QColor("#FFFFFF"));
+        QFont extFont = painter->font();
+        extFont.setPointSize(8);
+        extFont.setBold(true);
+        painter->setFont(extFont);
+        painter->drawText(extRect, Qt::AlignCenter, ext);
+    }
 
     int baseIconSize = option.decorationSize.width();
     if (baseIconSize <= 0) baseIconSize = 64; 

@@ -612,9 +612,12 @@ void MainWindow::navigateTo(const QString& path, bool record) {
     if (path == "computer://") {
         m_currentPath = "computer://";
         if (record) {
+            if (m_historyIndex < static_cast<int>(m_history.size()) - 1) {
+                m_history = m_history.mid(0, m_historyIndex + 1);
+            }
             if (m_history.isEmpty() || m_history.last() != path) {
                 m_history.append(path);
-                m_historyIndex = m_history.size() - 1;
+                m_historyIndex = static_cast<int>(m_history.size()) - 1;
             }
         }
         m_pathEdit->setText("此电脑");
@@ -664,8 +667,13 @@ void MainWindow::onForwardClicked() {
 }
 
 void MainWindow::onUpClicked() {
+    if (m_currentPath == "computer://") return;
+
     QDir dir(m_currentPath);
-    if (dir.cdUp()) {
+    // 如果当前已经在根目录（如 C:\），则向上跳转到“此电脑”
+    if (dir.isRoot() || m_currentPath.length() <= 3) {
+        navigateTo("computer://");
+    } else if (dir.cdUp()) {
         navigateTo(dir.absolutePath());
     }
 }
@@ -674,8 +682,8 @@ void MainWindow::updateNavButtons() {
     m_btnBack->setEnabled(m_historyIndex > 0);
     m_btnForward->setEnabled(m_historyIndex < m_history.size() - 1);
     
-    bool atRoot = (m_currentPath == "computer://" || (QDir(m_currentPath).isRoot()));
-    m_btnUp->setEnabled(!atRoot && !m_currentPath.isEmpty());
+    bool atComputer = (m_currentPath == "computer://");
+    m_btnUp->setEnabled(!atComputer && !m_currentPath.isEmpty());
 }
 
 void MainWindow::updateStatusBar() {

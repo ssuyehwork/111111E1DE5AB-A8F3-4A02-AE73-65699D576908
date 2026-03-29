@@ -314,13 +314,18 @@ void MftReader::updateEntry(const FileEntry& entry) {
 }
 
 void MftReader::triggerPathRefresh(const std::wstring& volume) {
-    if (m_refreshPending[volume].exchange(true)) return; // 已有挂起的任务
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    if (m_refreshPending[volume]) return; // 已有挂起的任务
+    m_refreshPending[volume] = true;
 
     // 开启后台线程执行延时刷新
     std::thread([this, volume]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         precomputePaths(volume);
-        m_refreshPending[volume] = false;
+        {
+            std::lock_guard<std::recursive_mutex> lock(m_mutex);
+            m_refreshPending[volume] = false;
+        }
     }).detach();
 }
 
