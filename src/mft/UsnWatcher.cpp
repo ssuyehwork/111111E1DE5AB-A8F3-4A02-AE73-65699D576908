@@ -41,9 +41,23 @@ void UsnWatcher::watcherThread() {
         return;
     }
 
-    // 1. 离线变更追平逻辑：从数据库读取 NextUsn (原生 QtSql 实现)
+    // 2026-03-xx 按照红线要求：后台线程必须使用私有数据库连接
+    QString connName = "UsnWatcher_" + QString::fromStdWString(m_volume);
+    QSqlDatabase db;
+    if (QSqlDatabase::contains(connName)) {
+        db = QSqlDatabase::database(connName);
+    } else {
+        db = QSqlDatabase::addDatabase("QSQLITE", connName);
+        db.setDatabaseName(QString::fromStdWString(Database::instance().getDbPath()));
+    }
+    if (!db.isOpen() && !db.open()) {
+        CloseHandle(hVol);
+        return;
+    }
+
+    // 1. 离线变更追平逻辑：从数据库读取 NextUsn (使用私有连接 db)
     QString key = "usn_state_" + QString::fromStdWString(m_volume);
-    QSqlQuery query;
+    QSqlQuery query(db);
     query.prepare("SELECT value FROM sync_state WHERE key = ?");
     query.addBindValue(key);
     
@@ -75,7 +89,7 @@ void UsnWatcher::watcherThread() {
             BYTE* pData = buffer.data() + sizeof(USN);
             while (pData < buffer.data() + cb) {
                 USN_RECORD_V2* pRecord = (USN_RECORD_V2*)pData;
-                handleRecord(pRecord);
+                handleRecord(pRecord, db);
                 pData += pRecord->RecordLength;
             }
             
@@ -93,7 +107,7 @@ void UsnWatcher::watcherThread() {
  * @brief 处理具体变更事件
  * 逻辑：CREATE -> 插入索引；DELETE -> 级联删除；RENAME -> 原子迁移
  */
-void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
+void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord, QSqlDatabase db) {
     DWORD reason = pRecord->Reason;
     std::wstring fileName(pRecord->FileName, pRecord->FileNameLength / sizeof(wchar_t));
     std::wstring frnStr = QString::number(pRecord->FileReferenceNumber, 16).prepend("0x").toStdWString();
@@ -109,11 +123,11 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
     }
 
     if (reason & USN_REASON_FILE_DELETE) {
-        ItemRepo::markAsDeleted(m_volume, frnStr);
+        ItemRepo::markAsDeleted(m_volume, frnStr, db);
         MftReader::instance().removeEntry(m_volume, pRecord->FileReferenceNumber);
         std::wstring fullPath = PathBuilder::getPath(m_volume, pRecord->FileReferenceNumber);
         if (!fullPath.empty()) {
-            FolderRepo::remove(fullPath);
+            FolderRepo::remove(fullPath, db);
         }
     }
 
@@ -121,7 +135,7 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
         // 1. 获取新路径及新父目录路径
         std::wstring newPath = PathBuilder::getPath(m_volume, pRecord->FileReferenceNumber);
         std::wstring newParentPath = PathBuilder::getPath(m_volume, pRecord->ParentFileReferenceNumber);
-        std::wstring oldPath = ItemRepo::getPathByFrn(m_volume, frnStr);
+        std::wstring oldPath = ItemRepo::getPathByFrn(m_volume, frnStr, db);
 
         if (!newPath.empty() && oldPath != newPath) {
             // 2. 跨目录元数据迁移事务逻辑 (两阶段提交思想)
@@ -138,20 +152,22 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
                         
                         // 第二阶段：物理迁移 JSON 记录到新目录
                         AmMetaJson newMetaJson(newParentPath);
-                        newMetaJson.load();
-                        std::wstring newFileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
-                        newMetaJson.items()[newFileNameOnly] = meta;
-                        
-                        if (newMetaJson.save()) {
-                            // 成功后删除旧位置记录并更新数据库
-                            items.erase(it);
-                            oldMetaJson.save();
+                        // 2026-03-xx 增加加载校验：确保目标目录元数据加载正常
+                        if (newMetaJson.load()) {
+                            std::wstring newFileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
+                            newMetaJson.items()[newFileNameOnly] = meta;
+
+                            if (newMetaJson.save()) {
+                                // 成功后删除旧位置记录并更新数据库
+                                items.erase(it);
+                                oldMetaJson.save();
+                            }
                         }
                     }
                 }
             }
-            // 无论 JSON 迁移与否，更新数据库路径与内存索引
-            ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
+            // 无论 JSON 迁移与否，更新数据库路径与内存索引 (使用私有连接 db)
+            ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath, db);
 
             // 更新内存 MFT 索引 (同步维护反向索引)
             FileEntry entry;

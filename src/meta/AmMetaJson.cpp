@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <QFile>
+#include <QThread>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -106,9 +107,16 @@ bool AmMetaJson::save() const {
     // 2. 写入临时文件 .am_meta.json.tmp
     QString tmpPath = toQString(m_filePath) + ".tmp";
     QFile tmpFile(tmpPath);
-    if (!tmpFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        return false;
+    // 2026-03-xx 增加重试机制：防止后台线程 UsnWatcher 正在迁移导致的临时冲突
+    bool opened = false;
+    for (int i = 0; i < 3; ++i) {
+        if (tmpFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            opened = true;
+            break;
+        }
+        QThread::msleep(50);
     }
+    if (!opened) return false;
     if (tmpFile.write(jsonData) != jsonData.size()) {
         tmpFile.close();
         tmpFile.remove();

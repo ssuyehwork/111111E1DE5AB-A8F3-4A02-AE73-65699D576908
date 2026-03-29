@@ -4,6 +4,7 @@
 #include "../meta/AmMetaJson.h"
 #include <string>
 #include <vector>
+#include <QSqlDatabase>
 
 namespace ArcMeta {
 
@@ -12,19 +13,19 @@ namespace ArcMeta {
  */
 class ItemRepo {
 public:
-    static bool save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta);
-    static bool removeByFrn(const std::wstring& volume, const std::wstring& frn);
-    static bool markAsDeleted(const std::wstring& volume, const std::wstring& frn);
+    static bool save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta, QSqlDatabase db = QSqlDatabase::database());
+    static bool removeByFrn(const std::wstring& volume, const std::wstring& frn, QSqlDatabase db = QSqlDatabase::database());
+    static bool markAsDeleted(const std::wstring& volume, const std::wstring& frn, QSqlDatabase db = QSqlDatabase::database());
     
     /**
      * @brief 通过 FRN 获取当前数据库记录的路径
      */
-    static std::wstring getPathByFrn(const std::wstring& volume, const std::wstring& frn);
+    static std::wstring getPathByFrn(const std::wstring& volume, const std::wstring& frn, QSqlDatabase db = QSqlDatabase::database());
 
     /**
      * @brief 物理更新路径
      */
-    static bool updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath);
+    static bool updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath, QSqlDatabase db = QSqlDatabase::database());
 };
 
 } // namespace ArcMeta

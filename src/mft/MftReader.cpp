@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <execution>
 #include <mutex>
+#include <functional>
 
 namespace ArcMeta {
 
@@ -104,11 +105,16 @@ void MftReader::scanDirectoryFallback(const std::wstring& volumeName) {
         std::wstring rootPath = volumeName + L"\\";
         // 仅迭代一级目录
         for (const auto& entry : std::filesystem::directory_iterator(rootPath, std::filesystem::directory_options::skip_permission_denied)) {
+            std::wstring fullPath = entry.path().wstring();
             FileEntry fe;
             fe.volume = volumeName;
             fe.name = entry.path().filename().wstring();
             fe.attributes = entry.is_directory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
-            m_pathIndex[entry.path().wstring()] = fe;
+
+            // 2026-03-xx 降级模式主键增强：为无 FRN 的环境生成基于路径哈希的虚拟 FRN
+            fe.frn = std::hash<std::wstring>{}(fullPath);
+
+            m_pathIndex[fullPath] = fe;
         }
     } catch (...) {}
 }
@@ -138,10 +144,15 @@ std::vector<FileEntry> MftReader::getChildren(const std::wstring& folderPath) {
         try {
             std::filesystem::path p(folderPath);
             for (const auto& entry : std::filesystem::directory_iterator(p, std::filesystem::directory_options::skip_permission_denied)) {
+                std::wstring fullPath = entry.path().wstring();
                 FileEntry fe;
                 fe.volume = folderPath.substr(0, 2);
                 fe.name = entry.path().filename().wstring();
                 fe.attributes = entry.is_directory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+
+                // 2026-03-xx 降级模式主键增强
+                fe.frn = std::hash<std::wstring>{}(fullPath);
+
                 results.push_back(fe);
             }
         } catch (...) {}

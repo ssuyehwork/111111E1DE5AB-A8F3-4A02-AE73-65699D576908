@@ -3,6 +3,7 @@
 #include "Database.h"
 #include <string>
 #include <vector>
+#include <QSqlDatabase>
 
 namespace ArcMeta {
 
@@ -18,9 +19,9 @@ struct Favorite {
  */
 class FavoritesRepo {
 public:
-    static bool add(const Favorite& fav);
-    static bool remove(const std::wstring& path);
-    static std::vector<Favorite> getAll();
+    static bool add(const Favorite& fav, QSqlDatabase db = QSqlDatabase::database());
+    static bool remove(const std::wstring& path, QSqlDatabase db = QSqlDatabase::database());
+    static std::vector<Favorite> getAll(QSqlDatabase db = QSqlDatabase::database());
 };
 
 } // namespace ArcMeta

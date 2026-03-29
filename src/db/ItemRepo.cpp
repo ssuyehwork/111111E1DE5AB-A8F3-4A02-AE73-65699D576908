@@ -6,8 +6,8 @@
 
 namespace ArcMeta {
 
-bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta) {
-    QSqlQuery q;
+bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare(R"sql(
         INSERT OR REPLACE INTO items 
         (volume, frn, path, parent_path, type, rating, color, tags, pinned, note, 
@@ -42,24 +42,24 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
     return q.exec();
 }
 
-bool ItemRepo::markAsDeleted(const std::wstring& volume, const std::wstring& frn) {
-    QSqlQuery q;
+bool ItemRepo::markAsDeleted(const std::wstring& volume, const std::wstring& frn, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("UPDATE items SET deleted = 1 WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
     return q.exec();
 }
 
-bool ItemRepo::removeByFrn(const std::wstring& volume, const std::wstring& frn) {
-    QSqlQuery q;
+bool ItemRepo::removeByFrn(const std::wstring& volume, const std::wstring& frn, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("DELETE FROM items WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
     return q.exec();
 }
 
-std::wstring ItemRepo::getPathByFrn(const std::wstring& volume, const std::wstring& frn) {
-    QSqlQuery q;
+std::wstring ItemRepo::getPathByFrn(const std::wstring& volume, const std::wstring& frn, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("SELECT path FROM items WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
@@ -69,8 +69,8 @@ std::wstring ItemRepo::getPathByFrn(const std::wstring& volume, const std::wstri
     return L"";
 }
 
-bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath) {
-    QSqlQuery q;
+bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("UPDATE items SET path = ?, parent_path = ? WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(newPath));
     q.addBindValue(QString::fromStdWString(newParentPath));

@@ -6,8 +6,8 @@
 
 namespace ArcMeta {
 
-bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
-    QSqlQuery q;
+bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     q.addBindValue(QString::fromStdWString(path));
     q.addBindValue(meta.rating);
@@ -25,8 +25,8 @@ bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
     return q.exec();
 }
 
-bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
-    QSqlQuery q;
+bool FolderRepo::get(const std::wstring& path, FolderMeta& meta, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order FROM folders WHERE path = ?");
     q.addBindValue(QString::fromStdWString(path));
     
@@ -49,8 +49,8 @@ bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
     return false;
 }
 
-bool FolderRepo::remove(const std::wstring& path) {
-    QSqlQuery q;
+bool FolderRepo::remove(const std::wstring& path, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("DELETE FROM folders WHERE path = ?");
     q.addBindValue(QString::fromStdWString(path));
     return q.exec();

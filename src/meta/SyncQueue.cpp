@@ -102,12 +102,12 @@ bool SyncQueue::processBatch() {
             AmMetaJson meta(path);
             if (!meta.load()) continue;
 
-            // 1. 使用 Repository 同步文件夹
-            FolderRepo::save(path, meta.folder());
+            // 1. 使用 Repository 同步文件夹 (2026-03-xx 传入后台线程私有连接 db)
+            FolderRepo::save(path, meta.folder(), db);
 
-            // 2. 使用 Repository 同步所有条目
+            // 2. 使用 Repository 同步所有条目 (2026-03-xx 传入后台线程私有连接 db)
             for (const auto& [name, iMeta] : meta.items()) {
-                ItemRepo::save(path, name, iMeta);
+                ItemRepo::save(path, name, iMeta, db);
             }
         }
 

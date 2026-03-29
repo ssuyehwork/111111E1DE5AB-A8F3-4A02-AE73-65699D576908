@@ -3,6 +3,7 @@
 #include "Database.h"
 #include <string>
 #include <vector>
+#include <QSqlDatabase>
 
 namespace ArcMeta {
 
@@ -22,14 +23,14 @@ struct Category {
  */
 class CategoryRepo {
 public:
-    static bool add(Category& cat);
-    static bool update(const Category& cat);
-    static bool remove(int id);
-    static std::vector<Category> getAll();
+    static bool add(Category& cat, QSqlDatabase db = QSqlDatabase::database());
+    static bool update(const Category& cat, QSqlDatabase db = QSqlDatabase::database());
+    static bool remove(int id, QSqlDatabase db = QSqlDatabase::database());
+    static std::vector<Category> getAll(QSqlDatabase db = QSqlDatabase::database());
 
     // 条目关联逻辑
-    static bool addItemToCategory(int categoryId, const std::wstring& itemPath);
-    static bool removeItemFromCategory(int categoryId, const std::wstring& itemPath);
+    static bool addItemToCategory(int categoryId, const std::wstring& itemPath, QSqlDatabase db = QSqlDatabase::database());
+    static bool removeItemFromCategory(int categoryId, const std::wstring& itemPath, QSqlDatabase db = QSqlDatabase::database());
 };
 
 } // namespace ArcMeta
