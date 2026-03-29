@@ -156,36 +156,31 @@ void MainWindow::initUi() {
             m_metaPanel->setTags(QStringList());
             if (m_statusRight) m_statusRight->setText("");
         } else {
+            // 2026-03-xx 高性能优化：优先从模型缓存中读取元数据，避免频繁磁盘访问
+            auto indexes = m_contentPanel->getSelectedIndexes();
+            if (indexes.isEmpty()) return;
+
+            QModelIndex idx = indexes.first();
             QString path = paths.first();
             QFileInfo info(path);
+
+            // 基础信息展示
             m_metaPanel->updateInfo(
-                info.fileName(), 
+                info.fileName().isEmpty() ? path : info.fileName(),
                 info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件",
                 info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB",
                 info.birthTime().toString("yyyy-MM-dd"),
                 info.lastModified().toString("yyyy-MM-dd"),
                 info.lastRead().toString("yyyy-MM-dd"),
                 info.absoluteFilePath(),
-                false
+                idx.data(EncryptedRole).toBool()
             );
 
-            // 从 .am-meta.json 回读物理状态以刷新侧边面板 UI
-            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-            meta.load();
-            auto it = meta.items().find(info.fileName().toStdWString());
-            if (it != meta.items().end()) {
-                m_metaPanel->setRating(it->second.rating);
-                m_metaPanel->setColor(it->second.color);
-                m_metaPanel->setPinned(it->second.pinned);
-                QStringList tgs;
-                for (const auto& t : it->second.tags) tgs << QString::fromStdWString(t);
-                m_metaPanel->setTags(tgs);
-            } else {
-                m_metaPanel->setRating(0);
-                m_metaPanel->setColor(L"");
-                m_metaPanel->setPinned(false);
-                m_metaPanel->setTags(QStringList());
-            }
+            // 应用缓存中的元数据状态
+            m_metaPanel->setRating(idx.data(RatingRole).toInt());
+            m_metaPanel->setColor(idx.data(ColorRole).toString().toStdWString());
+            m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
+            m_metaPanel->setTags(idx.data(TagsRole).toStringList());
         }
         // 状态栏右侧显示已选数量
         if (m_statusRight) {
@@ -343,7 +338,7 @@ void MainWindow::initToolbar() {
 
     // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
     m_pathStack = new QStackedWidget(this);
-    m_pathStack->setFixedHeight(36);
+    m_pathStack->setFixedHeight(40); // 2026-03-xx 按照规范要求：地址栏高度统一设定为 40px
     m_pathStack->setMinimumWidth(300);
     m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
 
@@ -380,7 +375,7 @@ void MainWindow::initToolbar() {
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setFixedWidth(200);
-    m_searchEdit->setFixedHeight(36); // 与地址栏容器等高
+    m_searchEdit->setFixedHeight(40); // 2026-03-xx 按照规范要求：地址栏高度统一设定为 40px
     m_searchEdit->setStyleSheet(
         "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"
@@ -397,7 +392,7 @@ void MainWindow::setupSplitters() {
     mainL->setSpacing(5); // 各元素垂直间距统一 5px
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(36); // 地址栏高度 36px
+    addressBar->setFixedHeight(40); // 2026-03-xx 按照规范要求：地址栏高度统一设定为 40px
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);

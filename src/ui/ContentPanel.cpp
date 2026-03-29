@@ -737,6 +737,7 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
             nameItem->setData(itemRating, RatingRole);
             nameItem->setData(itemColor, ColorRole);
             nameItem->setData(it->second.pinned, IsLockedRole);
+            nameItem->setData(it->second.encrypted, EncryptedRole); // 2026-03-xx 完善加密角色填充
             hasTags = !it->second.tags.empty();
             for (const auto& tag : it->second.tags) {
                 QString t = QString::fromStdWString(tag);
@@ -831,6 +832,7 @@ void ContentPanel::search(const QString& query) {
             nameItem->setData(itemRating, RatingRole);
             nameItem->setData(itemColor, ColorRole);
             nameItem->setData(it->second.pinned, IsLockedRole);
+            nameItem->setData(it->second.encrypted, EncryptedRole); // 2026-03-xx 完善加密角色填充
             
             hasTags = !it->second.tags.empty();
             QStringList tgs;
@@ -1164,8 +1166,8 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
     if (QFile::rename(oldPath, newPath)) {
         model->setData(index, value, Qt::EditRole);
         model->setData(index, newPath, PathRole);
-        // 如果有独立的 MetaJson 辅助类，此处由于是在 ContentPanel.cpp，
-        // 我们留给外部依赖扫描器去刷新，或只在这里进行纯物理重命名展示。
+        // 2026-03-xx 按照用户要求：修复重命名后元数据丢失问题，同步更新 JSON
+        AmMetaJson::renameItem(info.absolutePath(), info.fileName(), value);
     } else {
         // 失败则不改模型
     }

@@ -91,6 +91,14 @@ public:
      */
     std::wstring getMetaFilePath() const { return m_filePath; }
 
+    /**
+     * @brief 静态辅助方法：物理重命名元数据条目
+     * @param folderPath 所在目录
+     * @param oldName 旧文件名
+     * @param newName 新文件名
+     */
+    static bool renameItem(const QString& folderPath, const QString& oldName, const QString& newName);
+
 private:
     std::wstring m_folderPath;
     std::wstring m_filePath;

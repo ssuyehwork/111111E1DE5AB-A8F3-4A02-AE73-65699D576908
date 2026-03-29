@@ -148,6 +148,30 @@ bool AmMetaJson::save() const {
     return true;
 }
 
+/**
+ * @brief 按照用户要求：物理重命名元数据条目（2026-03-xx）
+ */
+bool AmMetaJson::renameItem(const QString& folderPath, const QString& oldName, const QString& newName) {
+    if (oldName == newName) return true;
+
+    AmMetaJson meta(folderPath.toStdWString());
+    if (!meta.load()) return false;
+
+    auto& items = meta.items();
+    std::wstring wOld = oldName.toStdWString();
+    std::wstring wNew = newName.toStdWString();
+
+    auto it = items.find(wOld);
+    if (it != items.end()) {
+        // 迁移元数据到新键值
+        items[wNew] = it->second;
+        items.erase(it);
+        return meta.save();
+    }
+
+    return true; // 没有对应元数据也视为成功
+}
+
 // --- 内部辅助函数：转换 ---
 
 QJsonObject AmMetaJson::folderToEntry(const FolderMeta& meta) {
