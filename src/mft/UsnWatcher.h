@@ -4,6 +4,7 @@
 #include <string>
 #include <thread>
 #include <atomic>
+#include <QSqlDatabase>
 
 namespace ArcMeta {
 
@@ -37,7 +38,7 @@ private:
     /**
      * @brief 解析并分发单个记录
      */
-    void handleRecord(USN_RECORD_V2* pRecord);
+    void handleRecord(USN_RECORD_V2* pRecord, QSqlDatabase db);
 
     std::wstring m_volume;
     std::thread m_thread;

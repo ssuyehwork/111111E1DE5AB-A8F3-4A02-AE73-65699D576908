@@ -34,7 +34,11 @@
 #include <QInputDialog>
 #include <windows.h>
 #include <shellapi.h>
+#include <functional>
+#include <QStringList>
+#include <QDateTime>
 #include "../mft/MftReader.h"
+#include "../db/ItemRepo.h"
 #include "../mft/PathBuilder.h"
 #include "../meta/AmMetaJson.h"
 #include "UiHelper.h"
@@ -153,6 +157,73 @@ protected:
 };
 
 
+// ─── FileModel 实现 (极致性能享元架构) ───────────────────────────────────
+
+FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent) {}
+
+int FileModel::rowCount(const QModelIndex&) const { return m_items.count(); }
+int FileModel::columnCount(const QModelIndex&) const { return 4; }
+
+void FileModel::setItems(const QList<FileItem>& items) {
+    beginResetModel();
+    m_items = items;
+    endResetModel();
+}
+
+QVariant FileModel::data(const QModelIndex& index, int role) const {
+    if (!index.isValid() || index.row() >= m_items.count()) return QVariant();
+    const auto& item = m_items[index.row()];
+
+    if (role == Qt::DisplayRole || role == Qt::EditRole) {
+        switch (index.column()) {
+            case 0: return item.name;
+            case 1: return item.sizeStr;
+            case 2: return item.typeStr;
+            case 3: return item.timeStr;
+        }
+    } else if (role == Qt::DecorationRole && index.column() == 0) {
+        // 后续可接入图标缓存以进一步优化性能
+        static QFileIconProvider provider;
+        return provider.icon(item.isDir ? QFileIconProvider::Folder : QFileIconProvider::File);
+    } else if (role == PathRole)      return item.fullPath;
+    else if (role == RatingRole)    return item.rating;
+    else if (role == ColorRole)     return item.color;
+    else if (role == IsLockedRole)  return item.pinned;
+    else if (role == EncryptedRole) return item.encrypted;
+    else if (role == TagsRole)      return item.tags;
+    else if (role == TypeRole)      return item.isDir ? "folder" : "file";
+    else if (role == SizeRawRole)   return (qlonglong)item.size;
+    else if (role == MTimeRawRole)  return item.mtime;
+    else if (role == CTimeRawRole)  return item.ctime;
+    else if (role == IsDirRole)     return item.isDir;
+
+    return QVariant();
+}
+
+bool FileModel::setData(const QModelIndex& index, const QVariant& value, int role) {
+    if (!index.isValid() || index.row() >= m_items.count()) return false;
+    auto& item = m_items[index.row()];
+
+    if (role == RatingRole)    item.rating = value.toInt();
+    else if (role == ColorRole)     item.color = value.toString();
+    else if (role == IsLockedRole)  item.pinned = value.toBool();
+    else if (role == Qt::EditRole)   item.name = value.toString();
+    else return false;
+
+    emit dataChanged(index, index, {role});
+    return true;
+}
+
+QVariant FileModel::headerData(int section, Qt::Orientation orientation, int role) const {
+    if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+        static QStringList headers = {"名称", "大小", "类型", "修改时间"};
+        return headers.value(section);
+    }
+    return QVariant();
+}
+
+// ─── ContentPanel 实现 ───────────────────────────────────────────────────
+
 ContentPanel::ContentPanel(QWidget* parent)
     : QWidget(parent) {
     setMinimumWidth(200);
@@ -162,7 +233,7 @@ ContentPanel::ContentPanel(QWidget* parent)
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    m_model = new QStandardItemModel(this);
+    m_model = new FileModel(this); // 2026-03-xx 极致性能重构：切换至自定义享元模型
     m_proxyModel = new FilterProxyModel(this);
     m_proxyModel->setSourceModel(m_model);
 
@@ -254,54 +325,52 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         }
 
         if (view) {
+            auto indexes = view->selectionModel()->selectedIndexes();
+            if (indexes.isEmpty()) return false;
+
+            // 极致性能：批量更新逻辑封装
+            auto updateBatch = [&](std::function<void(AmMetaJson&, const std::wstring&, const QModelIndex&)> updater) {
+                std::map<std::wstring, std::vector<std::pair<QModelIndex, std::wstring>>> groups;
+                for (const auto& idx : indexes) {
+                    if (idx.column() != 0) continue;
+                    QString p = idx.data(PathRole).toString();
+                    if (p.isEmpty()) continue;
+                    QFileInfo info(p);
+                    groups[info.absolutePath().toStdWString()].push_back({idx, info.fileName().toStdWString()});
+                }
+                for (auto& [folder, itemsGroup] : groups) {
+                    AmMetaJson meta(folder);
+                    meta.load();
+                    for (auto& itemPair : itemsGroup) updater(meta, itemPair.second, itemPair.first);
+                    meta.save();
+                }
+            };
+
             // 1. Ctrl + 0..5 (星级)
             if ((keyEvent->modifiers() & Qt::ControlModifier) && 
                 (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_5)) {
-                
-                int rating = keyEvent->key() - Qt::Key_0;
-                auto indexes = view->selectionModel()->selectedIndexes();
-                for (const auto& idx : indexes) {
-                    if (idx.column() == 0) {
-                        m_proxyModel->setData(idx, rating, RatingRole);
-                        QString path = idx.data(PathRole).toString();
-                        if (!path.isEmpty()) {
-                            QFileInfo info(path);
-                            AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            meta.items()[info.fileName().toStdWString()].rating = rating;
-                            meta.save();
-                        }
-                    }
-                }
+                int r = keyEvent->key() - Qt::Key_0;
+                updateBatch([&](AmMetaJson& meta, const std::wstring& name, const QModelIndex& idx) {
+                    m_proxyModel->setData(idx, r, RatingRole);
+                    meta.items()[name].rating = r;
+                });
                 return true;
             }
 
             // 2. Alt + D (置顶/取消置顶)
             if (((keyEvent->modifiers() & Qt::AltModifier) || (keyEvent->modifiers() & (Qt::AltModifier | Qt::WindowShortcut))) && 
                 (keyEvent->key() == Qt::Key_D)) {
-                auto indexes = view->selectionModel()->selectedIndexes();
-                for (const QModelIndex& idx : indexes) {
-                    if (idx.column() == 0) {
-                        QString itemPath = idx.data(PathRole).toString();
-                        if (!itemPath.isEmpty()) {
-                            QFileInfo info(itemPath);
-                            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            bool current = meta.items()[info.fileName().toStdWString()].pinned;
-                            meta.items()[info.fileName().toStdWString()].pinned = !current;
-                            meta.save();
-                            // 同步模型显示 (IsLockedRole)
-                            m_proxyModel->setData(idx, !current, IsLockedRole);
-                        }
-                    }
-                }
+                updateBatch([&](AmMetaJson& meta, const std::wstring& name, const QModelIndex& idx) {
+                    bool cur = meta.items()[name].pinned;
+                    meta.items()[name].pinned = !cur;
+                    m_proxyModel->setData(idx, !cur, IsLockedRole);
+                });
                 return true;
             }
 
             // 3. Alt + 1..9 (颜色打标)
             if ((keyEvent->modifiers() & Qt::AltModifier) && 
                 (keyEvent->key() >= Qt::Key_1 && keyEvent->key() <= Qt::Key_9)) {
-                
                 QString color;
                 switch (keyEvent->key()) {
                     case Qt::Key_1: color = "red"; break;
@@ -314,21 +383,10 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     case Qt::Key_8: color = "gray"; break;
                     case Qt::Key_9: color = ""; break;
                 }
-
-                auto indexes = view->selectionModel()->selectedIndexes();
-                for (const auto& idx : indexes) {
-                    if (idx.column() == 0) {
-                        m_proxyModel->setData(idx, color, ColorRole);
-                        QString path = idx.data(PathRole).toString();
-                        if (!path.isEmpty()) {
-                            QFileInfo info(path);
-                            AmMetaJson meta(info.absolutePath().toStdWString());
-                            meta.load();
-                            meta.items()[info.fileName().toStdWString()].color = color.toStdWString();
-                            meta.save();
-                        }
-                    }
-                }
+                updateBatch([&](AmMetaJson& meta, const std::wstring& name, const QModelIndex& idx) {
+                    m_proxyModel->setData(idx, color, ColorRole);
+                    meta.items()[name].color = color.toStdWString();
+                });
                 return true;
             }
 
@@ -426,8 +484,18 @@ void ContentPanel::wheelEvent(QWheelEvent* event) {
 }
 
 void ContentPanel::setViewMode(ViewMode mode) {
-    if (mode == GridView) m_viewStack->setCurrentWidget(m_gridView);
-    else m_viewStack->setCurrentWidget(m_treeView);
+    // 2026-03-xx 交互架构修复：实现跨视图选择状态同步
+    QAbstractItemView* oldView = (m_viewStack->currentIndex() == 0) ? (QAbstractItemView*)m_gridView : (QAbstractItemView*)m_treeView;
+    QAbstractItemView* newView = (mode == GridView) ? (QAbstractItemView*)m_gridView : (QAbstractItemView*)m_treeView;
+
+    if (oldView != newView) {
+        QItemSelection selection = oldView->selectionModel()->selection();
+        m_viewStack->setCurrentWidget(newView);
+        newView->selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect);
+        if (!selection.isEmpty()) {
+            newView->scrollTo(selection.indexes().first());
+        }
+    }
 }
 
 void ContentPanel::initGridView() {
@@ -572,18 +640,23 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         if (SHFileOperationW(&fileOp) == 0) loadDirectory(m_currentPath);
     } else if (actionText == "置顶 / 取消置顶") {
         auto indexes = view->selectionModel()->selectedIndexes();
-        for (const QModelIndex& idx : indexes) {
-            if (idx.column() == 0) {
-                QString itemPath = idx.data(PathRole).toString();
-                if (!itemPath.isEmpty()) {
-                    QFileInfo info(itemPath);
-                    ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-                    meta.load();
-                    bool current = meta.items()[info.fileName().toStdWString()].pinned;
-                    meta.items()[info.fileName().toStdWString()].pinned = !current;
-                    meta.save();
-                }
+        std::map<std::wstring, std::vector<std::pair<QModelIndex, std::wstring>>> groups;
+        for (const auto& idx : indexes) {
+            if (idx.column() != 0) continue;
+            QString p = idx.data(PathRole).toString();
+            if (p.isEmpty()) continue;
+            QFileInfo info(p);
+            groups[info.absolutePath().toStdWString()].push_back({idx, info.fileName().toStdWString()});
+        }
+        for (auto& [folder, itemPairs] : groups) {
+            AmMetaJson meta(folder);
+            meta.load();
+            for (auto& item : itemPairs) {
+                bool cur = meta.items()[item.second].pinned;
+                meta.items()[item.second].pinned = !cur;
+                m_proxyModel->setData(item.first, !cur, IsLockedRole);
             }
+            meta.save();
         }
     } else if (actionText == "属性") {
         SHELLEXECUTEINFOW sei = { sizeof(sei) };
@@ -627,13 +700,10 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
 }
 
 void ContentPanel::loadDirectory(const QString& path, bool recursive) {
-    m_model->clear();
-    m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
-
-    // 空路径 → 展示此电脑（所有驱动器）
+    // 2026-03-xx 极致性能重构：彻底废除 QStandardItem 堆分配
+    QList<FileItem> items;
     if (path.isEmpty() || path == "computer://") {
         m_currentPath = "computer://";
-        QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
         
         QMap<int, int>     ratingCounts;
@@ -645,22 +715,18 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
 
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
-            auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
-            item->setData(drivePath, PathRole);
-            item->setData("folder", TypeRole);
-            item->setData(0, RatingRole);
-            item->setData("", ColorRole);
-            item->setData(false, IsLockedRole);
-
-            QList<QStandardItem*> row;
-            row << item;
-            row << new QStandardItem("-");
-            row << new QStandardItem("磁盘分区");
-            row << new QStandardItem("-");
-            m_model->appendRow(row);
+            FileItem fi;
+            fi.name = drivePath;
+            fi.fullPath = drivePath;
+            fi.isDir = true;
+            fi.typeStr = "磁盘分区";
+            fi.sizeStr = "-";
+            fi.timeStr = "-";
+            items.append(fi);
 
             typeCounts["folder"]++;
         }
+        m_model->setItems(items);
         // 发送统计数据，使筛选面板更新（例如显示“文件夹(8)”）
         emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
                                   createDateCounts, modifyDateCounts);
@@ -677,7 +743,8 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     QMap<QString, int> modifyDateCounts;
     int noTagCount = 0;
 
-    addItemsFromDirectory(path, recursive, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
+    addItemsFromDirectory(path, recursive, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount, items);
+    m_model->setItems(items);
 
     applyFilters();
 
@@ -693,18 +760,16 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
                                        QMap<QString, int>& typeCounts,
                                        QMap<QString, int>& createDateCounts,
                                        QMap<QString, int>& modifyDateCounts,
-                                       int& noTagCount) 
+                                       int& noTagCount,
+                                       QList<FileItem>& outItems)
 {
     QDir dir(path);
     if (!dir.exists()) return;
 
     QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
-    QFileIconProvider iconProvider;
 
-    // 预读当前目录的元数据配置图谱
-    ArcMeta::AmMetaJson meta(path.toStdWString());
-    meta.load();
-    const auto& metaItems = meta.items();
+    // 2026-03-xx 极致性能重构：切换至“数据库优先”预取策略，彻底消除逐个 JSON 解析的 IO 开销
+    auto metaItems = ItemRepo::getMetadataBatch(path.toStdWString());
 
     QDate today    = QDate::currentDate();
     QDate yesterday = today.addDays(-1);
@@ -719,56 +784,58 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         QString fileName = info.fileName();
         if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
 
-        QString fullPath = info.absoluteFilePath();
-        QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, PathRole);
-        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
+        FileItem fi;
+        fi.name = fileName;
+        fi.fullPath = info.absoluteFilePath();
+        fi.isDir = info.isDir();
+        fi.extension = info.suffix().toUpper();
 
-        // 元数据反填 + 统计
-        int     itemRating = 0;
-        QString itemColor;
-        bool    hasTags = false;
-        QStringList itemTags;
-
+        // 2026-03-xx 极致性能重构：元数据反填 (Flyweight + DB-First Zero IO)
         auto it = metaItems.find(fileName.toStdWString());
         if (it != metaItems.end()) {
-            itemRating = it->second.rating;
-            itemColor  = QString::fromStdWString(it->second.color);
-            nameItem->setData(itemRating, RatingRole);
-            nameItem->setData(itemColor, ColorRole);
-            nameItem->setData(it->second.pinned, IsLockedRole);
-            nameItem->setData(it->second.encrypted, EncryptedRole); // 2026-03-xx 完善加密角色填充
-            hasTags = !it->second.tags.empty();
-            for (const auto& tag : it->second.tags) {
-                QString t = QString::fromStdWString(tag);
-                itemTags << t;
-                tagCounts[t]++;
-            }
-            nameItem->setData(itemTags, TagsRole);
+            fi.rating = it->second.rating;
+            fi.color = QString::fromStdWString(it->second.color);
+            fi.pinned = it->second.pinned;
+            fi.encrypted = it->second.encrypted;
+            for (const auto& tag : it->second.tags) fi.tags << QString::fromStdWString(tag);
+
+            // 2026-03-xx 极致性能：预填充所有原始数值，消除 UI 渗漏 IO
+            fi.size = it->second.size;
+            fi.mtime = it->second.mtime;
+            fi.ctime = it->second.ctime;
+
+            // 从 DB 预取显示属性，消除 QFileInfo 物理 IO
+            fi.sizeStr = fi.isDir ? "-" : QString::number(fi.size / 1024) + " KB";
+            fi.timeStr = QDateTime::fromMSecsSinceEpoch((qint64)fi.mtime).toString("yyyy-MM-dd HH:mm");
+
+            // 统计更新
+            createDateCounts[dateKey(QDateTime::fromMSecsSinceEpoch((qint64)fi.ctime).date())]++;
+            modifyDateCounts[dateKey(QDateTime::fromMSecsSinceEpoch((qint64)fi.mtime).date())]++;
+        } else {
+            // 后备方案：若 DB 尚未同步，才使用 QFileInfo (仅在初次创建时发生)
+            fi.size = info.size();
+            fi.mtime = (double)info.lastModified().toMSecsSinceEpoch();
+            fi.ctime = (double)info.birthTime().toMSecsSinceEpoch();
+
+            fi.sizeStr = fi.isDir ? "-" : QString::number(fi.size / 1024) + " KB";
+            fi.timeStr = QDateTime::fromMSecsSinceEpoch((qint64)fi.mtime).toString("yyyy-MM-dd HH:mm");
+            createDateCounts[dateKey(info.birthTime().date())]++;
+            modifyDateCounts[dateKey(info.lastModified().date())]++;
         }
 
-        // 评级统计
-        ratingCounts[itemRating]++;
-        // 颜色统计
-        colorCounts[itemColor]++;
-        // 无标签计数
-        if (!hasTags) noTagCount++;
-        // 文件类型统计
-        typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
-        // 创建日期统计
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        // 修改日期统计
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
+        fi.typeStr = fi.isDir ? "文件夹" : (fi.extension.isEmpty() ? "文件" : fi.extension + " 文件");
 
-        row << nameItem;
-        row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
-        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
-        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
-        m_model->appendRow(row);
+        // 基础统计
+        ratingCounts[fi.rating]++;
+        colorCounts[fi.color]++;
+        if (fi.tags.isEmpty()) noTagCount++;
+        else for (const auto& t : fi.tags) tagCounts[t]++;
+        typeCounts[fi.isDir ? "folder" : fi.extension]++;
+
+        outItems.append(fi);
 
         if (recursive && info.isDir()) {
-            addItemsFromDirectory(fullPath, true, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
+            addItemsFromDirectory(fi.fullPath, true, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount, outItems);
         }
     }
 }
@@ -777,8 +844,9 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
 
 void ContentPanel::search(const QString& query) {
     if (query.isEmpty()) return;
-    m_model->clear();
-    m_model->setHorizontalHeaderLabels({"名称", "路径", "类型", "修改时间"});
+
+    // 2026-03-xx 极致性能重构：切换至享元条目列表
+    QList<FileItem> items;
 
     auto results = MftReader::instance().search(query.toStdWString());
     QFileIconProvider iconProvider;
@@ -806,60 +874,59 @@ void ContentPanel::search(const QString& query) {
         QString fileName = QString::fromStdWString(entry.name);
         if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
 
-        std::wstring fullWPath = PathBuilder::getPath(entry.volume, entry.frn);
+        // 2026-03-xx 极致性能重构：利用双向 O(1) 索引获取路径，消除递归
+        std::wstring fullWPath = MftReader::instance().getPathFromFrn(entry.volume, entry.frn);
         QString fullPath = QString::fromStdWString(fullWPath);
         if (fullPath.isEmpty()) {
             fullPath = QString::fromStdWString(entry.volume) + "[FRN:" + QString::number(entry.frn, 16) + "]";
         }
 
         QFileInfo info(fullPath);
-        QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, PathRole); 
-        nameItem->setData(entry.isDir() ? "folder" : "file", TypeRole);
-        
-        int     itemRating = 0;
-        QString itemColor;
-        bool    hasTags = false;
+        FileItem fi;
+        fi.name = fileName;
+        fi.fullPath = fullPath;
+        fi.isDir = entry.isDir();
+        fi.extension = info.suffix().toUpper();
+        fi.sizeStr = fullPath; // 在搜索模式下，第二列展示路径
+        fi.typeStr = fi.isDir ? "文件夹" : (fi.extension.isEmpty() ? "文件" : fi.extension + " 文件");
 
-        // --- 搜索模式下单体探针：由于不在同一目录，需单体读取所属父目录元数据 ---
+        // --- 搜索模式下元数据对接：2026-03-xx 极致性能重构：采用数据库批量缓存，消除同步磁盘探针 ---
+        static QString lastDir;
+        static std::map<std::wstring, ItemMeta> cachedMetaBatch;
+        
         QString parentDir = info.absolutePath();
-        ArcMeta::AmMetaJson meta(parentDir.toStdWString());
-        meta.load();
-        auto it = meta.items().find(fileName.toStdWString());
-        if (it != meta.items().end()) {
-            itemRating = it->second.rating;
-            itemColor  = QString::fromStdWString(it->second.color);
-            nameItem->setData(itemRating, RatingRole);
-            nameItem->setData(itemColor, ColorRole);
-            nameItem->setData(it->second.pinned, IsLockedRole);
-            nameItem->setData(it->second.encrypted, EncryptedRole); // 2026-03-xx 完善加密角色填充
+        if (parentDir != lastDir) {
+            cachedMetaBatch = ItemRepo::getMetadataBatch(parentDir.toStdWString());
+            lastDir = parentDir;
+        }
+
+        auto it = cachedMetaBatch.find(fileName.toStdWString());
+        if (it != cachedMetaBatch.end()) {
+            fi.rating = it->second.rating;
+            fi.color = QString::fromStdWString(it->second.color);
+            fi.pinned = it->second.pinned;
+            fi.encrypted = it->second.encrypted;
+            for (const auto& tag : it->second.tags) fi.tags << QString::fromStdWString(tag);
             
-            hasTags = !it->second.tags.empty();
-            QStringList tgs;
-            for (const auto& t : it->second.tags) {
-                QString ts = QString::fromStdWString(t);
-                tgs << ts;
-                tagCounts[ts]++;
-            }
-            nameItem->setData(tgs, TagsRole);
+            fi.timeStr = QDateTime::fromMSecsSinceEpoch((qint64)it->second.mtime).toString("yyyy-MM-dd HH:mm");
+            createDateCounts[dateKey(QDateTime::fromMSecsSinceEpoch((qint64)it->second.ctime).date())]++;
+            modifyDateCounts[dateKey(QDateTime::fromMSecsSinceEpoch((qint64)it->second.mtime).date())]++;
+        } else {
+            fi.timeStr = info.lastModified().toString("yyyy-MM-dd HH:mm");
+            createDateCounts[dateKey(info.birthTime().date())]++;
+            modifyDateCounts[dateKey(info.lastModified().date())]++;
         }
 
         // 统计累加
-        ratingCounts[itemRating]++;
-        colorCounts[itemColor]++;
-        if (!hasTags) noTagCount++;
-        typeCounts[entry.isDir() ? "folder" : info.suffix().toUpper()]++;
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
+        ratingCounts[fi.rating]++;
+        colorCounts[fi.color]++;
+        if (fi.tags.isEmpty()) noTagCount++;
+        else for (const auto& t : fi.tags) tagCounts[t]++;
+        typeCounts[fi.isDir ? "folder" : fi.extension]++;
 
-        row << nameItem;
-        row << new QStandardItem(fullPath);
-        row << new QStandardItem(entry.isDir() ? "文件夹" : (info.suffix().isEmpty() ? "文件" : info.suffix().toUpper() + " 文件"));
-        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
-
-        m_model->appendRow(row);
+        items.append(fi);
     }
+    m_model->setItems(items);
 
     if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
     emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
@@ -905,14 +972,17 @@ void ContentPanel::createNewItem(const QString& type) {
 
     if (success) {
         loadDirectory(m_currentPath);
-        // 自动进入重命名模式（查找对应项并激活编辑）
-        auto results = m_model->findItems(finalName, Qt::MatchExactly, 0);
-        if (!results.isEmpty()) {
-            QModelIndex srcIdx = results.first()->index();
-            QModelIndex proxyIdx = m_proxyModel->mapFromSource(srcIdx);
-            if (proxyIdx.isValid()) {
-                m_gridView->setCurrentIndex(proxyIdx);
-                m_gridView->edit(proxyIdx);
+        // 自动进入重命名模式
+        const auto& items = m_model->items();
+        for (int i = 0; i < items.size(); ++i) {
+            if (items[i].name == finalName) {
+                QModelIndex srcIdx = m_model->index(i, 0);
+                QModelIndex proxyIdx = m_proxyModel->mapFromSource(srcIdx);
+                if (proxyIdx.isValid()) {
+                    m_gridView->setCurrentIndex(proxyIdx);
+                    m_gridView->edit(proxyIdx);
+                }
+                break;
             }
         }
     }

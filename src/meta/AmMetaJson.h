@@ -47,6 +47,11 @@ struct ItemMeta {
     std::wstring volume;
     std::wstring frn;             // 十六进制字符串存储，避免溢出
 
+    // 2026-03-xx 极致性能：系统级属性缓存
+    long long size = 0;
+    double mtime = 0;
+    double ctime = 0;
+
     /**
      * @brief 判断该条目是否有过用户操作。
      * 只有满足该条件的条目才会被序列化到 JSON 的 items 节点中。

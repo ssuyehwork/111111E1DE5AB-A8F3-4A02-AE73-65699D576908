@@ -7,8 +7,8 @@
 
 namespace ArcMeta {
 
-bool CategoryRepo::add(Category& cat) {
-    QSqlQuery q;
+bool CategoryRepo::add(Category& cat, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("INSERT INTO categories (parent_id, name, color, preset_tags, sort_order, pinned, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
     q.addBindValue(cat.parentId);
     q.addBindValue(QString::fromStdWString(cat.name));
@@ -29,8 +29,8 @@ bool CategoryRepo::add(Category& cat) {
     return false;
 }
 
-bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPath) {
-    QSqlQuery q;
+bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPath, QSqlDatabase db) {
+    QSqlQuery q(db);
     q.prepare("INSERT OR IGNORE INTO category_items (category_id, item_path, added_at) VALUES (?, ?, ?)");
     q.addBindValue(categoryId);
     q.addBindValue(QString::fromStdWString(itemPath));
@@ -38,9 +38,9 @@ bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPat
     return q.exec();
 }
 
-std::vector<Category> CategoryRepo::getAll() {
+std::vector<Category> CategoryRepo::getAll(QSqlDatabase db) {
     std::vector<Category> results;
-    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned FROM categories ORDER BY sort_order ASC");
+    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned FROM categories ORDER BY sort_order ASC", db);
     while (q.next()) {
         Category cat;
         cat.id = q.value(0).toInt();
@@ -60,16 +60,36 @@ std::vector<Category> CategoryRepo::getAll() {
     return results;
 }
 
-bool CategoryRepo::remove(int id) {
-    QSqlQuery q1;
+bool CategoryRepo::remove(int id, QSqlDatabase db) {
+    QSqlQuery q1(db);
     q1.prepare("DELETE FROM category_items WHERE category_id = ?");
     q1.addBindValue(id);
     q1.exec();
 
-    QSqlQuery q2;
+    QSqlQuery q2(db);
     q2.prepare("DELETE FROM categories WHERE id = ?");
     q2.addBindValue(id);
     return q2.exec();
+}
+
+bool CategoryRepo::update(const Category& cat, QSqlDatabase db) {
+    QSqlQuery q(db);
+    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ? WHERE id = ?");
+    q.addBindValue(cat.parentId);
+    q.addBindValue(QString::fromStdWString(cat.name));
+    q.addBindValue(QString::fromStdWString(cat.color));
+    q.addBindValue(cat.sortOrder);
+    q.addBindValue(cat.pinned ? 1 : 0);
+    q.addBindValue(cat.id);
+    return q.exec();
+}
+
+bool CategoryRepo::removeItemFromCategory(int categoryId, const std::wstring& itemPath, QSqlDatabase db) {
+    QSqlQuery q(db);
+    q.prepare("DELETE FROM category_items WHERE category_id = ? AND item_path = ?");
+    q.addBindValue(categoryId);
+    q.addBindValue(QString::fromStdWString(itemPath));
+    return q.exec();
 }
 
 } // namespace ArcMeta

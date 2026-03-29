@@ -1,4 +1,5 @@
 #include "SyncQueue.h"
+#include <QFileInfo>
 #include "AmMetaJson.h"
 #include "../db/Database.h"
 #include "../db/FolderRepo.h"
@@ -102,12 +103,24 @@ bool SyncQueue::processBatch() {
             AmMetaJson meta(path);
             if (!meta.load()) continue;
 
-            // 1. 使用 Repository 同步文件夹
-            FolderRepo::save(path, meta.folder());
+            // 1. 使用 Repository 同步文件夹 (2026-03-xx 传入后台线程私有连接 db)
+            FolderRepo::save(path, meta.folder(), db);
 
-            // 2. 使用 Repository 同步所有条目
-            for (const auto& [name, iMeta] : meta.items()) {
-                ItemRepo::save(path, name, iMeta);
+            // 2. 使用 Repository 同步所有条目 (2026-03-xx 传入后台线程私有连接 db)
+            for (auto& [name, iMeta] : meta.items()) {
+                // 2026-03-xx 极致性能优化：在同步阶段预填充系统属性，消除 UI 线程的 QFileInfo 压力
+                std::wstring fullPath = path;
+                if (!fullPath.empty() && fullPath.back() != L'\\' && fullPath.back() != L'/') fullPath += L'\\';
+                fullPath += name;
+
+                QFileInfo info(QString::fromStdWString(fullPath));
+                if (info.exists()) {
+                    iMeta.size = info.size();
+                    iMeta.mtime = (double)info.lastModified().toMSecsSinceEpoch();
+                    iMeta.ctime = (double)info.birthTime().toMSecsSinceEpoch();
+                }
+
+                ItemRepo::save(path, name, iMeta, db);
             }
         }
 
