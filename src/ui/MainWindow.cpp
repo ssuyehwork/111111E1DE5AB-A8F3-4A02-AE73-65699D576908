@@ -44,13 +44,13 @@ MainWindow::MainWindow(QWidget* parent)
     // 设置基础窗口标志 (保持无边框)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    // 初始应用置顶 (WinAPI)
+    // 2026-03-xx 按照用户要求优化启动置顶逻辑：强制同步 Qt 标志位并使用高性能 WinAPI 标志
     if (m_isPinned) {
+        setWindowFlag(Qt::WindowStaysOnTopHint, true);
 #ifdef Q_OS_WIN
         HWND hwnd = (HWND)winId();
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-#else
-        setWindowFlag(Qt::WindowStaysOnTopHint, true);
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #endif
     }
 
@@ -543,6 +543,7 @@ void MainWindow::setupCustomTitleBarButtons() {
     connect(actNewMd,     &QAction::triggered, [handleCreate](){ handleCreate("md"); });
     connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
 
+    // 2026-03-xx 按照宪法 5.7 要求：置顶态使用垂直图标，非置顶使用 pin_tilted
     m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
     m_btnPinTop->setProperty("tooltipText", "置顶窗口");
     m_btnPinTop->installEventFilter(this);
@@ -674,21 +675,24 @@ void MainWindow::updateStatusBar() {
 
 void MainWindow::onPinToggled(bool checked) {
     // 2026-03-xx 按照用户要求优化置顶逻辑：
-    // 避免重复调用导致卡顿，并优化 WinAPI 标志位以减少冗余消息推送
+    // 强制同步 Qt 标志位与 WinAPI 状态，并配合高性能标志位消灭卡顿
     if (m_isPinned == checked) return;
     m_isPinned = checked;
 
+    // 2026-03-xx 核心优化：首先同步 Qt 内部框架标志位，防止重绘冲突与状态撕裂
+    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
+
 #ifdef Q_OS_WIN
     HWND hwnd = (HWND)winId();
-    // 使用 SWP_NOSENDCHANGING 拦截冗余消息，减少 UI 线程的消息风暴，从而解决卡顿
+    // 使用 SWP_NOSENDCHANGING | SWP_NOREDRAW 极速完成系统层级切换，不干扰 UI 线程消息循环
     SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_NOREDRAW);
 #else
-    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
     show(); // 非 Windows 平台修改 Flag 后通常需要重新显示
 #endif
 
-    // 更新图标和颜色 (按下置顶为品牌橙色)
+    // 2026-03-xx 按照宪法 5.7 要求：置顶态使用垂直图标 (pin_vertical)，非置顶使用 pin_tilted
+    // 按下置顶高亮为品牌橙色 (#FF551C)
     if (m_isPinned) {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
     } else {
