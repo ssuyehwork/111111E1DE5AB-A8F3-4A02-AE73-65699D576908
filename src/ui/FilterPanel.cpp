@@ -327,7 +327,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     hdr->setText("  " + title);
     hdr->setCheckable(true);
     hdr->setChecked(true);
-    hdr->setArrowType(Qt::DownArrow);
+    // hdr->setArrowType(Qt::DownArrow); // 核心红线：禁止使用或显示三角形
     hdr->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     hdr->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     hdr->setFixedHeight(24);
@@ -343,9 +343,9 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     outContentLayout->setSpacing(0);
 
     connect(hdr, &QToolButton::toggled, content, &QWidget::setVisible);
-    connect(hdr, &QToolButton::toggled, [hdr](bool checked) {
-        hdr->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-    });
+    // connect(hdr, &QToolButton::toggled, [hdr](bool checked) {
+    //     hdr->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
+    // });
 
     wl->addWidget(hdr);
     wl->addWidget(content);

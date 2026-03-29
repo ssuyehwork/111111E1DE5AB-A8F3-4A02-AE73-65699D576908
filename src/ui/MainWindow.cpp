@@ -454,7 +454,7 @@ void MainWindow::setupCustomTitleBarButtons() {
     m_btnCreate->setToolTip("新建...");
     QMenu* createMenu = new QMenu(m_btnCreate);
     createMenu->setStyleSheet(
-        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; }"
+        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 4px; }"
         "QMenu::item { height: 26px; padding: 0 20px 0 10px; border-radius: 3px; font-size: 12px; }"
         "QMenu::item:selected { background-color: #378ADD; }"
     );
@@ -464,7 +464,8 @@ void MainWindow::setupCustomTitleBarButtons() {
     QAction* actNewTxt    = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)");
 
     m_btnCreate->setMenu(createMenu);
-    // 强制显示下拉箭头（可选，这里保持精简直接点击弹出）
+    // 禁止显示三角形/下拉箭头 (通过样式控制，并直接关联点击)
+    m_btnCreate->setStyleSheet(m_btnCreate->styleSheet() + "QPushButton::menu-indicator { image: none; }");
     connect(m_btnCreate, &QPushButton::clicked, [this]() {
         m_btnCreate->showMenu();
     });

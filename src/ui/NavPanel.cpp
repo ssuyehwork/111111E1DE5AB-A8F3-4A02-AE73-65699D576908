@@ -47,16 +47,18 @@ void NavPanel::initUi() {
     m_model = new QStandardItemModel(this);
     QFileIconProvider iconProvider;
 
-    // 1. 新增：桌面入口
+    // 1. 新增：桌面入口 (使用系统原生图标)
     QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
-    QStandardItem* desktopItem = new QStandardItem(UiHelper::getIcon("monitor", QColor("#EEEEEE")), "桌面");
+    QStandardItem* desktopItem = new QStandardItem(iconProvider.icon(QFileInfo(desktopPath)), "桌面");
     desktopItem->setData(desktopPath, Qt::UserRole + 1);
     // 增加虚拟子项以便显示展开箭头
     desktopItem->appendRow(new QStandardItem("Loading..."));
     m_model->appendRow(desktopItem);
 
-    // 2. 新增：此电脑入口
-    QStandardItem* computerItem = new QStandardItem(UiHelper::getIcon("hard_drive", QColor("#EEEEEE")), "此电脑");
+    // 2. 新增：此电脑入口 (使用系统原生图标)
+    // 对于此电脑这种虚拟路径，尝试用 Computer 专用图标，若失败则回退到系统驱动器图标
+    QIcon computerIcon = iconProvider.icon(QFileIconProvider::Computer);
+    QStandardItem* computerItem = new QStandardItem(computerIcon, "此电脑");
     computerItem->setData("computer://", Qt::UserRole + 1);
     m_model->appendRow(computerItem);
 
@@ -73,13 +75,13 @@ void NavPanel::initUi() {
     m_treeView->setModel(m_model);
     connect(m_treeView, &QTreeView::expanded, this, &NavPanel::onItemExpanded);
 
-    // 树形控件样式美化
+    // 树形控件样式美化 (禁止使用或显示三角形)
     m_treeView->setStyleSheet(
-        "QTreeView { background-color: transparent; border: none; font-size: 12px; selection-background-color: #378ADD; }"
+        "QTreeView { background-color: transparent; border: none; font-size: 12px; selection-background-color: #378ADD; outline: none; }"
         "QTreeView::item { height: 28px; padding-left: 4px; color: #EEEEEE; }"
         "QTreeView::item:hover { background-color: rgba(255, 255, 255, 0.05); }"
         "QTreeView::branch:has-children:!has-siblings:closed,"
-        "QTreeView::branch:closed:has-children:has-siblings { border-image: none; image: none; }"
+        "QTreeView::branch:closed:has-children:has-siblings,"
         "QTreeView::branch:has-children:!has-siblings:open,"
         "QTreeView::branch:open:has-children:has-siblings { border-image: none; image: none; }"
     );

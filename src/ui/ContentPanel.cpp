@@ -332,12 +332,18 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 return true;
             }
 
-            if (keyEvent->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier) && keyEvent->key() == Qt::Key_C) {
-                QStringList paths;
-                auto indexes = view->selectionModel()->selectedIndexes();
-                for (const auto& idx : indexes) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(PathRole).toString());
-                if (!paths.isEmpty()) QApplication::clipboard()->setText(paths.join("\r\n"));
-                return true;
+            if (keyEvent->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier)) {
+                if (keyEvent->key() == Qt::Key_C) {
+                    QStringList paths;
+                    auto indexes = view->selectionModel()->selectedIndexes();
+                    for (const auto& idx : indexes) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(PathRole).toString());
+                    if (!paths.isEmpty()) QApplication::clipboard()->setText(paths.join("\r\n"));
+                    return true;
+                }
+                if (keyEvent->key() == Qt::Key_R) {
+                    // 批量重命名 (Ctrl+Shift+R) 被触发
+                    return true;
+                }
             }
 
             if (keyEvent->key() == Qt::Key_F2) {
@@ -489,7 +495,7 @@ void ContentPanel::initListView() {
 void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QMenu menu(this);
     menu.setStyleSheet(
-        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; }"
+        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 4px; }"
         "QMenu::item { height: 22px; padding: 0 10px 0 10px; border-radius: 3px; font-size: 12px; }"
         "QMenu::item:selected { background-color: #378ADD; }"
         "QMenu::separator { height: 1px; background: #444444; margin: 4px 8px 4px 8px; }"
@@ -519,7 +525,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     cryptoMenu->addAction("修改密码");
     
     menu.addSeparator();
-    menu.addAction("批量重命名 (Ctrl+Shift+S)");
+    menu.addAction("批量重命名 (Ctrl+Shift+R)");
     menu.addSeparator();
     
     menu.addAction("重命名");
