@@ -194,7 +194,9 @@ void ColorPickerWidget::mousePressEvent(QMouseEvent* e) {
 // --- MetaPanel ---
 MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
     setFixedWidth(240); 
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    setObjectName("MetaPanel");
+    // 2026-03-xx 物理隔离方案：使用对象名选择器，防止递归污染子控件（如 QCheckBox）的背景
+    setStyleSheet("#MetaPanel { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
     m_mainLayout = new QVBoxLayout(this); 
     m_mainLayout->setContentsMargins(0, 0, 0, 0); 
     m_mainLayout->setSpacing(0);
@@ -228,15 +230,8 @@ void MetaPanel::initUi() {
     m_containerLayout->addWidget(createSeparator());
 
     chkPinned = new QCheckBox("置顶条目", m_container); 
-    chkPinned->setStyleSheet(
-        "QCheckBox { font-size: 11px; color: #5F5E5A; spacing: 5px; }"
-        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: transparent; }"
-        "QCheckBox::indicator:checked { "
-        "   border: 1px solid #378ADD; "
-        "   background: transparent; "
-        "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
-        "}"
-    );
+    // 2026-03-xx 物理铲除局部 QSS：彻底移除此处 setStyleSheet，回归 MainWindow 全局统一控制
+    // chkPinned->setStyleSheet(...) 已移除
     m_containerLayout->addWidget(chkPinned);
 
     QLabel* lR = new QLabel("星级", m_container); 

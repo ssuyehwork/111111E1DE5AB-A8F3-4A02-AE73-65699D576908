@@ -27,8 +27,13 @@ public:
 
     /**
      * @brief 获取带颜色的 SVG Pixmap (返回 QPixmap)
+     * 2026-03-xx 增加运行时缓存，避免高频切换（如置顶状态切换）时反复解析 SVG 导致的卡顿
      */
     static QPixmap getPixmap(const QString& key, const QSize& size, const QColor& color) {
+        static QMap<QString, QPixmap> s_pixmapCache;
+        QString cacheKey = QString("%1_%2_%3x%4").arg(key, color.name()).arg(size.width()).arg(size.height());
+        if (s_pixmapCache.contains(cacheKey)) return s_pixmapCache[cacheKey];
+
         if (!SvgIcons::icons.contains(key)) return QPixmap();
 
         QString svgData = SvgIcons::icons[key];
@@ -49,6 +54,7 @@ public:
         QSvgRenderer renderer(svgData.toUtf8());
         renderer.render(&painter);
         
+        s_pixmapCache[cacheKey] = pixmap;
         return pixmap;
     }
 

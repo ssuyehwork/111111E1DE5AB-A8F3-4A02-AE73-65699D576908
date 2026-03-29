@@ -8,6 +8,10 @@
 #include <QLabel>
 #include <QStackedWidget>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 namespace ArcMeta {
 
 class BreadcrumbBar;
@@ -95,6 +99,10 @@ private:
     // 窗口拖动
     bool m_isDragging = false;
     QPoint m_dragPosition;
+
+#ifdef Q_OS_WIN
+    HWND m_hwnd = nullptr;
+#endif
 };
 
 } // namespace ArcMeta

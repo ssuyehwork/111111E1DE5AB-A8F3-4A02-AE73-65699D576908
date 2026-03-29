@@ -39,18 +39,18 @@ static QString ratingDisplayName(int r) {
 // ─── 可整行点击的行控件 ────────────────────────────────────────────
 /**
  * ClickableRow: 点击行内任意位置均触发关联 QCheckBox 的 toggle。
- * 复选框本身的点击事件不需要额外处理，它会自然传播。
+ * 2026-03-xx 物理隔离方案：使用唯一对象名 + ID 选择器，绝对不干扰内部子控件。
  */
 class ClickableRow : public QWidget {
 public:
     explicit ClickableRow(QCheckBox* cb, QWidget* parent = nullptr)
         : QWidget(parent), m_cb(cb) {
         setCursor(Qt::PointingHandCursor);
+        setObjectName("ClickableRow");
     }
 protected:
     void mousePressEvent(QMouseEvent* e) override {
         if (e->button() == Qt::LeftButton) {
-            // 如果点击位置不在复选框上，手动 toggle，避免双重触发
             QPoint local = m_cb->mapFromGlobal(e->globalPosition().toPoint());
             if (!m_cb->rect().contains(local)) {
                 m_cb->setChecked(!m_cb->isChecked());
@@ -59,7 +59,7 @@ protected:
         QWidget::mousePressEvent(e);
     }
     void enterEvent(QEnterEvent* e) override {
-        setStyleSheet("QWidget { background: #2A2A2A; }");
+        setStyleSheet("#ClickableRow { background: #2A2A2A; }");
         QWidget::enterEvent(e);
     }
     void leaveEvent(QEvent* e) override {
@@ -73,7 +73,9 @@ private:
 // ─── FilterPanel ──────────────────────────────────────────────────
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    setObjectName("FilterPanel");
+    // 2026-03-xx 物理隔离方案：使用对象名选择器，防止递归污染子控件（如 QCheckBox）的背景
+    setStyleSheet("#FilterPanel { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -341,18 +343,20 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     wl->setContentsMargins(0, 0, 0, 0);
     wl->setSpacing(0);
 
-    // 2026-03-xx 彻底解决对齐问题：将 QToolButton 更换为 QPushButton，移除多余内部渲染逻辑
+    // 2026-03-xx 彻底解决对齐问题：使用 padding: 0 彻底消除默认偏移，强制 12px 文本对齐
     QPushButton* hdr = new QPushButton(wrapper);
     hdr->setText(title); // 2026-03-xx 按照用户要求，移除硬编码空格，统一使用 QSS 边距控制
     hdr->setCheckable(true);
     hdr->setChecked(true);
     hdr->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     hdr->setFixedHeight(24);
+    hdr->setCursor(Qt::PointingHandCursor);
     hdr->setStyleSheet(
         "QPushButton { background: #252525; border: none; border-top: 1px solid #333;"
         "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
-        "              padding-left: 12px; } "
-        "QPushButton:hover { color: #EEEEEE; } ");
+        "              padding: 0; padding-left: 12px; } "
+        "QPushButton:hover { color: #EEEEEE; background: #2A2A2A; } "
+        "QPushButton::menu-indicator { width: 0; } ");
 
     QWidget* content = new QWidget(wrapper);
     content->setStyleSheet("QWidget { background: transparent; }");
@@ -370,18 +374,8 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
 // ─── addFilterRow ─────────────────────────────────────────────────
 QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, int count, const QColor& dotColor) {
     QCheckBox* cb = new QCheckBox();
-    // 2026-03-xx 彻底解决实心背景问题：将 background 设为 transparent
-    cb->setStyleSheet(
-        "QCheckBox { spacing: 0px; }"
-        "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444;"
-        "                       border-radius: 2px; background: transparent; }"
-        "QCheckBox::indicator:hover { border: 1px solid #666; }"
-        "QCheckBox::indicator:checked { "
-        "   border: 1px solid #378ADD; "
-        "   background: transparent; "
-        "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
-        "}"
-    );
+    // 2026-03-xx 物理铲除局部 QSS：彻底移除此处 setStyleSheet，回归 MainWindow 全局统一控制
+    // cb->setStyleSheet(...) 已移除
 
     // 整行可点击容器
     // 增加高度至 24px 以适配各种系统缩放，避免文字截断

@@ -27,6 +27,7 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <dwmapi.h>
 #endif
 
 namespace ArcMeta {
@@ -44,14 +45,10 @@ MainWindow::MainWindow(QWidget* parent)
     // 设置基础窗口标志 (保持无边框)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    // 初始应用置顶 (WinAPI)
+    // 初始应用置顶 (Qt Native Hint)
+    // 2026-03-xx 优化：在 show() 之前设置 flag 不会导致窗口重绘，比 WinAPI 更高效
     if (m_isPinned) {
-#ifdef Q_OS_WIN
-        HWND hwnd = (HWND)winId();
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-#else
         setWindowFlag(Qt::WindowStaysOnTopHint, true);
-#endif
     }
 
     // 应用全局样式（包括滚动条美化）
@@ -101,14 +98,15 @@ MainWindow::MainWindow(QWidget* parent)
             background: none;
         }
 
-        /* 统一复选框样式：2026-03-xx 按照用户要求，仅保留蓝色勾选标记，背景保持深色 */
+        /* 统一复选框样式：2026-03-xx 按照用户要求实现真正的“内缩蓝勾”视觉 */
         QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
         QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: transparent; }
         QCheckBox::indicator:hover { border: 1px solid #666; }
         QCheckBox::indicator:checked { 
-            border: 1px solid #378ADD; 
+            border: 1px solid #444;
             background: transparent;
-            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
+            /* 使用带内边距的高对比蓝勾 (#378ADD)，物理防止填满色块 */
+            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii00IC00IDMyIDMyIiBmaWxsPSJub25lIiBzdHJva2U9IiMzNzhBREQiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
         }
 
         /* 统一输入框样式 */
@@ -500,7 +498,8 @@ void MainWindow::setupCustomTitleBarButtons() {
 
     auto createTitleBtn = [this](const QString& iconKey, const QString& hoverColor = "rgba(255, 255, 255, 0.1)") {
         QPushButton* btn = new QPushButton(this);
-        btn->setFixedSize(24, 24); // 固定 24x24px
+        // 2026-03-xx 按照宪法 5.6 定律：标题栏按钮尺寸固定为 32x32px
+        btn->setFixedSize(32, 32);
         
         // 使用 UiHelper 全局辅助类
         QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
@@ -508,7 +507,7 @@ void MainWindow::setupCustomTitleBarButtons() {
         btn->setIconSize(QSize(18, 18));
         
         btn->setStyleSheet(QString(
-            "QPushButton { background: transparent; border: none; border-radius: 4px; padding: 0; }"
+            "QPushButton { background: transparent; border: none; border-radius: 4px; padding: 0; margin: 2px; }"
             "QPushButton:hover { background: %1; }"
             "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
         ).arg(hoverColor));
@@ -524,6 +523,10 @@ void MainWindow::setupCustomTitleBarButtons() {
         "QMenu::item:selected { background-color: #505050; }"
         "QMenu::right-arrow { image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRUVFRUVFIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iOSAxOCAxNSAxMiA5IDYiPjwvcG9seWxpbmU+PC9zdmc+); width: 12px; height: 12px; right: 8px; }"
     );
+
+    // 2026-03-xx 物理级切除菜单指示器：
+    // 强制指示器宽度为0，彻底解决按钮因保留三角形空间而导致的图标偏左问题
+    m_btnCreate->setStyleSheet(m_btnCreate->styleSheet() + "QPushButton::menu-indicator { width: 0; }");
     
     QAction* actNewFolder = createMenu->addAction(UiHelper::getIcon("folder", QColor("#EEEEEE")), "创建文件夹");
     QAction* actNewMd     = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建 Markdown");
@@ -543,13 +546,15 @@ void MainWindow::setupCustomTitleBarButtons() {
     connect(actNewMd,     &QAction::triggered, [handleCreate](){ handleCreate("md"); });
     connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
 
-    m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
+    m_btnPinTop = createTitleBtn(m_isPinned ? "pin" : "pin_tilted");
     m_btnPinTop->setProperty("tooltipText", "置顶窗口");
     m_btnPinTop->installEventFilter(this);
     m_btnPinTop->setCheckable(true);
     m_btnPinTop->setChecked(m_isPinned);
+    // 2026-03-xx 按照宪法 5.7 定律：置顶态背景锁定高亮
+    m_btnPinTop->setStyleSheet(m_btnPinTop->styleSheet() + "QPushButton:checked { background: rgba(255, 255, 255, 0.15); }");
     if (m_isPinned) {
-        m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
+        m_btnPinTop->setIcon(UiHelper::getIcon("pin", QColor("#FF551C")));
     }
 
     m_btnMin = createTitleBtn("minimize");
@@ -587,6 +592,14 @@ void MainWindow::setupCustomTitleBarButtons() {
 
     // 逻辑：置顶切换
     connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);
+
+#ifdef Q_OS_WIN
+    // 2026-03-xx 按照宪法 5.6 定律：开启 Windows 11 原生圆角 (Attr: 33, Value: 2)
+    if (!m_hwnd) m_hwnd = (HWND)winId();
+    DWORD cornerPreference = 2; // DWMWCP_ROUND
+    // DWMWA_WINDOW_CORNER_PREFERENCE = 33
+    ::DwmSetWindowAttribute(m_hwnd, 33, &cornerPreference, sizeof(cornerPreference));
+#endif
 }
 
 void MainWindow::navigateTo(const QString& path, bool record) {
@@ -679,9 +692,10 @@ void MainWindow::onPinToggled(bool checked) {
     m_isPinned = checked;
 
 #ifdef Q_OS_WIN
-    HWND hwnd = (HWND)winId();
+    // 2026-03-xx 缓存 HWND，避免在主线程高频调用 winId()
+    if (!m_hwnd) m_hwnd = (HWND)winId();
     // 使用 SWP_NOSENDCHANGING 拦截冗余消息，减少 UI 线程的消息风暴，从而解决卡顿
-    SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+    SetWindowPos(m_hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #else
     setWindowFlag(Qt::WindowStaysOnTopHint, checked);
@@ -689,8 +703,9 @@ void MainWindow::onPinToggled(bool checked) {
 #endif
 
     // 更新图标和颜色 (按下置顶为品牌橙色)
+    // 2026-03-xx 按照宪法 5.7 定律：置顶态使用 "pin" 图标
     if (m_isPinned) {
-        m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
+        m_btnPinTop->setIcon(UiHelper::getIcon("pin", QColor("#FF551C")));
     } else {
         m_btnPinTop->setIcon(UiHelper::getIcon("pin_tilted", QColor("#EEEEEE")));
     }
