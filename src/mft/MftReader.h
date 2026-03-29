@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <atomic>
 #include <windows.h>
 
 namespace ArcMeta {
@@ -16,6 +17,7 @@ struct FileEntry {
     DWORDLONG frn = 0;
     DWORDLONG parentFrn = 0;
     std::wstring name;
+    std::wstring nameLower; // 2026-03-xx 极致性能：预存储小写名称
     DWORD attributes = 0;
 
     bool isDir() const { return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
@@ -61,11 +63,23 @@ private:
 
     // 性能优化：volume -> (fullPath -> frn)
     std::unordered_map<std::wstring, std::unordered_map<std::wstring, DWORDLONG>> m_pathToFrn;
+    // 2026-03-xx 极致性能：双向 $O(1)$ 映射 volume -> (frn -> fullPath)
+    std::unordered_map<std::wstring, std::unordered_map<DWORDLONG, std::wstring>> m_frnToPath;
 
     /**
      * @brief 根据路径获取对应的 FRN（用于 MFT 模式下的钻取）
      */
     DWORDLONG getFrnFromPath(const std::wstring& folderPath);
+
+    /**
+     * @brief 根据 FRN 获取全路径 ($O(1)$ 复杂度)
+     */
+    std::wstring getPathFromFrn(const std::wstring& volume, DWORDLONG frn);
+
+    /**
+     * @brief 极致性能：预计算全量路径映射
+     */
+    void precomputePaths(const std::wstring& volume);
 
     // 降级模式下的路径索引：fullPath -> Entry
     std::unordered_map<std::wstring, FileEntry> m_pathIndex;
@@ -81,12 +95,18 @@ public:
     void updateEntry(const FileEntry& entry);
 
     /**
+     * @brief 触发异步延迟路径刷新 (防抖)
+     */
+    void triggerPathRefresh(const std::wstring& volume);
+
+    /**
      * @brief USN 监听器移除记录
      */
     void removeEntry(const std::wstring& volume, DWORDLONG frn);
 
 private:
     mutable std::recursive_mutex m_mutex; // 保护所有索引数据
+    std::unordered_map<std::wstring, std::atomic<bool>> m_refreshPending;
 };
 
 } // namespace ArcMeta

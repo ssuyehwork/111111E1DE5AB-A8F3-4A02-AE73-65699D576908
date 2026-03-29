@@ -28,6 +28,55 @@ enum ItemRole {
 };
 
 /**
+ * @brief 极致性能：轻量化享元条目结构
+ */
+struct FileItem {
+    QString name;
+    QString fullPath;
+    QString extension;
+    bool isDir = false;
+
+    // 系统属性 (从 DB 预取)
+    long long size = 0;
+    double mtime = 0;
+    double ctime = 0;
+    double atime = 0;
+
+    // 元数据 (从 DB 预取)
+    int rating = 0;
+    QString color;
+    bool pinned = false;
+    bool encrypted = false;
+    QStringList tags;
+
+    // 渲染字符串缓存 (预计算)
+    QString sizeStr;
+    QString timeStr;
+    QString typeStr;
+};
+
+/**
+ * @brief 极致性能：自定义享元模型，消除 QStandardItem 堆分配开销
+ */
+class FileModel : public QAbstractTableModel {
+    Q_OBJECT
+public:
+    explicit FileModel(QObject* parent = nullptr);
+
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+    bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+
+    void setItems(const QList<FileItem>& items);
+    const QList<FileItem>& items() const { return m_items; }
+
+private:
+    QList<FileItem> m_items;
+};
+
+/**
  * @brief 内容面板（面板四）：核心业务展示区
  * 支持网格视图（QListView）与列表视图（QTreeView）切换
  */
@@ -99,7 +148,7 @@ private:
     // 视图组件
     QListView* m_gridView = nullptr;
     QTreeView* m_treeView = nullptr;
-    QStandardItemModel* m_model = nullptr;
+    FileModel* m_model = nullptr; // 2026-03-xx 极致性能重构：切换至自定义享元模型
     QSortFilterProxyModel* m_proxyModel = nullptr;
 
     FilterState m_currentFilter;
@@ -115,7 +164,8 @@ private:
                                QMap<QString, int>& typeCounts,
                                QMap<QString, int>& createDateCounts,
                                QMap<QString, int>& modifyDateCounts,
-                               int& noTagCount);
+                               int& noTagCount,
+                               QList<FileItem>& outItems);
 
 public slots:
     void onSelectionChanged();

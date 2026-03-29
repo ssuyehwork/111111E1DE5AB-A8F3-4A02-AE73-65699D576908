@@ -178,15 +178,18 @@ void MainWindow::initUi() {
             QString path = paths.first();
             QFileInfo info(path);
             
-            // 基础信息展示
+            // 2026-03-xx 极致性能优化：Zero-IO UI，所有属性直接从模型 Role 读取，彻底禁绝 QFileInfo 系统调用
+            bool isDir = idx.data(IsDirRole).toBool();
+            QString name = info.fileName().isEmpty() ? path : info.fileName();
+            QString typeStr = isDir ? "文件夹" : info.suffix().toUpper() + " 文件";
+            qlonglong sizeRaw = idx.data(SizeRawRole).toLongLong();
+            QString sizeStr = isDir ? "-" : QString::number(sizeRaw / 1024) + " KB";
+
+            QString ctimeStr = QDateTime::fromMSecsSinceEpoch((qint64)idx.data(CTimeRawRole).toDouble()).toString("yyyy-MM-dd");
+            QString mtimeStr = QDateTime::fromMSecsSinceEpoch((qint64)idx.data(MTimeRawRole).toDouble()).toString("yyyy-MM-dd");
+
             m_metaPanel->updateInfo(
-                info.fileName().isEmpty() ? path : info.fileName(), 
-                info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件",
-                info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB",
-                info.birthTime().toString("yyyy-MM-dd"),
-                info.lastModified().toString("yyyy-MM-dd"),
-                info.lastRead().toString("yyyy-MM-dd"),
-                info.absoluteFilePath(),
+                name, typeStr, sizeStr, ctimeStr, mtimeStr, mtimeStr, path,
                 idx.data(EncryptedRole).toBool()
             );
 
@@ -249,28 +252,38 @@ void MainWindow::initUi() {
         }
     });
 
-    // 8. 响应元数据面板自己的星级/颜色变更
+    // 8. 响应元数据面板自己的星级/颜色变更 (2026-03-xx 极致性能：实现批量事务化保存，消除 IO 震荡)
     connect(m_metaPanel, &MetaPanel::metadataChanged, [this](int rating, const std::wstring& color) {
         auto indexes = m_contentPanel->getSelectedIndexes();
-        for (const auto& idx : indexes) {
-            QString path = idx.data(PathRole).toString(); 
-            if(path.isEmpty()) continue;
-            
-            QFileInfo info(path);
-            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-            meta.load();
+        if (indexes.isEmpty()) return;
 
-            if (rating != -1) {
-                // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
-                // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
-                m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
-                meta.items()[info.fileName().toStdWString()].rating = rating;
+        // 1. 按所属文件夹对选中项进行分组
+        std::map<std::wstring, std::vector<std::pair<QModelIndex, std::wstring>>> folderGroups;
+        for (const auto& idx : indexes) {
+            QString fullPath = idx.data(PathRole).toString();
+            if (fullPath.isEmpty()) continue;
+            QFileInfo info(fullPath);
+            folderGroups[info.absolutePath().toStdWString()].push_back({idx, info.fileName().toStdWString()});
+        }
+
+        // 2. 逐文件夹执行批量原子保存
+        for (auto& [folderPath, items] : folderGroups) {
+            ArcMeta::AmMetaJson meta(folderPath);
+            meta.load();
+            for (auto& itemPair : items) {
+                const auto& idx = itemPair.first;
+                const auto& fileName = itemPair.second;
+
+                if (rating != -1) {
+                    m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
+                    meta.items()[fileName].rating = rating;
+                }
+                if (color != L"__NO_CHANGE__") {
+                    m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
+                    meta.items()[fileName].color = color;
+                }
             }
-            if (color != L"__NO_CHANGE__") {
-                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
-                meta.items()[info.fileName().toStdWString()].color = color;
-            }
-            meta.save();
+            meta.save(); // 每个文件夹仅执行一次磁盘写入
         }
     });
 }

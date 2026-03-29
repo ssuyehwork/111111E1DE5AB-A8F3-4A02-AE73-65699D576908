@@ -26,6 +26,11 @@ public:
      * @brief 物理更新路径
      */
     static bool updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath, QSqlDatabase db = QSqlDatabase::database());
+
+    /**
+     * @brief 极致性能：批量获取目录下所有条目的元数据
+     */
+    static std::map<std::wstring, ItemMeta> getMetadataBatch(const std::wstring& parentPath, QSqlDatabase db = QSqlDatabase::database());
 };
 
 } // namespace ArcMeta

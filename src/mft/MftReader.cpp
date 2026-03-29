@@ -7,6 +7,7 @@
 #include <execution>
 #include <mutex>
 #include <functional>
+#include <thread>
 
 namespace ArcMeta {
 
@@ -80,6 +81,10 @@ bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
             entry.attributes = pRecord->FileAttributes;
             entry.name = std::wstring(pRecord->FileName, pRecord->FileNameLength / sizeof(wchar_t));
             
+            // 2026-03-xx 极致性能优化：预存储小写名称
+            entry.nameLower = entry.name;
+            std::transform(entry.nameLower.begin(), entry.nameLower.end(), entry.nameLower.begin(), ::towlower);
+
             volumeIndex[entry.frn] = entry;
             // 建立父子索引
             m_parentToChildren[volumeName][entry.parentFrn].push_back(entry.frn);
@@ -91,7 +96,60 @@ bool MftReader::loadMftForVolume(const std::wstring& volumeName) {
 
     CloseHandle(hVol);
     m_isUsingMft = true;
+
+    // 2026-03-xx 极致性能重构：线性扫描预计算全量路径映射，消除 $O(N \cdot D)$ 递归
+    precomputePaths(volumeName);
+
     return true;
+}
+
+/**
+ * @brief 极致性能：使用非递归 BFS 一次性建立全量路径索引
+ */
+void MftReader::precomputePaths(const std::wstring& volume) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto& volIndex = m_index[volume];
+    auto& childrenMap = m_parentToChildren[volume];
+    auto& pathMap = m_pathToFrn[volume];
+    auto& frnMap = m_frnToPath[volume];
+
+    pathMap.clear();
+    frnMap.clear();
+
+    // BFS 核心循环：使用非递归方式避免栈溢出并达到 O(N) 建立全量索引
+    struct Node { DWORDLONG frn; std::wstring path; };
+    std::vector<Node> bfsQueue;
+    bfsQueue.reserve(volIndex.size());
+
+    // 1. 初始化根目录子项 (FRN=5 为根)
+    if (childrenMap.count(5)) {
+        for (DWORDLONG childFrn : childrenMap[5]) {
+            if (volIndex.count(childFrn)) {
+                FileEntry& fe = volIndex[childFrn];
+                std::wstring path = volume + L"\\" + fe.name;
+                pathMap[path] = childFrn;
+                frnMap[childFrn] = path;
+                if (fe.isDir()) bfsQueue.push_back({childFrn, path});
+            }
+        }
+    }
+
+    // 2. 层序遍历
+    size_t head = 0;
+    while (head < bfsQueue.size()) {
+        Node parent = bfsQueue[head++];
+        if (childrenMap.count(parent.frn)) {
+            for (DWORDLONG childFrn : childrenMap[parent.frn]) {
+                if (volIndex.count(childFrn)) {
+                    FileEntry& fe = volIndex[childFrn];
+                    std::wstring fullPath = parent.path + L"\\" + fe.name;
+                    pathMap[fullPath] = childFrn;
+                    frnMap[childFrn] = fullPath;
+                    if (fe.isDir()) bfsQueue.push_back({childFrn, fullPath});
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -173,20 +231,12 @@ DWORDLONG MftReader::getFrnFromPath(const std::wstring& folderPath) {
     if (vol.empty()) return 0;
     
     const auto& volPathMap = m_pathToFrn[vol];
+    // 2026-03-xx 极致性能优化：全量预计算后，此处检索复杂度严格为 O(1)
     auto it = volPathMap.find(folderPath);
     if (it != volPathMap.end()) {
         return it->second;
     }
     
-    // 备选逻辑：如果映射表未填充，则全量匹配并缓存（仅在特殊初始化阶段发生）
-    auto& entries = m_index[vol];
-    for (const auto& [frn, entry] : entries) {
-        if (entry.isDir()) {
-            std::wstring fullPath = PathBuilder::getPath(vol, frn);
-            m_pathToFrn[vol][fullPath] = frn;
-            if (fullPath == folderPath) return frn;
-        }
-    }
     return 0; 
 }
 
@@ -195,6 +245,10 @@ DWORDLONG MftReader::getFrnFromPath(const std::wstring& folderPath) {
  */
 std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::wstring& volume) {
     if (query.empty()) return {};
+
+    // 2026-03-xx 极致性能重构：小写转换提前至外部
+    std::wstring lQuery = query;
+    std::transform(lQuery.begin(), lQuery.end(), lQuery.begin(), ::towlower);
 
     // 1. 收集所有待搜索项的指针
     std::vector<const FileEntry*> pool;
@@ -212,19 +266,12 @@ std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::w
         }
     }
 
-    // 2. 将 query 转换为小写，支持大小写不敏感匹配
-    std::wstring lQuery = query;
-    std::transform(lQuery.begin(), lQuery.end(), lQuery.begin(), ::towlower);
-
-    // 3. 并行过滤
+    // 3. 并行过滤 (2026-03-xx 极致性能：消除循环内内存分配，直接匹配预存的小写字段)
     std::vector<FileEntry> results;
     std::mutex resultsMutex;
 
     std::for_each(std::execution::par, pool.begin(), pool.end(), [&](const FileEntry* entry) {
-        std::wstring lName = entry->name;
-        std::transform(lName.begin(), lName.end(), lName.begin(), ::towlower);
-        
-        if (lName.find(lQuery) != std::wstring::npos) {
+        if (entry->nameLower.find(lQuery) != std::wstring::npos) {
             std::lock_guard<std::mutex> lock(resultsMutex);
             results.push_back(*entry);
         }
@@ -234,7 +281,7 @@ std::vector<FileEntry> MftReader::search(const std::wstring& query, const std::w
 }
 
 /**
- * @brief USN 监听器更新内存索引，并同步维护反向索引 (红线修复)
+ * @brief USN 监听器更新内存索引，并同步维护反向索引 (极致性能：增量维护路径缓存)
  */
 void MftReader::updateEntry(const FileEntry& entry) {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -244,7 +291,12 @@ void MftReader::updateEntry(const FileEntry& entry) {
     bool isNew = (volIndex.find(entry.frn) == volIndex.end());
     DWORDLONG oldParentFrn = isNew ? 0 : volIndex[entry.frn].parentFrn;
     
-    volIndex[entry.frn] = entry;
+    FileEntry newEntry = entry;
+    // 2026-03-xx 极致性能优化：维护预存储的小写名称
+    newEntry.nameLower = newEntry.name;
+    std::transform(newEntry.nameLower.begin(), newEntry.nameLower.end(), newEntry.nameLower.begin(), ::towlower);
+
+    volIndex[entry.frn] = newEntry;
 
     // 2. 维护父子关系索引
     if (!isNew && oldParentFrn != entry.parentFrn) {
@@ -257,8 +309,31 @@ void MftReader::updateEntry(const FileEntry& entry) {
         m_parentToChildren[entry.volume][entry.parentFrn].push_back(entry.frn);
     }
 
-    // 3. 失效路径缓存 (USN 变更后路径已不可信)
-    m_pathToFrn[entry.volume].clear();
+    // 3. 增量维护路径缓存 (2026-03-xx 极致性能优化：采用异步延迟刷新，防止批量操作卡死)
+    triggerPathRefresh(entry.volume);
+}
+
+void MftReader::triggerPathRefresh(const std::wstring& volume) {
+    if (m_refreshPending[volume].exchange(true)) return; // 已有挂起的任务
+
+    // 开启后台线程执行延时刷新
+    std::thread([this, volume]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        precomputePaths(volume);
+        m_refreshPending[volume] = false;
+    }).detach();
+}
+
+std::wstring MftReader::getPathFromFrn(const std::wstring& volume, DWORDLONG frn) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto itVol = m_frnToPath.find(volume);
+    if (itVol != m_frnToPath.end()) {
+        auto itPath = itVol->second.find(frn);
+        if (itPath != itVol->second.end()) {
+            return itPath->second;
+        }
+    }
+    return L"";
 }
 
 /**

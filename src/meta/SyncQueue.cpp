@@ -106,7 +106,19 @@ bool SyncQueue::processBatch() {
             FolderRepo::save(path, meta.folder(), db);
 
             // 2. 使用 Repository 同步所有条目 (2026-03-xx 传入后台线程私有连接 db)
-            for (const auto& [name, iMeta] : meta.items()) {
+            for (auto& [name, iMeta] : meta.items()) {
+                // 2026-03-xx 极致性能优化：在同步阶段预填充系统属性，消除 UI 线程的 QFileInfo 压力
+                std::wstring fullPath = path;
+                if (!fullPath.empty() && fullPath.back() != L'\\' && fullPath.back() != L'/') fullPath += L'\\';
+                fullPath += name;
+
+                QFileInfo info(QString::fromStdWString(fullPath));
+                if (info.exists()) {
+                    iMeta.size = info.size();
+                    iMeta.mtime = (double)info.lastModified().toMSecsSinceEpoch();
+                    iMeta.ctime = (double)info.birthTime().toMSecsSinceEpoch();
+                }
+
                 ItemRepo::save(path, name, iMeta, db);
             }
         }
