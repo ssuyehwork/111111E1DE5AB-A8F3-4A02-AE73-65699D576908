@@ -6,9 +6,11 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QStackedWidget>
 
 namespace ArcMeta {
 
+class BreadcrumbBar;
 class CategoryPanel;
 class NavPanel;
 class ContentPanel;
@@ -49,6 +51,10 @@ private:
     void initToolbar();
     void setupSplitters();
     void setupCustomTitleBarButtons();
+
+    // 面包屑地址栏
+    BreadcrumbBar* m_breadcrumbBar = nullptr;
+    QStackedWidget* m_pathStack = nullptr;
 
     // 六个面板
     CategoryPanel* m_categoryPanel = nullptr;

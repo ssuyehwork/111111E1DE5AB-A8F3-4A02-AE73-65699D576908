@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "BreadcrumbBar.h"
 #include "CategoryPanel.h"
 #include "NavPanel.h"
 #include "ContentPanel.h"
@@ -140,8 +141,9 @@ void MainWindow::initUi() {
 
     // 1a. 分类选择 -> 内容面板执行检索或筛选
     connect(m_categoryPanel, &CategoryPanel::categorySelected, [this](const QString& name) {
+        m_pathStack->setCurrentWidget(m_pathEdit);
         m_pathEdit->setText("分类: " + name);
-        m_contentPanel->search(name); // 暂时通过 search 模拟分类展示
+        m_contentPanel->search(name);
     });
 
     // 2. 内容面板选中项改变 -> 元数据面板刷新
@@ -220,9 +222,12 @@ void MainWindow::initUi() {
         QString input = m_pathEdit->text();
         if (QDir(input).exists()) {
             navigateTo(input);
+        } else if (input == "computer://" || input == "此电脑") {
+            navigateTo("computer://");
         } else {
             // 如果路径无效，恢复为当前实际路径
             m_pathEdit->setText(QDir::toNativeSeparators(m_currentPath));
+            m_pathStack->setCurrentWidget(m_breadcrumbBar);
         }
     });
 
@@ -336,14 +341,41 @@ void MainWindow::initToolbar() {
     connect(m_btnForward, &QPushButton::clicked, this, &MainWindow::onForwardClicked);
     connect(m_btnUp, &QPushButton::clicked, this, &MainWindow::onUpClicked);
 
-    m_pathEdit = new QLineEdit(this);
+    // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
+    m_pathStack = new QStackedWidget(this);
+    m_pathStack->setFixedHeight(36);
+    m_pathStack->setMinimumWidth(300);
+    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
+
+    // A. 面包屑视图
+    m_breadcrumbBar = new BreadcrumbBar(m_pathStack);
+    m_pathStack->addWidget(m_breadcrumbBar);
+
+    // B. 编辑视图
+    m_pathEdit = new QLineEdit(m_pathStack);
     m_pathEdit->setPlaceholderText("输入路径...");
-    m_pathEdit->setMinimumWidth(200);
-    m_pathEdit->setFixedHeight(36); // 与地址栏容器等高
-    m_pathEdit->setStyleSheet(
-        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 8px; }"
-        "QLineEdit:focus { border: 1px solid #FFFFFF; }"
-    );
+    m_pathEdit->setFixedHeight(34);
+    m_pathEdit->setStyleSheet("QLineEdit { background: transparent; border: none; color: #EEEEEE; padding-left: 8px; }");
+    m_pathStack->addWidget(m_pathEdit);
+
+    m_pathStack->setCurrentWidget(m_breadcrumbBar);
+
+    // 交互逻辑
+    connect(m_breadcrumbBar, &BreadcrumbBar::blankAreaClicked, [this]() {
+        m_pathEdit->setText(QDir::toNativeSeparators(m_currentPath));
+        m_pathStack->setCurrentWidget(m_pathEdit);
+        m_pathEdit->setFocus();
+        m_pathEdit->selectAll();
+    });
+    connect(m_pathEdit, &QLineEdit::editingFinished, [this]() {
+        // 只有在失去焦点或按回车后切回面包屑 (如果不是由于 confirm 跳转)
+        if (m_pathStack->currentWidget() == m_pathEdit) {
+            m_pathStack->setCurrentWidget(m_breadcrumbBar);
+        }
+    });
+    connect(m_breadcrumbBar, &BreadcrumbBar::pathClicked, [this](const QString& path) {
+        navigateTo(path);
+    });
 
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
@@ -374,7 +406,7 @@ void MainWindow::setupSplitters() {
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);
     addrL->addWidget(m_btnUp);
-    addrL->addWidget(m_pathEdit, 1);
+    addrL->addWidget(m_pathStack, 1);
     addrL->addWidget(m_searchEdit);
 
     // --- 主拆分条（5px handleWidth） ---
@@ -525,7 +557,9 @@ void MainWindow::navigateTo(const QString& path, bool record) {
             }
         }
         m_pathEdit->setText("此电脑");
-        m_contentPanel->loadDirectory(""); // 传空路径让 ContentPanel 展示磁盘列表
+        m_breadcrumbBar->setPath("computer://");
+        m_pathStack->setCurrentWidget(m_breadcrumbBar);
+        m_contentPanel->loadDirectory("");
         int driveCount = static_cast<int>(QDir::drives().count());
         m_statusLeft->setText(QString("%1 个分区").arg(driveCount));
         m_statusCenter->setText("此电脑");
@@ -547,6 +581,8 @@ void MainWindow::navigateTo(const QString& path, bool record) {
     }
     
     m_pathEdit->setText(normPath);
+    m_breadcrumbBar->setPath(normPath);
+    m_pathStack->setCurrentWidget(m_breadcrumbBar);
     m_contentPanel->loadDirectory(normPath);
     updateNavButtons();
     updateStatusBar();

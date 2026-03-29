@@ -634,19 +634,35 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         m_currentPath = "computer://";
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
+
+        QMap<int, int>     ratingCounts;
+        QMap<QString, int> colorCounts;
+        QMap<QString, int> tagCounts;
+        QMap<QString, int> typeCounts;
+        QMap<QString, int> createDateCounts;
+        QMap<QString, int> modifyDateCounts;
+
         for (const QFileInfo& drive : drives) {
-            auto* item = new QStandardItem(iconProvider.icon(drive), drive.absolutePath());
-            item->setData(drive.absolutePath(), PathRole);
+            QString drivePath = drive.absolutePath();
+            auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
+            item->setData(drivePath, PathRole);
             item->setData("folder", TypeRole);
+            item->setData(0, RatingRole);
+            item->setData("", ColorRole);
+            item->setData(false, IsLockedRole);
+
             QList<QStandardItem*> row;
             row << item;
             row << new QStandardItem("-");
             row << new QStandardItem("磁盘分区");
             row << new QStandardItem("-");
             m_model->appendRow(row);
+
+            typeCounts["folder"]++;
         }
-        // 清除筛选统计
-        emit directoryStatsReady({}, {}, {}, {}, {}, {});
+        // 发送统计数据，使筛选面板更新（例如显示“文件夹(8)”）
+        emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
+                                  createDateCounts, modifyDateCounts);
         return;
     }
 
