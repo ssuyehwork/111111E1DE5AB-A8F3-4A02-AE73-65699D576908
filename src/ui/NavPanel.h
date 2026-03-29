@@ -5,6 +5,7 @@
 #include <QStandardItemModel>
 #include <QStandardItem>
 #include <QVBoxLayout>
+#include <QDir>
 
 namespace ArcMeta {
 

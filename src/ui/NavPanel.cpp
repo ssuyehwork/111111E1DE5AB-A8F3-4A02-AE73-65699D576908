@@ -4,8 +4,11 @@
 #include <QScrollBar>
 #include <QLabel>
 #include <QStandardItemModel>
+#include <QStandardItem>
 #include <QFileIconProvider>
 #include <QDir>
+#include <QFileInfo>
+#include <QIcon>
 #include <QStandardPaths>
 
 namespace ArcMeta {

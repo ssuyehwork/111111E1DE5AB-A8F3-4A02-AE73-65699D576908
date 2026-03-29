@@ -18,6 +18,7 @@
 #include <QCloseEvent>
 #include "UiHelper.h"
 #include <QFileInfo>
+#include <QDir>
 #include "../meta/AmMetaJson.h"
 
 #ifdef Q_OS_WIN
@@ -524,7 +525,7 @@ void MainWindow::navigateTo(const QString& path, bool record) {
         }
         m_pathEdit->setText("此电脑");
         m_contentPanel->loadDirectory(""); // 传空路径让 ContentPanel 展示磁盘列表
-        int driveCount = QDir::drives().count();
+        int driveCount = static_cast<int>(QDir::drives().count());
         m_statusLeft->setText(QString("%1 个分区").arg(driveCount));
         m_statusCenter->setText("此电脑");
         updateNavButtons();
@@ -535,12 +536,12 @@ void MainWindow::navigateTo(const QString& path, bool record) {
     m_currentPath = normPath;
 
     if (record) {
-        if (m_historyIndex < m_history.size() - 1) {
+            if (m_historyIndex < static_cast<int>(m_history.size()) - 1) {
             m_history = m_history.mid(0, m_historyIndex + 1);
         }
         if (m_history.isEmpty() || m_history.last() != normPath) {
             m_history.append(normPath);
-            m_historyIndex = m_history.size() - 1;
+                m_historyIndex = static_cast<int>(m_history.size()) - 1;
         }
     }
     

@@ -927,7 +927,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
 
     int baseIconSize = option.decorationSize.width();
     if (baseIconSize <= 0) baseIconSize = 64; 
-    int iconDrawSize = baseIconSize * 0.65; 
+    int iconDrawSize = static_cast<int>(baseIconSize * 0.65);
     
     int ratingH = 12;
     int nameH = 16;
