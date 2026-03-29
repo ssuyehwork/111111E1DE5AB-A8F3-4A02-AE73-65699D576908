@@ -193,7 +193,7 @@ void MainWindow::initUi() {
 
             m_metaPanel->updateInfo(
                 name, typeStr, sizeStr, ctimeStr, mtimeStr, mtimeStr, path,
-                idx.data(EncryptedRole).toBool()
+                idx.data(ArcMeta::EncryptedRole).toBool()
             );
 
             // 应用缓存中的元数据状态
@@ -278,11 +278,11 @@ void MainWindow::initUi() {
                 const auto& fileName = itemPair.second;
 
                 if (rating != -1) {
-                    m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
+                    m_contentPanel->getProxyModel()->setData(idx, rating, ArcMeta::RatingRole);
                     meta.items()[fileName].rating = rating;
                 }
                 if (color != L"__NO_CHANGE__") {
-                    m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
+                    m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ArcMeta::ColorRole);
                     meta.items()[fileName].color = color;
                 }
             }

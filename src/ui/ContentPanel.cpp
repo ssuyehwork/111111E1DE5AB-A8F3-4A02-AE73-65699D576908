@@ -338,10 +338,10 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     QFileInfo info(p);
                     groups[info.absolutePath().toStdWString()].push_back({idx, info.fileName().toStdWString()});
                 }
-                for (auto& [folder, itemPairs] : groups) {
+                for (auto& [folder, itemsGroup] : groups) {
                     AmMetaJson meta(folder);
                     meta.load();
-                    for (auto& item : itemPairs) updater(meta, item.second, item.first);
+                    for (auto& itemPair : itemsGroup) updater(meta, itemPair.second, itemPair.first);
                     meta.save();
                 }
             };

@@ -24,7 +24,11 @@ enum ItemRole {
     PathRole,
     IsLockedRole,
     TagsRole,
-    TypeRole
+    TypeRole,
+    SizeRawRole,
+    MTimeRawRole,
+    CTimeRawRole,
+    IsDirRole
 };
 
 /**

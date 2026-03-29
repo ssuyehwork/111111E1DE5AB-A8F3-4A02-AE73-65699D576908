@@ -69,8 +69,10 @@ private:
     /**
      * @brief 根据路径获取对应的 FRN（用于 MFT 模式下的钻取）
      */
+public:
     DWORDLONG getFrnFromPath(const std::wstring& folderPath);
 
+private:
     /**
      * @brief 极致性能：预计算全量路径映射
      */
