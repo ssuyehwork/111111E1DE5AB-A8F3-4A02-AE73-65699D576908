@@ -248,6 +248,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         QAbstractItemView* view = qobject_cast<QAbstractItemView*>(obj);
         if (!view) view = qobject_cast<QAbstractItemView*>(obj->parent());
 
+        // 核心红线：如果当前正在编辑（重命名），直接放行，不干扰原生输入控件的方向键行为
+        if (view && view->state() == QAbstractItemView::EditingState) {
+            return false;
+        }
+
         if (view) {
             // 1. Ctrl + 0..5 (星级)
             if ((keyEvent->modifiers() & Qt::ControlModifier) && 
@@ -494,6 +499,13 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     menu.addAction("用系统默认程序打开");
     menu.addAction("在资源管理器中显示");
     menu.addSeparator();
+
+    QMenu* newMenu = menu.addMenu("新建...");
+    newMenu->setIcon(UiHelper::getIcon("ruler_spacing", QColor("#EEEEEE")));
+    QAction* actNewFolder = newMenu->addAction(UiHelper::getIcon("folder", QColor("#EEEEEE")), "创建文件夹");
+    QAction* actNewMd     = newMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建 Markdown");
+    QAction* actNewTxt    = newMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)");
+    menu.addSeparator();
     
     QMenu* categorizeMenu = menu.addMenu("归类到...");
     categorizeMenu->addAction("（暂无分类）"); // 占位，待后续对接数据库加载
@@ -534,6 +546,12 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         QStringList args;
         args << "/select," << QDir::toNativeSeparators(path);
         QProcess::startDetached("explorer", args);
+    } else if (selectedAction == actNewFolder) {
+        createNewItem("folder");
+    } else if (selectedAction == actNewMd) {
+        createNewItem("md");
+    } else if (selectedAction == actNewTxt) {
+        createNewItem("txt");
     } else if (actionText == "复制路径") {
         QApplication::clipboard()->setText(QDir::toNativeSeparators(path));
     } else if (actionText == "重命名") {
@@ -613,7 +631,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         for (const QFileInfo& drive : drives) {
             auto* item = new QStandardItem(iconProvider.icon(drive), drive.absolutePath());
             item->setData(drive.absolutePath(), PathRole);
-        item->setData("folder", TypeRole);
+            item->setData("folder", TypeRole);
             QList<QStandardItem*> row;
             row << item;
             row << new QStandardItem("-");
@@ -621,6 +639,8 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             row << new QStandardItem("-");
             m_model->appendRow(row);
         }
+        // 清除筛选统计
+        emit directoryStatsReady({}, {}, {}, {}, {}, {});
         return;
     }
 
@@ -739,6 +759,22 @@ void ContentPanel::search(const QString& query) {
     auto results = MftReader::instance().search(query.toStdWString());
     QFileIconProvider iconProvider;
 
+    QMap<int, int>     ratingCounts;
+    QMap<QString, int> colorCounts;
+    QMap<QString, int> tagCounts;
+    QMap<QString, int> typeCounts;
+    QMap<QString, int> createDateCounts;
+    QMap<QString, int> modifyDateCounts;
+    int noTagCount = 0;
+
+    QDate today = QDate::currentDate();
+    QDate yesterday = today.addDays(-1);
+    auto dateKey = [&](const QDate& d) -> QString {
+        if (d == today)     return "today";
+        if (d == yesterday) return "yesterday";
+        return d.toString("yyyy-MM-dd");
+    };
+
     int count = 0;
     for (const auto& entry : results) {
         if (++count > 1000) break;
@@ -752,34 +788,57 @@ void ContentPanel::search(const QString& query) {
             fullPath = QString::fromStdWString(entry.volume) + "[FRN:" + QString::number(entry.frn, 16) + "]";
         }
 
+        QFileInfo info(fullPath);
         QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(QFileInfo(fullPath)), fileName);
+        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
         nameItem->setData(fullPath, PathRole); 
         nameItem->setData(entry.isDir() ? "folder" : "file", TypeRole);
         
+        int     itemRating = 0;
+        QString itemColor;
+        bool    hasTags = false;
+
         // --- 搜索模式下单体探针：由于不在同一目录，需单体读取所属父目录元数据 ---
-        // 虽然有轻微性能损耗，但在 1000 级结果内依然是 I/O 无感的
-        QString parentDir = QFileInfo(fullPath).absolutePath();
+        QString parentDir = info.absolutePath();
         ArcMeta::AmMetaJson meta(parentDir.toStdWString());
         meta.load();
         auto it = meta.items().find(fileName.toStdWString());
         if (it != meta.items().end()) {
-            nameItem->setData(it->second.rating, RatingRole);
-            nameItem->setData(QString::fromStdWString(it->second.color), ColorRole);
+            itemRating = it->second.rating;
+            itemColor  = QString::fromStdWString(it->second.color);
+            nameItem->setData(itemRating, RatingRole);
+            nameItem->setData(itemColor, ColorRole);
             nameItem->setData(it->second.pinned, IsLockedRole);
+
+            hasTags = !it->second.tags.empty();
             QStringList tgs;
-            for (const auto& t : it->second.tags) tgs << QString::fromStdWString(t);
+            for (const auto& t : it->second.tags) {
+                QString ts = QString::fromStdWString(t);
+                tgs << ts;
+                tagCounts[ts]++;
+            }
             nameItem->setData(tgs, TagsRole);
         }
 
-        
+        // 统计累加
+        ratingCounts[itemRating]++;
+        colorCounts[itemColor]++;
+        if (!hasTags) noTagCount++;
+        typeCounts[entry.isDir() ? "folder" : info.suffix().toUpper()]++;
+        createDateCounts[dateKey(info.birthTime().date())]++;
+        modifyDateCounts[dateKey(info.lastModified().date())]++;
+
         row << nameItem;
         row << new QStandardItem(fullPath);
-        row << new QStandardItem(entry.isDir() ? "文件夹" : "文件");
-        row << new QStandardItem("-");
+        row << new QStandardItem(entry.isDir() ? "文件夹" : (info.suffix().isEmpty() ? "文件" : info.suffix().toUpper() + " 文件"));
+        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
 
         m_model->appendRow(row);
     }
+
+    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
+    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
+                              createDateCounts, modifyDateCounts);
 }
 
 void ContentPanel::applyFilters(const FilterState& state) {
@@ -791,6 +850,47 @@ void ContentPanel::applyFilters() {
     auto* proxy = static_cast<FilterProxyModel*>(m_proxyModel);
     proxy->currentFilter = m_currentFilter;
     proxy->updateFilter();
+}
+
+void ContentPanel::createNewItem(const QString& type) {
+    if (m_currentPath.isEmpty() || m_currentPath == "computer://") return;
+
+    QString baseName = (type == "folder") ? "新建文件夹" : "未命名";
+    QString ext = (type == "md") ? ".md" : ((type == "txt") ? ".txt" : "");
+    QString finalName = baseName + ext;
+    QString fullPath = m_currentPath + "/" + finalName;
+
+    // 自动避重
+    int counter = 1;
+    while (QFileInfo::exists(fullPath)) {
+        finalName = baseName + QString(" (%1)").arg(counter++) + ext;
+        fullPath = m_currentPath + "/" + finalName;
+    }
+
+    bool success = false;
+    if (type == "folder") {
+        success = QDir(m_currentPath).mkdir(finalName);
+    } else {
+        QFile file(fullPath);
+        if (file.open(QIODevice::WriteOnly)) {
+            file.close();
+            success = true;
+        }
+    }
+
+    if (success) {
+        loadDirectory(m_currentPath);
+        // 自动进入重命名模式（查找对应项并激活编辑）
+        auto results = m_model->findItems(finalName, Qt::MatchExactly, 0);
+        if (!results.isEmpty()) {
+            QModelIndex srcIdx = results.first()->index();
+            QModelIndex proxyIdx = m_proxyModel->mapFromSource(srcIdx);
+            if (proxyIdx.isValid()) {
+                m_gridView->setCurrentIndex(proxyIdx);
+                m_gridView->edit(proxyIdx);
+            }
+        }
+    }
 }
 
 // --- Delegate ---
@@ -906,6 +1006,31 @@ QSize GridItemDelegate::sizeHint(const QStyleOptionViewItem& option, const QMode
     return QSize(96, 112);
 }
 
+bool GridItemDelegate::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+        QLineEdit* editor = qobject_cast<QLineEdit*>(obj);
+        if (editor) {
+            // 修复重命名：允许方向键、Home/End 在编辑框内正常导航，不触发视图切换
+            switch (keyEvent->key()) {
+                case Qt::Key_Left:
+                case Qt::Key_Right:
+                case Qt::Key_Up:
+                case Qt::Key_Down:
+                case Qt::Key_Home:
+                case Qt::Key_End:
+                    // 返回 false 表示不拦截，让 QLineEdit 自身处理
+                    // 同时停止事件传播，防止 QAbstractItemView 捕获并结束编辑
+                    keyEvent->accept();
+                    return false;
+                default:
+                    break;
+            }
+        }
+    }
+    return QStyledItemDelegate::eventFilter(obj, event);
+}
+
 bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) {
     if (event->type() == QEvent::MouseButtonPress) {
         QMouseEvent* mEvent = static_cast<QMouseEvent*>(event);
@@ -969,6 +1094,12 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
 QWidget* GridItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const {
     Q_UNUSED(option);
     QLineEdit* editor = new QLineEdit(parent);
+
+    // 关键点：重命名时光标行为修复
+    // 默认情况下 QAbstractItemView 会在编辑状态下拦截方向键
+    // 我们通过设置属性让编辑器能处理方向键
+    editor->installEventFilter(const_cast<GridItemDelegate*>(this));
+
     editor->setAlignment(Qt::AlignCenter);
     editor->setFrame(false);
     

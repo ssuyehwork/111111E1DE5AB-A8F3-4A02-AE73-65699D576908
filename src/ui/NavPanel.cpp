@@ -1,7 +1,12 @@
 #include "NavPanel.h"
+#include "UiHelper.h"
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QLabel>
+#include <QStandardItemModel>
+#include <QFileIconProvider>
+#include <QDir>
+#include <QStandardPaths>
 
 namespace ArcMeta {
 
@@ -31,23 +36,39 @@ void NavPanel::initUi() {
     m_mainLayout->addWidget(titleLabel);
 
     m_treeView = new QTreeView(this);
-    m_treeView->setHeaderHidden(true); // 隐藏表头
+    m_treeView->setHeaderHidden(true);
     m_treeView->setAnimated(true);
     m_treeView->setIndentation(16);
-    m_treeView->setSortingEnabled(true);
     m_treeView->setExpandsOnDoubleClick(true);
 
-    // 设置文件系统模型
-    m_fileModel = new QFileSystemModel(this);
-    m_fileModel->setFilter(QDir::AllDirs | QDir::NoDotAndDotDot); // 只显示文件夹，不显示文件
-    m_fileModel->setRootPath(""); // 监视全盘
+    m_model = new QStandardItemModel(this);
+    QFileIconProvider iconProvider;
 
-    m_treeView->setModel(m_fileModel);
+    // 1. 新增：桌面入口
+    QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    QStandardItem* desktopItem = new QStandardItem(UiHelper::getIcon("monitor", QColor("#EEEEEE")), "桌面");
+    desktopItem->setData(desktopPath, Qt::UserRole + 1);
+    // 增加虚拟子项以便显示展开箭头
+    desktopItem->appendRow(new QStandardItem("Loading..."));
+    m_model->appendRow(desktopItem);
 
-    // 隐藏除“名称”列以外的所有列
-    for (int i = 1; i < m_fileModel->columnCount(); ++i) {
-        m_treeView->hideColumn(i);
+    // 2. 新增：此电脑入口
+    QStandardItem* computerItem = new QStandardItem(UiHelper::getIcon("hard_drive", QColor("#EEEEEE")), "此电脑");
+    computerItem->setData("computer://", Qt::UserRole + 1);
+    m_model->appendRow(computerItem);
+
+    // 3. 磁盘列表
+    const auto drives = QDir::drives();
+    for (const QFileInfo& drive : drives) {
+        QString driveName = drive.absolutePath();
+        QStandardItem* driveItem = new QStandardItem(iconProvider.icon(drive), driveName);
+        driveItem->setData(driveName, Qt::UserRole + 1);
+        driveItem->appendRow(new QStandardItem("Loading..."));
+        m_model->appendRow(driveItem);
     }
+
+    m_treeView->setModel(m_model);
+    connect(m_treeView, &QTreeView::expanded, this, &NavPanel::onItemExpanded);
 
     // 树形控件样式美化
     m_treeView->setStyleSheet(
@@ -75,20 +96,53 @@ void NavPanel::initUi() {
  * @brief 设置当前显示的根路径并自动展开
  */
 void NavPanel::setRootPath(const QString& path) {
-    QModelIndex index = m_fileModel->index(path);
-    if (index.isValid()) {
-        m_treeView->expand(index);
-        m_treeView->scrollTo(index);
-        m_treeView->setCurrentIndex(index);
-    }
+    Q_UNUSED(path);
+    // 由于改为扁平化快捷入口列表，不再支持 setRootPath 的树深度同步
 }
 
 /**
  * @brief 当用户点击目录时，发出信号告知外部组件（如内容面板）
  */
 void NavPanel::onTreeClicked(const QModelIndex& index) {
-    QString path = m_fileModel->filePath(index);
-    emit directorySelected(path);
+    QString path = index.data(Qt::UserRole + 1).toString();
+    if (!path.isEmpty() && path != "computer://") {
+        emit directorySelected(path);
+    } else if (path == "computer://") {
+        emit directorySelected("computer://");
+    }
+}
+
+void NavPanel::onItemExpanded(const QModelIndex& index) {
+    QStandardItem* item = m_model->itemFromIndex(index);
+    if (!item) return;
+
+    // 如果只有一个 Loading 子项，则触发真实加载
+    if (item->rowCount() == 1 && item->child(0)->text() == "Loading...") {
+        fetchChildDirs(item);
+    }
+}
+
+void NavPanel::fetchChildDirs(QStandardItem* parent) {
+    QString path = parent->data(Qt::UserRole + 1).toString();
+    if (path.isEmpty() || path == "computer://") return;
+
+    parent->removeRows(0, parent->rowCount());
+
+    QDir dir(path);
+    QFileInfoList list = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    QFileIconProvider iconProvider;
+
+    for (const QFileInfo& info : list) {
+        QStandardItem* child = new QStandardItem(iconProvider.icon(info), info.fileName());
+        child->setData(info.absoluteFilePath(), Qt::UserRole + 1);
+
+        // 探测是否有子目录，有则加占位符
+        QDir subDir(info.absoluteFilePath());
+        if (!subDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty()) {
+            child->appendRow(new QStandardItem("Loading..."));
+        }
+        parent->appendRow(child);
+    }
 }
 
 } // namespace ArcMeta

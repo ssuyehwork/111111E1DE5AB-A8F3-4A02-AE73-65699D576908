@@ -363,8 +363,9 @@ QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, 
     );
 
     // 整行可点击容器
+    // 增加高度至 24px 以适配各种系统缩放，避免文字截断
     ClickableRow* row = new ClickableRow(cb);
-    row->setFixedHeight(22);
+    row->setFixedHeight(24);
 
     QHBoxLayout* rl = new QHBoxLayout(row);
     rl->setContentsMargins(12, 0, 8, 0);

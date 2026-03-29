@@ -24,6 +24,9 @@ public:
      */
     void setRootPath(const QString& path);
 
+private slots:
+    void onItemExpanded(const QModelIndex& index);
+
 signals:
     /**
      * @brief 当用户点击目录时发出信号
@@ -33,9 +36,10 @@ signals:
 
 private:
     void initUi();
+    void fetchChildDirs(QStandardItem* parent);
     
     QTreeView* m_treeView = nullptr;
-    QFileSystemModel* m_fileModel = nullptr;
+    QStandardItemModel* m_model = nullptr;
     QVBoxLayout* m_mainLayout = nullptr;
 
 private slots:

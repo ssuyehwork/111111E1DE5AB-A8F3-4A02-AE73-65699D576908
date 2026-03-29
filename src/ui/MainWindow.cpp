@@ -211,6 +211,7 @@ void MainWindow::initUi() {
     // 5b. FilterPanel 勾选变化 -> 内容面板过滤
     connect(m_filterPanel, &FilterPanel::filterChanged, [this](const FilterState& state) {
         m_contentPanel->applyFilters(state);
+        updateStatusBar(); // 筛选后立即更新底栏可见项目总数
     });
 
     // 6. 工具栏路径跳转
@@ -448,6 +449,32 @@ void MainWindow::setupCustomTitleBarButtons() {
         return btn;
     };
 
+    m_btnCreate = createTitleBtn("ruler_spacing");
+    m_btnCreate->setToolTip("新建...");
+    QMenu* createMenu = new QMenu(m_btnCreate);
+    createMenu->setStyleSheet(
+        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; }"
+        "QMenu::item { height: 26px; padding: 0 20px 0 10px; border-radius: 3px; font-size: 12px; }"
+        "QMenu::item:selected { background-color: #378ADD; }"
+    );
+
+    QAction* actNewFolder = createMenu->addAction(UiHelper::getIcon("folder", QColor("#EEEEEE")), "创建文件夹");
+    QAction* actNewMd     = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建 Markdown");
+    QAction* actNewTxt    = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)");
+
+    m_btnCreate->setMenu(createMenu);
+    // 强制显示下拉箭头（可选，这里保持精简直接点击弹出）
+    connect(m_btnCreate, &QPushButton::clicked, [this]() {
+        m_btnCreate->showMenu();
+    });
+
+    auto handleCreate = [this](const QString& type) {
+        m_contentPanel->createNewItem(type);
+    };
+    connect(actNewFolder, &QAction::triggered, [handleCreate](){ handleCreate("folder"); });
+    connect(actNewMd,     &QAction::triggered, [handleCreate](){ handleCreate("md"); });
+    connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
+
     m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
     m_btnPinTop->setCheckable(true);
     m_btnPinTop->setChecked(m_isPinned);
@@ -459,6 +486,7 @@ void MainWindow::setupCustomTitleBarButtons() {
     m_btnMax = createTitleBtn("maximize");
     m_btnClose = createTitleBtn("close", "#e81123"); // 关闭按钮悬停红色
 
+    layout->addWidget(m_btnCreate);
     layout->addWidget(m_btnPinTop);
     layout->addWidget(m_btnMin);
     layout->addWidget(m_btnMax);
@@ -554,8 +582,9 @@ void MainWindow::updateNavButtons() {
 void MainWindow::updateStatusBar() {
     if (!m_statusLeft || !m_statusCenter || !m_statusRight) return;
     
-    int total = m_contentPanel->model()->rowCount();
-    m_statusLeft->setText(QString("%1 个项目").arg(total));
+    // 修正：显示经过过滤后的可见项目总数
+    int visibleCount = m_contentPanel->getProxyModel()->rowCount();
+    m_statusLeft->setText(QString("%1 个项目").arg(visibleCount));
     m_statusCenter->setText(m_currentPath == "computer://" ? "此电脑" : m_currentPath);
     m_statusRight->setText(""); // 选中时由 selectionChanged 更新
 }

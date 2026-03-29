@@ -138,6 +138,11 @@ public slots:
     void applyFilters(const FilterState& state);
     void applyFilters(); // 使用保存的状态重新应用
 
+    /**
+     * @brief 创建新条目（文件夹/Markdown/Txt）
+     */
+    void createNewItem(const QString& type);
+
 protected:
     void wheelEvent(QWheelEvent* event) override;
 };
@@ -152,6 +157,7 @@ public:
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
 
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
