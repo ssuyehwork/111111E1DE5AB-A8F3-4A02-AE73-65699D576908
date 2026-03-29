@@ -230,10 +230,10 @@ void MetaPanel::initUi() {
     chkPinned = new QCheckBox("置顶条目", m_container); 
     chkPinned->setStyleSheet(
         "QCheckBox { font-size: 11px; color: #5F5E5A; spacing: 5px; }"
-        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: #1E1E1E; }"
+        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: transparent; }"
         "QCheckBox::indicator:checked { "
         "   border: 1px solid #378ADD; "
-        "   background: #1E1E1E; "
+        "   background: transparent; "
         "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
         "}"
     );

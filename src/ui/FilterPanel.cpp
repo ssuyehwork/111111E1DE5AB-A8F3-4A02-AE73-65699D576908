@@ -341,20 +341,18 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     wl->setContentsMargins(0, 0, 0, 0);
     wl->setSpacing(0);
 
-    QToolButton* hdr = new QToolButton(wrapper);
+    // 2026-03-xx 彻底解决对齐问题：将 QToolButton 更换为 QPushButton，移除多余内部渲染逻辑
+    QPushButton* hdr = new QPushButton(wrapper);
     hdr->setText(title); // 2026-03-xx 按照用户要求，移除硬编码空格，统一使用 QSS 边距控制
     hdr->setCheckable(true);
     hdr->setChecked(true);
-    // hdr->setArrowType(Qt::DownArrow); // 核心红线：禁止使用或显示三角形
-    hdr->setToolButtonStyle(Qt::ToolButtonTextOnly); // 2026-03-xx 强制仅文本，防止图标空间干扰左对齐
     hdr->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     hdr->setFixedHeight(24);
     hdr->setStyleSheet(
-        "QToolButton { background: #252525; border: none; border-top: 1px solid #333;"
+        "QPushButton { background: #252525; border: none; border-top: 1px solid #333;"
         "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
         "              padding-left: 12px; } "
-        "QToolButton:hover { color: #EEEEEE; } "
-        "QToolButton::menu-indicator { image: none; }"); // 彻底移除可能的菜单箭头占位
+        "QPushButton:hover { color: #EEEEEE; } ");
 
     QWidget* content = new QWidget(wrapper);
     content->setStyleSheet("QWidget { background: transparent; }");
@@ -362,10 +360,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     outContentLayout->setContentsMargins(0, 0, 0, 0);
     outContentLayout->setSpacing(0);
 
-    connect(hdr, &QToolButton::toggled, content, &QWidget::setVisible);
-    // connect(hdr, &QToolButton::toggled, [hdr](bool checked) {
-    //     hdr->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-    // });
+    connect(hdr, &QPushButton::toggled, content, &QWidget::setVisible);
 
     wl->addWidget(hdr);
     wl->addWidget(content);
@@ -375,15 +370,15 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
 // ─── addFilterRow ─────────────────────────────────────────────────
 QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, int count, const QColor& dotColor) {
     QCheckBox* cb = new QCheckBox();
-    // 2026-03-xx 按照用户要求，仅保留蓝色勾选标记 (#378ADD)，背景保持深色
+    // 2026-03-xx 彻底解决实心背景问题：将 background 设为 transparent
     cb->setStyleSheet(
         "QCheckBox { spacing: 0px; }"
         "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444;"
-        "                       border-radius: 2px; background: #1A1A1A; }"
+        "                       border-radius: 2px; background: transparent; }"
         "QCheckBox::indicator:hover { border: 1px solid #666; }"
         "QCheckBox::indicator:checked { "
         "   border: 1px solid #378ADD; "
-        "   background: #1A1A1A; "
+        "   background: transparent; "
         "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
         "}"
     );
