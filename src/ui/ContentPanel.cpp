@@ -325,13 +325,13 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         }
 
         if (view) {
-            auto indexes = view->selectionModel()->selectedIndexes();
-            if (indexes.isEmpty()) return false;
+            auto selectedIdxs = view->selectionModel()->selectedIndexes();
+            if (selectedIdxs.isEmpty()) return false;
 
             // 极致性能：批量更新逻辑封装
             auto updateBatch = [&](std::function<void(AmMetaJson&, const std::wstring&, const QModelIndex&)> updater) {
                 std::map<std::wstring, std::vector<std::pair<QModelIndex, std::wstring>>> groups;
-                for (const auto& idx : indexes) {
+                for (const auto& idx : selectedIdxs) {
                     if (idx.column() != 0) continue;
                     QString p = idx.data(PathRole).toString();
                     if (p.isEmpty()) continue;
@@ -393,8 +393,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
             if (keyEvent->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier)) {
                 if (keyEvent->key() == Qt::Key_C) {
                     QStringList paths;
-                    auto indexes = view->selectionModel()->selectedIndexes();
-                    for (const auto& idx : indexes) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(PathRole).toString());
+                    for (const auto& idx : selectedIdxs) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(PathRole).toString());
                     if (!paths.isEmpty()) QApplication::clipboard()->setText(paths.join("\r\n"));
                     return true;
                 }
@@ -416,8 +415,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
             if (keyEvent->modifiers() & Qt::ControlModifier) {
                 if (keyEvent->key() == Qt::Key_C && !(keyEvent->modifiers() & Qt::ShiftModifier)) {
                     QList<QUrl> urls;
-                    auto indexes = view->selectionModel()->selectedIndexes();
-                    for (const auto& idx : indexes) if (idx.column() == 0) urls << QUrl::fromLocalFile(idx.data(PathRole).toString());
+                    for (const auto& idx : selectedIdxs) if (idx.column() == 0) urls << QUrl::fromLocalFile(idx.data(PathRole).toString());
                     if (!urls.isEmpty()) {
                         QMimeData* mime = new QMimeData();
                         mime->setUrls(urls);
@@ -639,9 +637,9 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         fileOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
         if (SHFileOperationW(&fileOp) == 0) loadDirectory(m_currentPath);
     } else if (actionText == "置顶 / 取消置顶") {
-        auto indexes = view->selectionModel()->selectedIndexes();
+        auto selectedIdxs = view->selectionModel()->selectedIndexes();
         std::map<std::wstring, std::vector<std::pair<QModelIndex, std::wstring>>> groups;
-        for (const auto& idx : indexes) {
+        for (const auto& idx : selectedIdxs) {
             if (idx.column() != 0) continue;
             QString p = idx.data(PathRole).toString();
             if (p.isEmpty()) continue;
