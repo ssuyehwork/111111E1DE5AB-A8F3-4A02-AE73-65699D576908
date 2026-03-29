@@ -10,15 +10,13 @@
 #include <QFileInfo>
 #include <QIcon>
 #include <QStandardPaths>
+#include <QThreadPool>
+#include <QPersistentModelIndex>
 
 namespace ArcMeta {
 
-/**
- * @brief 构造函数，设置面板属性
- */
 NavPanel::NavPanel(QWidget* parent)
     : QWidget(parent) {
-    // 设置面板宽度（遵循文档：导航面板 200px）
     setFixedWidth(200);
     setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
 
@@ -29,11 +27,7 @@ NavPanel::NavPanel(QWidget* parent)
     initUi();
 }
 
-/**
- * @brief 初始化 UI 组件
- */
 void NavPanel::initUi() {
-    // 面板标题
     QLabel* titleLabel = new QLabel("本地目录", this);
     titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526;");
     m_mainLayout->addWidget(titleLabel);
@@ -45,37 +39,59 @@ void NavPanel::initUi() {
     m_treeView->setExpandsOnDoubleClick(true);
 
     m_model = new QStandardItemModel(this);
-    QFileIconProvider iconProvider;
 
-    // 1. 新增：桌面入口 (使用系统原生图标)
-    QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
-    QStandardItem* desktopItem = new QStandardItem(iconProvider.icon(QFileInfo(desktopPath)), "桌面");
-    desktopItem->setData(desktopPath, Qt::UserRole + 1);
-    // 增加虚拟子项以便显示展开箭头
+    // 1. 占位：桌面
+    QIcon desktopIcon = UiHelper::getIcon("layers", QColor("#B0B0B0"));
+    QStandardItem* desktopItem = new QStandardItem(desktopIcon, "桌面");
+    QString deskPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    desktopItem->setData(deskPath, Qt::UserRole + 1);
     desktopItem->appendRow(new QStandardItem("Loading..."));
     m_model->appendRow(desktopItem);
 
-    // 2. 新增：此电脑入口 (使用系统原生图标)
-    // 对于此电脑这种虚拟路径，尝试用 Computer 专用图标，若失败则回退到系统驱动器图标
-    QIcon computerIcon = iconProvider.icon(QFileIconProvider::Computer);
+    // 2. 占位：此电脑
+    QIcon computerIcon = UiHelper::getIcon("nav_next", QColor("#B0B0B0"));
     QStandardItem* computerItem = new QStandardItem(computerIcon, "此电脑");
     computerItem->setData("computer://", Qt::UserRole + 1);
     m_model->appendRow(computerItem);
 
-    // 3. 磁盘列表
+    // 3. 占位：磁盘列表
+    QIcon driveIcon = UiHelper::getIcon("folder", QColor("#B0B0B0"));
     const auto drives = QDir::drives();
     for (const QFileInfo& drive : drives) {
         QString driveName = drive.absolutePath();
-        QStandardItem* driveItem = new QStandardItem(iconProvider.icon(drive), driveName);
+        QStandardItem* driveItem = new QStandardItem(driveIcon, driveName);
         driveItem->setData(driveName, Qt::UserRole + 1);
         driveItem->appendRow(new QStandardItem("Loading..."));
         m_model->appendRow(driveItem);
     }
 
+    // 2026-03-xx 架构修复：使用 QPersistentModelIndex 确保异步更新 UI Item 的内存安全
+    // 捕获 QPersistentModelIndex 而非裸指针，防止在加载图标时切换模型导致崩溃
+    for (int row = 0; row < m_model->rowCount(); ++row) {
+        QPersistentModelIndex pIdx(m_model->index(row, 0));
+        QString path = pIdx.data(Qt::UserRole + 1).toString();
+
+        QThreadPool::globalInstance()->start([this, pIdx, path]() {
+            QFileIconProvider iconProvider;
+            QIcon realIcon;
+            if (path == "computer://") {
+                realIcon = iconProvider.icon(QFileIconProvider::Computer);
+            } else {
+                realIcon = iconProvider.icon(QFileInfo(path));
+            }
+
+            // 回调：校验索引有效性后才操作
+            QMetaObject::invokeMethod(this, [this, pIdx, realIcon]() {
+                if (pIdx.isValid()) {
+                    m_model->itemFromIndex(pIdx)->setIcon(realIcon);
+                }
+            }, Qt::QueuedConnection);
+        });
+    }
+
     m_treeView->setModel(m_model);
     connect(m_treeView, &QTreeView::expanded, this, &NavPanel::onItemExpanded);
 
-    // 树形控件样式美化 (禁止使用或显示三角形)
     m_treeView->setStyleSheet(
         "QTreeView { background-color: transparent; border: none; font-size: 12px; selection-background-color: #378ADD; outline: none; }"
         "QTreeView::item { height: 28px; padding-left: 4px; color: #EEEEEE; }"
@@ -86,24 +102,16 @@ void NavPanel::initUi() {
         "QTreeView::branch:open:has-children:has-siblings { border-image: none; image: none; }"
     );
 
-    // 滚动条样式
     m_treeView->verticalScrollBar()->setStyleSheet(
         "QScrollBar:vertical { background: transparent; width: 4px; }"
         "QScrollBar::handle:vertical { background: #444444; border-radius: 4px; }"
     );
 
     connect(m_treeView, &QTreeView::clicked, this, &NavPanel::onTreeClicked);
-
     m_mainLayout->addWidget(m_treeView);
 }
 
-/**
- * @brief 设置当前显示的根路径并自动展开
- */
-void NavPanel::setRootPath(const QString& path) {
-    Q_UNUSED(path);
-    // 由于改为扁平化快捷入口列表，不再支持 setRootPath 的树深度同步
-}
+void NavPanel::setRootPath(const QString& path) { Q_UNUSED(path); }
 
 void NavPanel::selectPath(const QString& path) {
     for (int i = 0; i < m_model->rowCount(); ++i) {
@@ -116,24 +124,14 @@ void NavPanel::selectPath(const QString& path) {
     }
 }
 
-/**
- * @brief 当用户点击目录时，发出信号告知外部组件（如内容面板）
- */
 void NavPanel::onTreeClicked(const QModelIndex& index) {
     QString path = index.data(Qt::UserRole + 1).toString();
-    if (!path.isEmpty() && path != "computer://") {
-        emit directorySelected(path);
-    } else if (path == "computer://") {
-        emit directorySelected("computer://");
-    }
+    if (!path.isEmpty()) emit directorySelected(path);
 }
 
 void NavPanel::onItemExpanded(const QModelIndex& index) {
     QStandardItem* item = m_model->itemFromIndex(index);
-    if (!item) return;
-
-    // 如果只有一个 Loading 子项，则触发真实加载
-    if (item->rowCount() == 1 && item->child(0)->text() == "Loading...") {
+    if (item && item->rowCount() == 1 && item->child(0)->text() == "Loading...") {
         fetchChildDirs(item);
     }
 }
@@ -143,21 +141,33 @@ void NavPanel::fetchChildDirs(QStandardItem* parent) {
     if (path.isEmpty() || path == "computer://") return;
 
     parent->removeRows(0, parent->rowCount());
-
     QDir dir(path);
     QFileInfoList list = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
-    QFileIconProvider iconProvider;
+
+    QIcon folderIcon = UiHelper::getIcon("folder", QColor("#B0B0B0"));
 
     for (const QFileInfo& info : list) {
-        QStandardItem* child = new QStandardItem(iconProvider.icon(info), info.fileName());
-        child->setData(info.absoluteFilePath(), Qt::UserRole + 1);
+        QStandardItem* child = new QStandardItem(folderIcon, info.fileName());
+        QString fullPath = info.absoluteFilePath();
+        child->setData(fullPath, Qt::UserRole + 1);
         
-        // 探测是否有子目录，有则加占位符
-        QDir subDir(info.absoluteFilePath());
+        QDir subDir(fullPath);
         if (!subDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty()) {
             child->appendRow(new QStandardItem("Loading..."));
         }
         parent->appendRow(child);
+
+        // 2026-03-xx：下层展开同样基于 QPersistentModelIndex 异步获取真实图标
+        QPersistentModelIndex pIdx(child->index());
+        QThreadPool::globalInstance()->start([this, pIdx, fullPath]() {
+            QFileIconProvider iconProvider;
+            QIcon realIcon = iconProvider.icon(QFileInfo(fullPath));
+            QMetaObject::invokeMethod(this, [this, pIdx, realIcon]() {
+                if (pIdx.isValid()) {
+                    m_model->itemFromIndex(pIdx)->setIcon(realIcon);
+                }
+            }, Qt::QueuedConnection);
+        });
     }
 }
 
