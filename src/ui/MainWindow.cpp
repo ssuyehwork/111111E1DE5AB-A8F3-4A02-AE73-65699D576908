@@ -520,7 +520,7 @@ void MainWindow::setupCustomTitleBarButtons() {
     QMenu* createMenu = new QMenu(m_btnCreate);
     createMenu->setStyleSheet(
         "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 6px; }"
-        "QMenu::item { height: 26px; padding: 0 20px 0 10px; border-radius: 6px; font-size: 12px; }"
+        "QMenu::item { height: 26px; padding: 0 20px 0 10px; border-radius: 3px; font-size: 12px; }"
         "QMenu::item:selected { background-color: #505050; }"
         "QMenu::right-arrow { image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRUVFRUVFIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iOSAxOCAxNSAxMiA5IDYiPjwvcG9seWxpbmU+PC9zdmc+); width: 12px; height: 12px; right: 8px; }"
     );
@@ -680,7 +680,7 @@ void MainWindow::onPinToggled(bool checked) {
 
 #ifdef Q_OS_WIN
     HWND hwnd = (HWND)winId();
-    // 使用 SWP_NOSENDCHANGING 拦截冗余消息，SWP_NOREDRAW 避免不必要的闪烁
+    // 使用 SWP_NOSENDCHANGING 拦截冗余消息，减少 UI 线程的消息风暴，从而解决卡顿
     SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #else
