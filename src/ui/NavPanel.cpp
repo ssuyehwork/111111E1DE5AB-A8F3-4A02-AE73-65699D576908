@@ -20,11 +20,19 @@ NavPanel::NavPanel(QWidget* parent)
     : QWidget(parent) {
     // 设置面板宽度（遵循文档：导航面板 230px）
     setFixedWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
+    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
+
+    // 还原 1px 焦点线
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
 
     initUi();
 }
@@ -40,6 +48,8 @@ void NavPanel::initUi() {
     m_mainLayout->addWidget(titleLabel);
 
     m_treeView = new QTreeView(this);
+    m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHeaderHidden(true);
     m_treeView->setAnimated(true);
     m_treeView->setIndentation(16);
@@ -87,11 +97,6 @@ void NavPanel::initUi() {
         "QTreeView::branch:open:has-children:has-siblings { border-image: none; image: none; }"
     );
 
-    // 滚动条样式
-    m_treeView->verticalScrollBar()->setStyleSheet(
-        "QScrollBar:vertical { background: transparent; width: 4px; }"
-        "QScrollBar::handle:vertical { background: #444444; border-radius: 4px; }"
-    );
 
     connect(m_treeView, &QTreeView::clicked, this, &NavPanel::onTreeClicked);
 

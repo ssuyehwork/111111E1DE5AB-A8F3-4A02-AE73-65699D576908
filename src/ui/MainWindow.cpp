@@ -21,6 +21,7 @@
 #include <QApplication>
 #include <QSettings>
 #include <QCloseEvent>
+#include <QGraphicsDropShadowEffect>
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>
@@ -54,19 +55,26 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 应用全局样式（包括滚动条美化）
     QString qss = R"(
-        QMainWindow { background-color: #1E1E1E; }
-        
+        QMainWindow { background-color: #1A1A1A; }
+
+        /* 核心容器样式还原 */
+        #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
+            background-color: #1E1E1E;
+            border: 1px solid #333333;
+            border-radius: 0px;
+        }
+
         /* 全局滚动条美化 */
         QScrollBar:vertical {
             border: none;
-            background: #1E1E1E;
-            width: 8px;
-            margin: 0px 0px 0px 0px;
+            background: transparent;
+            width: 4px;
+            margin: 0px;
         }
         QScrollBar::handle:vertical {
             background: #333333;
             min-height: 20px;
-            border-radius: 4px;
+            border-radius: 2px;
         }
         QScrollBar::handle:vertical:hover {
             background: #444444;
@@ -80,14 +88,14 @@ MainWindow::MainWindow(QWidget* parent)
 
         QScrollBar:horizontal {
             border: none;
-            background: #1E1E1E;
-            height: 8px;
-            margin: 0px 0px 0px 0px;
+            background: transparent;
+            height: 4px;
+            margin: 0px;
         }
         QScrollBar::handle:horizontal {
             background: #333333;
             min-width: 20px;
-            border-radius: 4px;
+            border-radius: 2px;
         }
         QScrollBar::handle:horizontal:hover {
             background: #444444;
@@ -99,7 +107,7 @@ MainWindow::MainWindow(QWidget* parent)
             background: none;
         }
 
-        /* 统一复选框样式：2026-03-xx 按照用户要求，仅保留蓝色勾选标记，背景保持深色 */
+        /* 统一复选框样式 */
         QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
         QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1E1E1E; }
         QCheckBox::indicator:hover { border: 1px solid #666; }
@@ -113,7 +121,7 @@ MainWindow::MainWindow(QWidget* parent)
         QLineEdit {
             background: #1E1E1E;
             border: 1px solid #333333;
-            border-radius: 6px;
+            border-radius: 4px;
             color: #EEEEEE;
             padding-left: 8px;
         }
@@ -381,7 +389,7 @@ void MainWindow::initToolbar() {
     // 2026-03-xx 按照用户最新要求：地址栏高度还原为 32px
     m_pathStack->setFixedHeight(32);
     m_pathStack->setMinimumWidth(300);
-    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
+    m_pathStack->setStyleSheet("QStackedWidget { background: transparent; border: 1px solid #444444; border-radius: 4px; }");
 
     // A. 面包屑视图
     m_breadcrumbBar = new BreadcrumbBar(m_pathStack);
@@ -419,7 +427,7 @@ void MainWindow::initToolbar() {
     // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
     m_searchEdit->setFixedHeight(32);
     m_searchEdit->setStyleSheet(
-        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
+        "QLineEdit { background: transparent; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"
     );
 
@@ -431,15 +439,15 @@ void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     centralC->setStyleSheet("background-color: #1E1E1E;"); // 强制还原背景色
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(5, 5, 5, 5); // 全局 5px 外边距
-    mainL->setSpacing(5); // 各元素垂直间距统一 5px
+    mainL->setContentsMargins(0, 0, 0, 0); // 物理 0 边距
+    mainL->setSpacing(0); // 物理 0 间距
 
     QWidget* addressBar = new QWidget(centralC);
     addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);
-    addrL->setSpacing(5); // 地址栏内部按鈕间距 5px
+    addrL->setSpacing(0);
 
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);
@@ -449,14 +457,39 @@ void MainWindow::setupSplitters() {
 
     // --- 主拆分条（5px handleWidth） ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(5); // 拆分条 5px
+    m_mainSplitter->setHandleWidth(1); // 拆分条 5px
     m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #2A2A2A; }");
 
     m_categoryPanel = new CategoryPanel(this);
+    m_categoryPanel->setObjectName("SidebarContainer");
+
     m_navPanel = new NavPanel(this);
+    m_navPanel->setObjectName("ListContainer");
+
     m_contentPanel = new ContentPanel(this);
+    m_contentPanel->setObjectName("EditorContainer");
+
     m_metaPanel = new MetaPanel(this);
+    m_metaPanel->setObjectName("MetadataContainer");
+
     m_filterPanel = new FilterPanel(this);
+    m_filterPanel->setObjectName("FilterContainer");
+
+    // 为每个面板应用阴影效果 (1:1 还原旧版本参数)
+    auto applyShadow = [this](QWidget* w) {
+        auto* shadow = new QGraphicsDropShadowEffect(w);
+        shadow->setBlurRadius(10);
+        shadow->setXOffset(0);
+        shadow->setYOffset(4);
+        shadow->setColor(QColor(0, 0, 0, 150));
+        w->setGraphicsEffect(shadow);
+    };
+
+    applyShadow(m_categoryPanel);
+    applyShadow(m_navPanel);
+    applyShadow(m_contentPanel);
+    applyShadow(m_metaPanel);
+    applyShadow(m_filterPanel);
 
     m_mainSplitter->addWidget(m_categoryPanel);
     m_mainSplitter->addWidget(m_navPanel);
@@ -469,7 +502,7 @@ void MainWindow::setupSplitters() {
     statusBar->setFixedHeight(28);
     statusBar->setStyleSheet("QWidget { background-color: #252525; border-top: 1px solid #333333; }");
     QHBoxLayout* statusL = new QHBoxLayout(statusBar);
-    statusL->setContentsMargins(10, 0, 10, 0);
+    statusL->setContentsMargins(5, 0, 5, 0);
     statusL->setSpacing(0);
 
     m_statusLeft = new QLabel("就绪中...", statusBar);

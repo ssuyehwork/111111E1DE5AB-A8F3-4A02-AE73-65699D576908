@@ -73,16 +73,24 @@ private:
 // ─── FilterPanel ──────────────────────────────────────────────────
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     setFixedWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
+    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
+    // 还原 1px 焦点线
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
+
     // 顶部标题栏
     QWidget* topBar = new QWidget(this);
     topBar->setFixedHeight(32);
-    topBar->setStyleSheet("QWidget { background: #252525; border-bottom: 1px solid #333; }");
+    topBar->setStyleSheet("QWidget { background: #252526; border-bottom: 1px solid #333333; }");
     QHBoxLayout* topL = new QHBoxLayout(topBar);
     topL->setContentsMargins(8, 0, 8, 0);
 
@@ -106,6 +114,8 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
 
     // 滚动内容区
     m_scrollArea = new QScrollArea(this);
+    m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_scrollArea->setWidgetResizable(true);
     m_scrollArea->setStyleSheet("QScrollArea { border: none; background: transparent; }");
 
@@ -350,7 +360,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     hdr->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     hdr->setFixedHeight(24);
     hdr->setStyleSheet(
-        "QToolButton { background: #252525; border: none; border-top: 1px solid #333;"
+        "QToolButton { background: #252526; border: none; border-top: 1px solid #333333;"
         "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
         "              padding-left: 12px; } "
         "QToolButton:hover { color: #EEEEEE; } "
@@ -394,7 +404,7 @@ QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, 
     row->setFixedHeight(24);
 
     QHBoxLayout* rl = new QHBoxLayout(row);
-    rl->setContentsMargins(12, 0, 8, 0);
+    rl->setContentsMargins(4, 0, 4, 0);
     rl->setSpacing(5);
     rl->addWidget(cb);
 

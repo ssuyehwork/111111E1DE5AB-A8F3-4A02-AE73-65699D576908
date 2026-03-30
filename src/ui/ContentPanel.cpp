@@ -157,11 +157,19 @@ protected:
 ContentPanel::ContentPanel(QWidget* parent)
     : QWidget(parent) {
     setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
+    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
+
+    // 还原 1px 焦点线
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
 
     m_model = new QStandardItemModel(this);
     m_proxyModel = new FilterProxyModel(this);
@@ -213,7 +221,7 @@ void ContentPanel::initUi() {
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
-    contentWrapper->setContentsMargins(10, 10, 10, 10);
+    contentWrapper->setContentsMargins(0, 0, 0, 0);
     contentWrapper->setSpacing(0);
     contentWrapper->addWidget(m_viewStack);
     
@@ -423,6 +431,8 @@ void ContentPanel::setViewMode(ViewMode mode) {
 
 void ContentPanel::initGridView() {
     m_gridView = new QListView(this);
+    m_gridView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_gridView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_gridView->setViewMode(QListView::IconMode);
     m_gridView->setMovement(QListView::Static);
     m_gridView->setSpacing(8);
@@ -430,7 +440,7 @@ void ContentPanel::initGridView() {
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
     m_gridView->setGridSize(QSize(126, 156)); // 遵循规范: W=96+30, H=96+60
-    m_gridView->setSpacing(10);
+    m_gridView->setSpacing(0);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
 
@@ -457,6 +467,8 @@ void ContentPanel::initGridView() {
 
 void ContentPanel::initListView() {
     m_treeView = new QTreeView(this);
+    m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setSortingEnabled(true);
     m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     m_treeView->setSelectionMode(QAbstractItemView::ExtendedSelection);

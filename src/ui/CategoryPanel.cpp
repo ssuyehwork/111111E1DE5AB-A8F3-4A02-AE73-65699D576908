@@ -25,11 +25,19 @@ namespace ArcMeta {
 CategoryPanel::CategoryPanel(QWidget* parent)
     : QWidget(parent) {
     setFixedWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
+    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
     
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
+
+    // 还原 1px 焦点线
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
     
     initUi();
     setupContextMenu(); // 初始化 Action 指针
@@ -63,8 +71,8 @@ void CategoryPanel::initUi() {
 void CategoryPanel::initTopStats() {
     m_statsWidget = new QWidget(this);
     m_statsLayout = new QVBoxLayout(m_statsWidget);
-    m_statsLayout->setContentsMargins(12, 8, 12, 8); // 缩小上下边距
-    m_statsLayout->setSpacing(2); // 还原紧凑间距
+    m_statsLayout->setContentsMargins(0, 0, 0, 0); // 缩小上下边距
+    m_statsLayout->setSpacing(0); // 还原紧凑间距
     
     addStatItem("all_data", "全部数据", 0);
     addStatItem("today", "今日数据", 0);
@@ -85,7 +93,7 @@ void CategoryPanel::addStatItem(const QString& iconKey, const QString& name, int
     QWidget* item = new QWidget(this);
     item->setFixedHeight(26); // 恢复紧凑型物理约束
     QHBoxLayout* layout = new QHBoxLayout(item);
-    layout->setContentsMargins(12, 0, 12, 0);
+    layout->setContentsMargins(4, 0, 4, 0);
     layout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(this);
@@ -124,6 +132,8 @@ bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
  */
 void CategoryPanel::initCategoryTree() {
     m_treeView = new QTreeView(this);
+    m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHeaderHidden(true);
     m_treeView->setIndentation(16);
     m_treeView->setAnimated(true);
@@ -133,10 +143,6 @@ void CategoryPanel::initCategoryTree() {
     m_treeView->setDragDropMode(QAbstractItemView::InternalMove);
     m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     
-    m_treeView->verticalScrollBar()->setStyleSheet(
-        "QScrollBar:vertical { background: transparent; width: 4px; }"
-        "QScrollBar::handle:vertical { background: #444444; border-radius: 2px; }"
-    );
 
     m_treeView->setStyleSheet(
         "QTreeView { background-color: transparent; border: none; font-size: 12px; selection-background-color: #378ADD; }"

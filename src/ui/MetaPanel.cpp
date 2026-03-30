@@ -194,10 +194,19 @@ void ColorPickerWidget::mousePressEvent(QMouseEvent* e) {
 // --- MetaPanel ---
 MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
     setFixedWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
+    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
     m_mainLayout = new QVBoxLayout(this); 
     m_mainLayout->setContentsMargins(0, 0, 0, 0); 
     m_mainLayout->setSpacing(0);
+
+    // 还原 1px 焦点线
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
+
     initUi();
 }
 
@@ -209,13 +218,15 @@ void MetaPanel::initUi() {
     m_mainLayout->addWidget(titleLabel);
 
     m_scrollArea = new QScrollArea(this); 
+    m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_scrollArea->setWidgetResizable(true); 
     m_scrollArea->setStyleSheet("QScrollArea { border: none; background: transparent; }");
 
     m_container = new QWidget(m_scrollArea); 
     m_containerLayout = new QVBoxLayout(m_container); 
-    m_containerLayout->setContentsMargins(12, 12, 12, 12); 
-    m_containerLayout->setSpacing(12);
+    m_containerLayout->setContentsMargins(0, 0, 0, 0);
+    m_containerLayout->setSpacing(0);
 
     addInfoRow("名称", lblName); 
     addInfoRow("类型", lblType); 
@@ -314,7 +325,7 @@ void MetaPanel::initUi() {
 void MetaPanel::addInfoRow(const QString& label, QLabel*& valueLabel) {
     QWidget* row = new QWidget(m_container); 
     QVBoxLayout* rl = new QVBoxLayout(row); 
-    rl->setContentsMargins(0, 0, 0, 0); 
+    rl->setContentsMargins(4, 0, 4, 0); // 物理缩减左右边距
     rl->setSpacing(2);
     QLabel* kl = new QLabel(label, row); 
     kl->setStyleSheet("font-size: 11px; color: #5F5E5A;");
