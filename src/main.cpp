@@ -18,6 +18,7 @@
  * 2026-03-xx 按照用户要求：在手动运行 .exe 时，通过日志文件排查初始化挂起或信号丢失问题。
  */
 void customMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
+    Q_UNUSED(context); // 显式消除未引用参数警告以满足编译严苛性要求
     QFile logFile("arcmeta_debug.log");
     // 采用追加模式，并确保每次写入都刷新到磁盘
     if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
