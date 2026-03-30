@@ -17,7 +17,7 @@ namespace ArcMeta {
  * @brief 分类面板（面板一）
  * 包含：顶部统计区、中间分类树区、底部工具栏
  */
-class CategoryPanel : public QWidget {
+class CategoryPanel : public QFrame {
     Q_OBJECT
 
 public:

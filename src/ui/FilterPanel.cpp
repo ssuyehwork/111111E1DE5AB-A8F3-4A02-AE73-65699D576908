@@ -72,30 +72,26 @@ private:
 };
 
 // ─── FilterPanel ──────────────────────────────────────────────────
-FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
+FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
+    setObjectName("FilterContainer");
+    setAttribute(Qt::WA_StyledBackground, true);
     setFixedWidth(230);
-    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
-    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
+
+    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
+    // 统一将文字颜色设为 #EEEEEE
+    setStyleSheet("color: #EEEEEE;");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    // 还原 1px 焦点线
-    m_focusLine = new QWidget(this);
-    m_focusLine->setObjectName("focusLine");
-    m_focusLine->setFixedHeight(1);
-    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_focusLine->setStyleSheet("background-color: #2ecc71;");
-    m_focusLine->hide();
-    m_mainLayout->addWidget(m_focusLine);
 
     // 顶部标题栏
     QWidget* topBar = new QWidget(this);
     topBar->setObjectName("ContainerHeader");
     topBar->setFixedHeight(32);
     QHBoxLayout* topL = new QHBoxLayout(topBar);
-    topL->setContentsMargins(15, 0, 4, 0);
+    topL->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
     topL->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(topBar);

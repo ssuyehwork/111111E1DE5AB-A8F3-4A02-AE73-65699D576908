@@ -13,7 +13,7 @@ namespace ArcMeta {
  * @brief 导航面板（面板二）
  * 使用 QTreeView + QFileSystemModel 实现文件夹树导航
  */
-class NavPanel : public QWidget {
+class NavPanel : public QFrame {
     Q_OBJECT
 
 public:

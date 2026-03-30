@@ -23,21 +23,24 @@ namespace ArcMeta {
  * @brief 构造函数，设置面板属性
  */
 CategoryPanel::CategoryPanel(QWidget* parent)
-    : QWidget(parent) {
+    : QFrame(parent) {
+    setObjectName("SidebarContainer");
+    setAttribute(Qt::WA_StyledBackground, true);
     setFixedWidth(230);
-    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
-    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
+
+    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
+    setStyleSheet("color: #EEEEEE;");
     
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    // 还原 1px 焦点线
+    // 还原 1px 焦点线 (物理逻辑：统一绿色 #2ecc71，且无边框以防视觉重叠)
     m_focusLine = new QWidget(this);
     m_focusLine->setObjectName("focusLine");
     m_focusLine->setFixedHeight(1);
     m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->setStyleSheet("background-color: #2ecc71; border: none;");
     m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
     
@@ -54,7 +57,7 @@ void CategoryPanel::initUi() {
     header->setObjectName("ContainerHeader");
     header->setFixedHeight(32);
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 15, 0);
+    headerLayout->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);

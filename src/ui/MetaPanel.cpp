@@ -192,22 +192,17 @@ void ColorPickerWidget::mousePressEvent(QMouseEvent* e) {
 }
 
 // --- MetaPanel ---
-MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
+MetaPanel::MetaPanel(QWidget* parent) : QFrame(parent) {
+    setObjectName("MetadataContainer");
+    setAttribute(Qt::WA_StyledBackground, true);
     setFixedWidth(230); 
-    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
-    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
+
+    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
+    setStyleSheet("color: #EEEEEE;");
     m_mainLayout = new QVBoxLayout(this); 
     m_mainLayout->setContentsMargins(0, 0, 0, 0); 
     m_mainLayout->setSpacing(0);
 
-    // 还原 1px 焦点线
-    m_focusLine = new QWidget(this);
-    m_focusLine->setObjectName("focusLine");
-    m_focusLine->setFixedHeight(1);
-    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_focusLine->setStyleSheet("background-color: #2ecc71;");
-    m_focusLine->hide();
-    m_mainLayout->addWidget(m_focusLine);
 
     initUi();
 }
@@ -218,7 +213,7 @@ void MetaPanel::initUi() {
     header->setObjectName("ContainerHeader");
     header->setFixedHeight(32);
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 4, 0);
+    headerLayout->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);

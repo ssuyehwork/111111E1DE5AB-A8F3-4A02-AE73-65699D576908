@@ -27,7 +27,7 @@ struct FilterState {
  * 由 MainWindow 在目录切换后调用 populate() 驱动数据填充。
  * 每行整体可点击（不需要对准复选框）。
  */
-class FilterPanel : public QWidget {
+class FilterPanel : public QFrame {
     Q_OBJECT
 
 public:

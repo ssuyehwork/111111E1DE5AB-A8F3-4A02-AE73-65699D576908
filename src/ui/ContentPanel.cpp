@@ -155,23 +155,18 @@ protected:
 
 
 ContentPanel::ContentPanel(QWidget* parent)
-    : QWidget(parent) {
+    : QFrame(parent) {
+    setObjectName("EditorContainer");
+    setAttribute(Qt::WA_StyledBackground, true);
     setMinimumWidth(200);
-    // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
-    setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
+
+    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
+    setStyleSheet("color: #EEEEEE;");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    // 还原 1px 焦点线
-    m_focusLine = new QWidget(this);
-    m_focusLine->setObjectName("focusLine");
-    m_focusLine->setFixedHeight(1);
-    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_focusLine->setStyleSheet("background-color: #2ecc71;");
-    m_focusLine->hide();
-    m_mainLayout->addWidget(m_focusLine);
 
     m_model = new QStandardItemModel(this);
     m_proxyModel = new FilterProxyModel(this);
@@ -187,7 +182,7 @@ void ContentPanel::initUi() {
     titleBar->setObjectName("ContainerHeader");
     titleBar->setFixedHeight(32);
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
-    titleL->setContentsMargins(15, 2, 15, 0);
+    titleL->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
 
     QLabel* iconLabel = new QLabel(titleBar);
     iconLabel->setPixmap(UiHelper::getIcon("eye", QColor("#41F2F2"), 18).pixmap(18, 18));

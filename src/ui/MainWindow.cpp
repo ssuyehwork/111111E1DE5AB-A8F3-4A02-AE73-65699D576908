@@ -57,14 +57,14 @@ MainWindow::MainWindow(QWidget* parent)
     QString qss = R"(
         QMainWindow { background-color: #1A1A1A; }
 
-        /* 核心容器样式还原 */
+        /* 核心容器样式还原 - 强化 1 像素物理切割感 */
         #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
             background-color: #1E1E1E;
             border: 1px solid #333333;
             border-radius: 0px;
         }
 
-        /* 容器标题栏样式 (还原 252526 背景与 1px 下切割线) */
+        /* 容器标题栏样式 (还原旧版 #252526 实色背景与下边框) */
         #ContainerHeader {
             background-color: #252526;
             border-bottom: 1px solid #333333;
@@ -470,18 +470,16 @@ void MainWindow::updateFocusLines() {
 
     checkFocus(m_categoryPanel, m_sidebarFocusLine);
     checkFocus(m_navPanel,      m_listFocusLine);
-    checkFocus(m_contentPanel,  m_editorFocusLine);
-    checkFocus(m_metaPanel,     m_metaFocusLine);
-    checkFocus(m_filterPanel,   m_filterFocusLine);
 
 }
 
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
-    centralC->setStyleSheet("background-color: #1E1E1E;"); // 强制还原背景色
+    // 核心修正：父容器背景必须透明或匹配主色，以便 Splitter 的 5px 物理缝隙能显示出底色差异
+    centralC->setStyleSheet("background-color: transparent;");
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(5, 5, 5, 5); // 物理还原 5px 边距
-    mainL->setSpacing(5); // 物理还原 5px 间距
+    mainL->setContentsMargins(5, 5, 5, 5); // 物理还原 5px 全局边距
+    mainL->setSpacing(5); // 物理还原 5px 垂直间距
 
     QWidget* addressBar = new QWidget(centralC);
     addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
@@ -496,10 +494,11 @@ void MainWindow::setupSplitters() {
     addrL->addWidget(m_pathStack, 1);
     addrL->addWidget(m_searchEdit);
 
-    // --- 主拆分条（5px handleWidth） ---
+    // --- 主拆分条 (严格 5px 物理缝隙，Handle 透明以突出容器 1px 边框) ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(5); // 物理还原 5px 宽度
-    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #2A2A2A; }");
+    m_mainSplitter->setHandleWidth(5);
+    m_mainSplitter->setChildrenCollapsible(false);
+    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: transparent; }");
 
     m_categoryPanel = new CategoryPanel(this);
     m_categoryPanel->setObjectName("SidebarContainer");
@@ -511,15 +510,12 @@ void MainWindow::setupSplitters() {
     
     m_contentPanel = new ContentPanel(this);
     m_contentPanel->setObjectName("EditorContainer");
-    m_editorFocusLine = m_contentPanel->findChild<QWidget*>("focusLine");
     
     m_metaPanel = new MetaPanel(this);
     m_metaPanel->setObjectName("MetadataContainer");
-    m_metaFocusLine = m_metaPanel->findChild<QWidget*>("focusLine");
     
     m_filterPanel = new FilterPanel(this);
     m_filterPanel->setObjectName("FilterContainer");
-    m_filterFocusLine = m_filterPanel->findChild<QWidget*>("focusLine");
 
     // 为每个面板应用阴影效果 (1:1 还原旧版本参数)
     auto applyShadow = [this](QWidget* w) {

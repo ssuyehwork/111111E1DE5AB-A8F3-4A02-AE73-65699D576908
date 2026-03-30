@@ -65,12 +65,9 @@ private:
     MetaPanel* m_metaPanel = nullptr;
     FilterPanel* m_filterPanel = nullptr;
 
-    // 焦点线架构 (1px 边缘高亮)
+    // 焦点线架构 (1px 边缘高亮 - 仅前二面板具备)
     QWidget* m_sidebarFocusLine = nullptr;
     QWidget* m_listFocusLine = nullptr;
-    QWidget* m_editorFocusLine = nullptr;
-    QWidget* m_metaFocusLine = nullptr;
-    QWidget* m_filterFocusLine = nullptr;
 
     QSplitter* m_mainSplitter = nullptr;
 

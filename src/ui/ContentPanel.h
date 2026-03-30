@@ -31,7 +31,7 @@ enum ItemRole {
  * @brief 内容面板（面板四）：核心业务展示区
  * 支持网格视图（QListView）与列表视图（QTreeView）切换
  */
-class ContentPanel : public QWidget {
+class ContentPanel : public QFrame {
     Q_OBJECT
 
 public:

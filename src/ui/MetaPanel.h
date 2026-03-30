@@ -103,7 +103,7 @@ private:
 /**
  * @brief 元数据面板（面板五）
  */
-class MetaPanel : public QWidget {
+class MetaPanel : public QFrame {
     Q_OBJECT
 public:
     explicit MetaPanel(QWidget* parent = nullptr);
