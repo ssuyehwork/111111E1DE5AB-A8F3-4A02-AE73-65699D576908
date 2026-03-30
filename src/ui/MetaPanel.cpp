@@ -139,14 +139,8 @@ void StarRatingWidget::paintEvent(QPaintEvent*) {
 }
 
 void StarRatingWidget::mousePressEvent(QMouseEvent* e) { 
-    int starW = 24; // starSize(20) + spacing(4)
-    int r = (e->pos().x() / starW) + 1; 
-    // 判定是否真的点在星星矩形内 (0..20 像素)
-    if ((e->pos().x() % starW) > 20) return; 
-
-    m_rating = (r == m_rating) ? 0 : qBound(0, r, 5); 
-    update(); 
-    emit ratingChanged(m_rating); 
+    // 2026-03-xx 按照用户要求：星级仅显示，禁止点击修改
+    e->accept();
 }
 
 // --- ColorPickerWidget ---
@@ -182,13 +176,8 @@ void ColorPickerWidget::paintEvent(QPaintEvent*) {
 }
 
 void ColorPickerWidget::mousePressEvent(QMouseEvent* e) { 
-    int idx = e->pos().x() / 24; 
-    if (idx >= 0 && idx < (int)m_colors.size()) { 
-        std::wstring c = m_colors[idx].name; 
-        m_currentColor = (c == m_currentColor) ? L"" : c; 
-        update(); 
-        emit colorChanged(m_currentColor); 
-    } 
+    // 2026-03-xx 按照用户要求：颜色标记仅显示，禁止点击修改
+    e->accept();
 }
 
 // --- MetaPanel ---
@@ -270,6 +259,9 @@ void MetaPanel::initUi() {
     m_containerLayout->addWidget(createSeparator());
 
     chkPinned = new QCheckBox("置顶条目", m_container); 
+    // 2026-03-xx 按照用户要求：置顶仅显示勾选状态，禁止用户交互
+    chkPinned->setAttribute(Qt::WA_TransparentForMouseEvents);
+    chkPinned->setFocusPolicy(Qt::NoFocus);
     chkPinned->setStyleSheet(
         "QCheckBox { font-size: 11px; color: #5F5E5A; spacing: 5px; }"
         "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: #1E1E1E; }"
