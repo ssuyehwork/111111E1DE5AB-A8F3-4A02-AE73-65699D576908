@@ -439,8 +439,8 @@ void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     centralC->setStyleSheet("background-color: #1E1E1E;"); // 强制还原背景色
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(5, 5, 5, 5); // 物理还原 5px 边距
-    mainL->setSpacing(5); // 物理还原 5px 间距
+    mainL->setContentsMargins(0, 0, 0, 0); // 还原旧版全局 0 边距
+    mainL->setSpacing(0); // 还原旧版全局 0 间距
 
     QWidget* addressBar = new QWidget(centralC);
     addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
@@ -458,7 +458,7 @@ void MainWindow::setupSplitters() {
     // --- 主拆分条（5px handleWidth） ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
     m_mainSplitter->setHandleWidth(5); // 物理还原 5px 宽度
-    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #2A2A2A; }");
+    m_mainSplitter->setStyleSheet("QSplitter { background: transparent; border: none; } QSplitter::handle { background: transparent; }");
 
     m_categoryPanel = new CategoryPanel(this);
     m_categoryPanel->setObjectName("SidebarContainer");
@@ -474,6 +474,14 @@ void MainWindow::setupSplitters() {
 
     m_filterPanel = new FilterPanel(this);
     m_filterPanel->setObjectName("FilterContainer");
+
+    // 2026-03-xx 按照旧版架构：在主拆分条外层套入 5px 边距容器
+    QWidget* splitterContainer = new QWidget(centralC);
+    QVBoxLayout* scLayout = new QVBoxLayout(splitterContainer);
+    scLayout->setContentsMargins(5, 5, 5, 5);
+    scLayout->setSpacing(0);
+    scLayout->addWidget(m_mainSplitter);
+    mainL->addWidget(splitterContainer, 1);
 
     // 为每个面板应用阴影效果 (1:1 还原旧版本参数)
     auto applyShadow = [this](QWidget* w) {
@@ -538,7 +546,7 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusRight, 1);
 
     mainL->addWidget(addressBar);
-    mainL->addWidget(m_mainSplitter, 1);
+    // splitterContainer 已经在上面通过 scLayout->addWidget(m_mainSplitter) 和 mainL->addWidget(splitterContainer, 1) 加入了
     mainL->addWidget(statusBar);
 
     setCentralWidget(centralC);

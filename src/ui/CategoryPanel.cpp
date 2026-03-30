@@ -24,7 +24,7 @@ namespace ArcMeta {
  */
 CategoryPanel::CategoryPanel(QWidget* parent)
     : QWidget(parent) {
-    setFixedWidth(230);
+    setMinimumWidth(230);
     // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
     setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
     

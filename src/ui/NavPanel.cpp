@@ -19,7 +19,7 @@ namespace ArcMeta {
 NavPanel::NavPanel(QWidget* parent)
     : QWidget(parent) {
     // 设置面板宽度（遵循文档：导航面板 230px）
-    setFixedWidth(230);
+    setMinimumWidth(230);
     // 移除 border: none 确保 MainWindow 的 ID 选择器边框能生效
     setStyleSheet("QWidget { background-color: transparent; color: #EEEEEE; }");
 
@@ -42,9 +42,10 @@ NavPanel::NavPanel(QWidget* parent)
  */
 void NavPanel::initUi() {
     // 面板标题
-    QLabel* titleLabel = new QLabel("本地目录", this);
+    // 2026-03-xx 还原旧版架构：第二个容器标识为“笔记列表”，颜色为绿色 #2ecc71
+    QLabel* titleLabel = new QLabel("笔记列表", this);
     titleLabel->setFixedHeight(32);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #2ecc71; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
     m_mainLayout->addWidget(titleLabel);
 
     m_treeView = new QTreeView(this);
