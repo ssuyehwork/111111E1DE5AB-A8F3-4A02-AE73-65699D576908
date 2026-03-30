@@ -108,14 +108,33 @@ private:
     QString m_currentPath;
     void updateGridSize();
 
-    void addItemsFromDirectory(const QString& path, bool recursive,
-                               QMap<int, int>& ratingCounts,
-                               QMap<QString, int>& colorCounts,
-                               QMap<QString, int>& tagCounts,
-                               QMap<QString, int>& typeCounts,
-                               QMap<QString, int>& createDateCounts,
-                               QMap<QString, int>& modifyDateCounts,
-                               int& noTagCount);
+    /**
+     * @brief 分帧加载核心逻辑：从队列中取出并处理下一批次
+     */
+    void processLoadBatch();
+
+    // 异步加载管理
+    QTimer* m_loadTimer = nullptr;
+    QFileInfoList m_loadQueue;
+    struct MftLoadEntry {
+        std::wstring name;
+        std::wstring volume;
+        unsigned long long frn;
+        bool isDir;
+    };
+    QList<MftLoadEntry> m_mftLoadQueue; // 用于搜索结果的异步加载
+    bool m_isSearching = false;
+
+    // 统计累加器
+    QMap<int, int>     m_accRating;
+    QMap<QString, int> m_accColor;
+    QMap<QString, int> m_accTag;
+    QMap<QString, int> m_accType;
+    QMap<QString, int> m_accCreateDate;
+    QMap<QString, int> m_accModifyDate;
+    int m_accNoTagCount = 0;
+
+    void addItemsToQueue(const QString& path, bool recursive);
 
 public slots:
     void onSelectionChanged();

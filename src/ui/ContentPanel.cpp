@@ -169,6 +169,11 @@ ContentPanel::ContentPanel(QWidget* parent)
 
     m_zoomLevel = 96;
 
+    // 2026-03-xx 按照用户要求：初始化异步加载定时器
+    m_loadTimer = new QTimer(this);
+    m_loadTimer->setInterval(10); // 10ms 间隔，给 UI 线程充分的喘息机会
+    connect(m_loadTimer, &QTimer::timeout, this, &ContentPanel::processLoadBatch);
+
     initUi();
 }
 
@@ -618,8 +623,22 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
 }
 
 void ContentPanel::loadDirectory(const QString& path, bool recursive) {
+    m_loadTimer->stop();
+    m_loadQueue.clear();
+    m_mftLoadQueue.clear();
+    m_isSearching = false;
+
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
+
+    // 2026-03-xx 按照用户要求：重置统计累加器
+    m_accRating.clear();
+    m_accColor.clear();
+    m_accTag.clear();
+    m_accType.clear();
+    m_accCreateDate.clear();
+    m_accModifyDate.clear();
+    m_accNoTagCount = 0;
 
     // 空路径 → 展示此电脑（所有驱动器）
     if (path.isEmpty() || path == "computer://") {
@@ -627,13 +646,6 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
         
-        QMap<int, int>     ratingCounts;
-        QMap<QString, int> colorCounts;
-        QMap<QString, int> tagCounts;
-        QMap<QString, int> typeCounts;
-        QMap<QString, int> createDateCounts;
-        QMap<QString, int> modifyDateCounts;
-
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
@@ -644,56 +656,38 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             item->setData(false, IsLockedRole);
 
             QList<QStandardItem*> row;
-            row << item;
-            row << new QStandardItem("-");
-            row << new QStandardItem("磁盘分区");
-            row << new QStandardItem("-");
+            row << item << new QStandardItem("-") << new QStandardItem("磁盘分区") << new QStandardItem("-");
             m_model->appendRow(row);
-
-            typeCounts["folder"]++;
+            m_accType["folder"]++;
         }
-        // 发送统计数据，使筛选面板更新（例如显示“文件夹(8)”）
-        emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                                  createDateCounts, modifyDateCounts);
+        emit directoryStatsReady(m_accRating, m_accColor, m_accTag, m_accType, m_accCreateDate, m_accModifyDate);
         return;
     }
 
     m_currentPath = path;
-    
-    QMap<int, int>     ratingCounts;
-    QMap<QString, int> colorCounts;
-    QMap<QString, int> tagCounts;
-    QMap<QString, int> typeCounts;
-    QMap<QString, int> createDateCounts;
-    QMap<QString, int> modifyDateCounts;
-    int noTagCount = 0;
-
-    addItemsFromDirectory(path, recursive, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
-
-    applyFilters();
-
-    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
-    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                              createDateCounts, modifyDateCounts);
+    addItemsToQueue(path, recursive);
+    m_loadTimer->start();
 }
 
-void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
-                                       QMap<int, int>& ratingCounts,
-                                       QMap<QString, int>& colorCounts,
-                                       QMap<QString, int>& tagCounts,
-                                       QMap<QString, int>& typeCounts,
-                                       QMap<QString, int>& createDateCounts,
-                                       QMap<QString, int>& modifyDateCounts,
-                                       int& noTagCount) 
-{
+void ContentPanel::addItemsToQueue(const QString& path, bool recursive) {
     QDir dir(path);
     if (!dir.exists()) return;
 
     QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
-    QFileIconProvider iconProvider;
+    m_loadQueue.append(entries);
 
-    // 2026-03-xx 重构：彻底抛弃单目录 AmMetaJson 加载，改为从 MetadataManager 内存镜像读取
-    QDate today    = QDate::currentDate();
+    if (recursive) {
+        for (const QFileInfo& info : entries) {
+            if (info.isDir()) addItemsToQueue(info.absoluteFilePath(), true);
+        }
+    }
+}
+
+void ContentPanel::processLoadBatch() {
+    int processed = 0;
+    const int batchSize = 100; // 2026-03-xx 按照用户要求：分帧处理，每批次 100 个
+    QFileIconProvider iconProvider;
+    QDate today = QDate::currentDate();
     QDate yesterday = today.addDays(-1);
 
     auto dateKey = [&](const QDate& d) -> QString {
@@ -702,56 +696,76 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         return d.toString("yyyy-MM-dd");
     };
 
-    for (const QFileInfo& info : entries) {
-        QString fileName = info.fileName();
-        if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
+    while (processed < batchSize) {
+        QString fileName, fullPath, suffix;
+        bool isDir = false;
+        QFileInfo info;
 
-        QString fullPath = info.absoluteFilePath();
+        if (m_isSearching) {
+            if (m_mftLoadQueue.isEmpty()) break;
+            auto entry = m_mftLoadQueue.takeFirst();
+            fileName = QString::fromStdWString(entry.name);
+            if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
+
+            std::wstring fullWPath = PathBuilder::getPath(entry.volume, entry.frn);
+            fullPath = QString::fromStdWString(fullWPath);
+            if (fullPath.isEmpty()) {
+                fullPath = QString::fromStdWString(entry.volume) + "[FRN:" + QString::number(entry.frn, 16) + "]";
+            }
+            info = QFileInfo(fullPath);
+            isDir = entry.isDir;
+            suffix = info.suffix().toUpper();
+        } else {
+            if (m_loadQueue.isEmpty()) break;
+            info = m_loadQueue.takeFirst();
+            fileName = info.fileName();
+            if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
+            fullPath = info.absoluteFilePath();
+            isDir = info.isDir();
+            suffix = info.suffix().toUpper();
+        }
+
         QList<QStandardItem*> row;
         auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
         nameItem->setData(fullPath, PathRole);
-        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
+        nameItem->setData(isDir ? "folder" : "file", TypeRole);
 
-        // 元数据反填 + 统计 (接入 L1 缓存)
         RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
-        
-        int     itemRating = runtimeMeta.rating;
-        QString itemColor  = QString::fromStdWString(runtimeMeta.color);
-        QStringList itemTags = runtimeMeta.tags;
-        bool    hasTags = !itemTags.isEmpty();
-
-        nameItem->setData(itemRating, RatingRole);
-        nameItem->setData(itemColor, ColorRole);
+        nameItem->setData(runtimeMeta.rating, RatingRole);
+        nameItem->setData(QString::fromStdWString(runtimeMeta.color), ColorRole);
         nameItem->setData(runtimeMeta.pinned, IsLockedRole);
         nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
-        nameItem->setData(itemTags, TagsRole);
+        nameItem->setData(runtimeMeta.tags, TagsRole);
 
-        for (const auto& t : itemTags) {
-            tagCounts[t]++;
+        m_accRating[runtimeMeta.rating]++;
+        m_accColor[QString::fromStdWString(runtimeMeta.color)]++;
+        if (runtimeMeta.tags.isEmpty()) m_accNoTagCount++;
+        else {
+            for (const auto& t : runtimeMeta.tags) m_accTag[t]++;
         }
-
-        // 评级统计
-        ratingCounts[itemRating]++;
-        // 颜色统计
-        colorCounts[itemColor]++;
-        // 无标签计数
-        if (!hasTags) noTagCount++;
-        // 文件类型统计
-        typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
-        // 创建日期统计
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        // 修改日期统计
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
+        m_accType[isDir ? "folder" : suffix]++;
+        m_accCreateDate[dateKey(info.birthTime().date())]++;
+        m_accModifyDate[dateKey(info.lastModified().date())]++;
 
         row << nameItem;
-        row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
-        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
+        if (m_isSearching) {
+            row << new QStandardItem(fullPath);
+            row << new QStandardItem(isDir ? "文件夹" : (suffix.isEmpty() ? "文件" : suffix + " 文件"));
+        } else {
+            row << new QStandardItem(isDir ? "-" : QString::number(info.size() / 1024) + " KB");
+            row << new QStandardItem(isDir ? "文件夹" : suffix + " 文件");
+        }
         row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
         m_model->appendRow(row);
 
-        if (recursive && info.isDir()) {
-            addItemsFromDirectory(fullPath, true, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
-        }
+        processed++;
+    }
+
+    if ((!m_isSearching && m_loadQueue.isEmpty()) || (m_isSearching && m_mftLoadQueue.isEmpty())) {
+        m_loadTimer->stop();
+        if (m_accNoTagCount > 0) m_accTag["__none__"] = m_accNoTagCount;
+        emit directoryStatsReady(m_accRating, m_accColor, m_accTag, m_accType, m_accCreateDate, m_accModifyDate);
+        applyFilters();
     }
 }
 
@@ -759,84 +773,25 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
 
 void ContentPanel::search(const QString& query) {
     if (query.isEmpty()) return;
+    m_loadTimer->stop();
+    m_loadQueue.clear();
+    m_mftLoadQueue.clear();
+    m_isSearching = true;
+
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "路径", "类型", "修改时间"});
 
+    m_accRating.clear(); m_accColor.clear(); m_accTag.clear(); m_accType.clear();
+    m_accCreateDate.clear(); m_accModifyDate.clear(); m_accNoTagCount = 0;
+
     auto results = MftReader::instance().search(query.toStdWString());
-    QFileIconProvider iconProvider;
-
-    QMap<int, int>     ratingCounts;
-    QMap<QString, int> colorCounts;
-    QMap<QString, int> tagCounts;
-    QMap<QString, int> typeCounts;
-    QMap<QString, int> createDateCounts;
-    QMap<QString, int> modifyDateCounts;
-    int noTagCount = 0;
-
-    QDate today = QDate::currentDate();
-    QDate yesterday = today.addDays(-1);
-    auto dateKey = [&](const QDate& d) -> QString {
-        if (d == today)     return "today";
-        if (d == yesterday) return "yesterday";
-        return d.toString("yyyy-MM-dd");
-    };
-
     int count = 0;
     for (const auto& entry : results) {
         if (++count > 1000) break;
-
-        QString fileName = QString::fromStdWString(entry.name);
-        if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
-
-        std::wstring fullWPath = PathBuilder::getPath(entry.volume, entry.frn);
-        QString fullPath = QString::fromStdWString(fullWPath);
-        if (fullPath.isEmpty()) {
-            fullPath = QString::fromStdWString(entry.volume) + "[FRN:" + QString::number(entry.frn, 16) + "]";
-        }
-
-        QFileInfo info(fullPath);
-        QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, PathRole); 
-        nameItem->setData(entry.isDir() ? "folder" : "file", TypeRole);
-        
-        // 2026-03-xx 重构：彻底消除搜索时的 IO 轰炸，接入 MetadataManager 内存镜像
-        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
-
-        int     itemRating = runtimeMeta.rating;
-        QString itemColor  = QString::fromStdWString(runtimeMeta.color);
-        QStringList itemTags = runtimeMeta.tags;
-        bool    hasTags = !itemTags.isEmpty();
-
-        nameItem->setData(itemRating, RatingRole);
-        nameItem->setData(itemColor, ColorRole);
-        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
-        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
-        nameItem->setData(itemTags, TagsRole);
-
-        for (const auto& t : itemTags) {
-            tagCounts[t]++;
-        }
-
-        // 统计累加
-        ratingCounts[itemRating]++;
-        colorCounts[itemColor]++;
-        if (!hasTags) noTagCount++;
-        typeCounts[entry.isDir() ? "folder" : info.suffix().toUpper()]++;
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
-
-        row << nameItem;
-        row << new QStandardItem(fullPath);
-        row << new QStandardItem(entry.isDir() ? "文件夹" : (info.suffix().isEmpty() ? "文件" : info.suffix().toUpper() + " 文件"));
-        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
-
-        m_model->appendRow(row);
+        m_mftLoadQueue.append({entry.name, entry.volume, entry.frn, entry.isDir});
     }
 
-    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
-    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                              createDateCounts, modifyDateCounts);
+    m_loadTimer->start();
 }
 
 void ContentPanel::applyFilters(const FilterState& state) {
