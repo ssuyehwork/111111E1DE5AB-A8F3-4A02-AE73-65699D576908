@@ -38,6 +38,11 @@ file(GLOB_RECURSE SOURCES
 list(APPEND SOURCES 
     "src/ui/BreadcrumbBar.h"
     "src/ui/BreadcrumbBar.cpp"
+    "src/ui/CategoryModel.cpp"
+    "src/ui/CategoryModel.h"
+    "src/ui/CategoryDelegate.h"
+    "src/ui/DropTreeView.cpp"
+    "src/ui/DropTreeView.h"
     "src/core/CoreController.h"
     "src/core/CoreController.cpp"
     "src/meta/MetadataManager.h"

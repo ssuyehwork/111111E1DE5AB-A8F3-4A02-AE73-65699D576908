@@ -1,21 +1,17 @@
 #pragma once
 
-#include <QWidget>
-#include <QTreeView>
-#include <QStandardItemModel>
-#include <QVBoxLayout>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QLabel>
 #include <QFrame>
-#include <QMenu>
-#include <QAction>
+#include <QTreeView>
+#include <QVBoxLayout>
 
 namespace ArcMeta {
 
+class CategoryModel;
+class DropTreeView;
+
 /**
  * @brief 分类面板（面板一）
- * 包含：顶部统计区、中间分类树区、底部工具栏
+ * 还原旧版双树架构
  */
 class CategoryPanel : public QFrame {
     Q_OBJECT
@@ -30,54 +26,23 @@ signals:
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
 
-private:
-    // UI 初始化方法
-    void initUi();
-    void initTopStats();
-    void initCategoryTree();
-    void initBottomToolbar();
+private slots:
+    void onCreateCategory();
+    void onRenameCategory();
+    void onDeleteCategory();
 
-    // 内部组件
+private:
+    void initUi();
+    void setupContextMenu();
+
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     
-    // 统计项容器
-    QWidget* m_statsWidget = nullptr;
-    QVBoxLayout* m_statsLayout = nullptr;
+    DropTreeView* m_systemTree = nullptr;
+    CategoryModel* m_systemModel = nullptr;
 
-    // 分类树
-    QTreeView* m_treeView = nullptr;
-    QStandardItemModel* m_treeModel = nullptr;
-
-    // 底部工具栏
-    QWidget* m_bottomToolbar = nullptr;
-    QLineEdit* m_searchEdit = nullptr;
-    QPushButton* m_addCategoryBtn = nullptr;
-
-    // 内部私有辅助
-    void addStatItem(const QString& iconKey, const QString& name, int count);
-    
-    // 右键菜单 Action 声明
-    void setupContextMenu();
-    QAction* actNewData = nullptr;
-    QAction* actAssignToCategory = nullptr;
-    QAction* actImportData = nullptr;
-    QAction* actExport = nullptr;
-    QAction* actSetColor = nullptr;
-    QAction* actRandomColor = nullptr;
-    QAction* actSetPresetTags = nullptr;
-    QAction* actNewSibling = nullptr;
-    QAction* actNewChild = nullptr;
-    QAction* actTogglePin = nullptr;
-    QAction* actRename = nullptr;
-    QAction* actDelete = nullptr;
-    QAction* actSortByName = nullptr;
-    QAction* actSortByCount = nullptr;
-    QAction* actSortByTime = nullptr;
-    QAction* actPasswordProtect = nullptr;
-
-private slots:
-    void onCustomContextMenuRequested(const QPoint& pos);
+    DropTreeView* m_partitionTree = nullptr;
+    CategoryModel* m_partitionModel = nullptr;
 };
 
 } // namespace ArcMeta
