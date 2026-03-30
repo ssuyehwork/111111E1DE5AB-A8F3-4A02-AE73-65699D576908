@@ -195,7 +195,9 @@ void ColorPickerWidget::mousePressEvent(QMouseEvent* e) {
 MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
     // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
     setMinimumWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
+    this->setObjectName("MetaPanel");
+    setStyleSheet("#MetaPanel { background-color: #1A1A1A; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; } "
+                  "QWidget { border: none; }");
     m_mainLayout = new QVBoxLayout(this); 
     m_mainLayout->setContentsMargins(0, 0, 0, 0); 
     m_mainLayout->setSpacing(0);
@@ -246,7 +248,7 @@ void MetaPanel::initUi() {
     chkPinned = new QCheckBox("置顶条目", m_container); 
     chkPinned->setStyleSheet(
         "QCheckBox { font-size: 11px; color: #5F5E5A; spacing: 5px; }"
-        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: #1E1E1E; }"
+        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 0px; background: #1E1E1E; }"
         "QCheckBox::indicator:checked { "
         "   border: 1px solid #378ADD; "
         "   background: #1E1E1E; "
@@ -298,7 +300,7 @@ void MetaPanel::initUi() {
     btnChangePwd = new QPushButton("修改密码", m_container);
     for (auto b : {btnEncrypt, btnDecrypt, btnChangePwd}) { 
         b->setFixedHeight(32); 
-        b->setStyleSheet("QPushButton { background: #378ADD; border: none; border-radius: 4px; color: white; font-weight: 500; } QPushButton:hover { background: #4A9BEF; }"); 
+        b->setStyleSheet("QPushButton { background: #378ADD; border: none; border-radius: 0px; color: white; font-weight: 500; } QPushButton:hover { background: #4A9BEF; }");
         m_containerLayout->addWidget(b); 
     }
     

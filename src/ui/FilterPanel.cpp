@@ -75,7 +75,9 @@ private:
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
     setMinimumWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
+    this->setObjectName("FilterPanel");
+    setStyleSheet("#FilterPanel { background-color: #1A1A1A; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; } "
+                  "QWidget { border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -103,7 +105,7 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     m_btnClearAll->setProperty("tooltipText", "重置所有筛选条件");
     m_btnClearAll->installEventFilter(this);
     m_btnClearAll->setStyleSheet(
-        "QPushButton { background: #2A2A2A; border: 1px solid #444; border-radius: 6px;"
+        "QPushButton { background: #2A2A2A; border: 1px solid #444; border-radius: 0px;"
         "              color: #AAAAAA; font-size: 11px; }"
         "QPushButton:hover { background: #3A3A3A; color: #EEEEEE; }");
     connect(m_btnClearAll, &QPushButton::clicked, this, &FilterPanel::clearAllFilters);

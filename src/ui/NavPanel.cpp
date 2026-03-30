@@ -20,7 +20,9 @@ NavPanel::NavPanel(QWidget* parent)
     : QWidget(parent) {
     // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
     setMinimumWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
+    this->setObjectName("NavPanel");
+    setStyleSheet("#NavPanel { background-color: #1A1A1A; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; } "
+                  "QWidget { border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -104,7 +106,7 @@ void NavPanel::initUi() {
     // 滚动条样式
     m_treeView->verticalScrollBar()->setStyleSheet(
         "QScrollBar:vertical { background: transparent; width: 4px; }"
-        "QScrollBar::handle:vertical { background: #444444; border-radius: 4px; }"
+        "QScrollBar::handle:vertical { background: #444444; border-radius: 0px; }"
     );
 
     connect(m_treeView, &QTreeView::clicked, this, &NavPanel::onTreeClicked);

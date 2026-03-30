@@ -158,7 +158,9 @@ ContentPanel::ContentPanel(QWidget* parent)
     : QWidget(parent) {
     // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
     setMinimumWidth(230);
-    setStyleSheet("QWidget { background-color: #1A1A1A; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
+    this->setObjectName("ContentPanel");
+    setStyleSheet("#ContentPanel { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; } "
+                  "QWidget { border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -455,8 +457,8 @@ void ContentPanel::initGridView() {
     m_gridView->setStyleSheet(
         "QListView { background-color: transparent; border: none; outline: none; }"
         "QListView::item { background: transparent; }"
-        "QListView::item:selected { background-color: rgba(55, 138, 221, 0.2); border-radius: 6px; }"
-        "QListView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 2px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
+        "QListView::item:selected { background-color: rgba(55, 138, 221, 0.2); border-radius: 4px; }"
+        "QListView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 0px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
     connect(m_gridView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
@@ -478,8 +480,8 @@ void ContentPanel::initListView() {
         "QTreeView { background-color: transparent; border: none; outline: none; font-size: 12px; }"
         "QTreeView::item { height: 28px; color: #EEEEEE; padding-left: 4px; }"
         "QTreeView::item:selected { background-color: #378ADD; }"
-        "QTreeView::item:hover { background-color: rgba(255, 255, 255, 0.05); }"
-        "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 2px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
+        "QTreeView::item:hover { background-color: rgba(255, 255, 255, 0.05); border-radius: 4px; }"
+        "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 0px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
     m_treeView->header()->setStyleSheet(
@@ -912,13 +914,13 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QColor cardBg = isSelected ? QColor("#282828") : (isHovered ? QColor("#2A2A2A") : QColor("#2D2D2D"));
     painter->setPen(isSelected ? QPen(QColor("#3498db"), 2) : QPen(QColor("#333333"), 1));
     painter->setBrush(cardBg);
-    // 2026-03-xx 按照用户要求：卡片圆角由 8px 统一调整为 2px (恢复利落的精致感)
-    painter->drawRoundedRect(cardRect, 2, 2);
+    // 2026-03-xx 按照用户要求：卡片圆角回归 0px (恢复利落的精致感)
+    painter->drawRect(cardRect);
 
     // 2026-03-xx 按照旧版参数：恢复卡片内部的 1px 细线描边
     painter->setPen(QPen(QColor("#333333"), 1));
     painter->setBrush(Qt::NoBrush);
-    painter->drawRoundedRect(cardRect, 2, 2);
+    painter->drawRect(cardRect);
 
     QString path = index.data(PathRole).toString();
     QFileInfo info(path);
@@ -929,8 +931,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
     painter->setPen(Qt::NoPen);
     painter->setBrush(badgeColor);
-    // 2026-03-xx 按照用户要求：卡片内圆角由 4px 统一调整为 2px
-    painter->drawRoundedRect(extRect, 2, 2);
+    // 2026-03-xx 按照用户要求：卡片内圆角回归 0px
+    painter->drawRect(extRect);
     painter->setPen(QColor("#FFFFFF"));
     QFont extFont = painter->font();
     extFont.setPointSize(8);
@@ -995,8 +997,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         if (dotC.isValid()) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(dotC);
-            // 2026-03-xx 按照用户要求：卡片内圆角由 4px 统一调整为 2px
-            painter->drawRoundedRect(nameRect, 2, 2);
+            // 2026-03-xx 按照用户要求：卡片内圆角回归 0px
+            painter->drawRect(nameRect);
             painter->setPen(dotC.lightness() > 180 ? Qt::black : Qt::white);
         } else {
             painter->setPen(QColor("#CCCCCC"));
@@ -1118,7 +1120,7 @@ QWidget* GridItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewI
     QString textColor = tagColorStr.isEmpty() ? "#FFFFFF" : "#000000";
 
     editor->setStyleSheet(
-        QString("QLineEdit { background-color: %1; color: %2; border-radius: 2px; "
+        QString("QLineEdit { background-color: %1; color: %2; border-radius: 0px; "
                 "border: 2px solid #3498db; font-weight: bold; font-size: 8pt; padding: 0px; }")
         .arg(bgColor, textColor)
     );

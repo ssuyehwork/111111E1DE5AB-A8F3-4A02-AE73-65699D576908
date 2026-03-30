@@ -68,7 +68,7 @@ MainWindow::MainWindow(QWidget* parent)
         QScrollBar::handle:vertical {
             background: #333333;
             min-height: 20px;
-            border-radius: 4px;
+            border-radius: 0px;
         }
         QScrollBar::handle:vertical:hover {
             background: #444444;
@@ -89,7 +89,7 @@ MainWindow::MainWindow(QWidget* parent)
         QScrollBar::handle:horizontal {
             background: #333333;
             min-width: 20px;
-            border-radius: 4px;
+            border-radius: 0px;
         }
         QScrollBar::handle:horizontal:hover {
             background: #444444;
@@ -103,7 +103,7 @@ MainWindow::MainWindow(QWidget* parent)
 
         /* 统一复选框样式：2026-03-xx 按照用户要求，仅保留蓝色勾选标记，背景保持深色 */
         QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
-        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1A1A1A; }
+        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 0px; background: #1A1A1A; }
         QCheckBox::indicator:hover { border: 1px solid #666; }
         QCheckBox::indicator:checked { 
             border: 1px solid #378ADD; 
@@ -111,7 +111,7 @@ MainWindow::MainWindow(QWidget* parent)
             image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
         }
 
-        /* 统一输入框样式 */
+        /* 统一输入框样式 (宪法规定 6px) */
         QLineEdit {
             background: #1A1A1A;
             border: 1px solid #333333;
@@ -339,9 +339,9 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
 
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
-    m_toolbar->setFixedHeight(36);
+    m_toolbar->setFixedHeight(32);
     m_toolbar->setMovable(false);
-    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
+    m_toolbar->setStyleSheet("QToolBar { background-color: #252526; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
 
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
@@ -380,10 +380,10 @@ void MainWindow::initToolbar() {
 
     // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
     m_pathStack = new QStackedWidget(this);
-    // 2026-03-xx 按照用户最新要求：地址栏高度由 40px 调整为更紧凑的 38px
-    m_pathStack->setFixedHeight(38); 
+    // 2026-03-xx 按照用户最新要求：地址栏高度调整为 32px 工业标准
+    m_pathStack->setFixedHeight(32);
     m_pathStack->setMinimumWidth(300);
-    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
+    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #333333; border-radius: 0px; }");
 
     // A. 面包屑视图
     m_breadcrumbBar = new BreadcrumbBar(m_pathStack);
@@ -418,11 +418,11 @@ void MainWindow::initToolbar() {
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setFixedWidth(200);
-    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度也调整为 38px
-    m_searchEdit->setFixedHeight(38); 
+    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度也调整为 32px
+    m_searchEdit->setFixedHeight(32);
     m_searchEdit->setStyleSheet(
-        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
-        "QLineEdit:focus { border: 1px solid #FFFFFF; }"
+        "QLineEdit { background: #1E1E1E; border: 1px solid #333333; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
+        "QLineEdit:focus { border: 1px solid #378ADD; }"
     );
 
 }
@@ -439,15 +439,15 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(5, 5, 5, 5); // 全局 5px 外边距
-    mainL->setSpacing(5); // 各元素垂直间距统一 5px
+    mainL->setContentsMargins(0, 0, 0, 0);
+    mainL->setSpacing(0);
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
+    addressBar->setFixedHeight(32);
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
-    addrL->setContentsMargins(0, 0, 0, 0);
-    addrL->setSpacing(5); // 地址栏内部按鈕间距 5px
+    addrL->setContentsMargins(5, 5, 5, 5);
+    addrL->setSpacing(5);
 
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);

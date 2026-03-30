@@ -121,7 +121,7 @@ void ToolTipOverlay::paintEvent(QPaintEvent*) {
     
     p.setPen(QPen(m_currentBorderColor, 1));
     p.setBrush(QColor("#2B2B2B"));
-    p.drawRoundedRect(rectF, 4, 4);
+    p.drawRect(rectF);
     
     p.save();
     p.translate(12, 8); 
