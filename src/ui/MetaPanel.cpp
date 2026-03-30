@@ -194,7 +194,8 @@ void ColorPickerWidget::mousePressEvent(QMouseEvent* e) {
 // --- MetaPanel ---
 MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
     setFixedWidth(240); 
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 2026-03-xx 按照用户要求：为面板容器添加 1 像素边缘线条
+    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; }");
     m_mainLayout = new QVBoxLayout(this); 
     m_mainLayout->setContentsMargins(0, 0, 0, 0); 
     m_mainLayout->setSpacing(0);
@@ -203,8 +204,10 @@ MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
 
 void MetaPanel::initUi() {
     // 面板标题
+    // 2026-03-xx 按照用户要求：统一高度至 36px 并添加 1 像素全边缘线条
     QLabel* titleLabel = new QLabel("元数据详情", this);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526;");
+    titleLabel->setFixedHeight(36);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding-left: 12px; background: #252526; border: 1px solid #333333;");
     m_mainLayout->addWidget(titleLabel);
 
     m_scrollArea = new QScrollArea(this); 

@@ -157,7 +157,8 @@ protected:
 ContentPanel::ContentPanel(QWidget* parent)
     : QWidget(parent) {
     setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1A1A1A; color: #EEEEEE; border: none; }");
+    // 2026-03-xx 按照用户要求：为面板容器添加 1 像素边缘线条
+    setStyleSheet("QWidget { background-color: #1A1A1A; color: #EEEEEE; border: 1px solid #333333; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -174,8 +175,9 @@ ContentPanel::ContentPanel(QWidget* parent)
 
 void ContentPanel::initUi() {
     QWidget* titleBar = new QWidget(this);
-    titleBar->setStyleSheet("background: #252526; border-bottom: 1px solid #333;");
-    titleBar->setFixedHeight(38);
+    // 2026-03-xx 按照用户要求：添加 1 像素边缘线条，统一背景与高度
+    titleBar->setStyleSheet("background: #252526; border: 1px solid #333333;");
+    titleBar->setFixedHeight(36);
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
     titleL->setContentsMargins(12, 0, 12, 0);
 
@@ -213,7 +215,8 @@ void ContentPanel::initUi() {
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
-    contentWrapper->setContentsMargins(10, 10, 10, 10);
+    // 2026-03-xx 修复设计缺陷：移除 10px 的冗余边距，实现内容区与标题栏的像素级对齐
+    contentWrapper->setContentsMargins(0, 0, 0, 0);
     contentWrapper->setSpacing(0);
     contentWrapper->addWidget(m_viewStack);
     
@@ -618,6 +621,10 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
 }
 
 void ContentPanel::loadDirectory(const QString& path, bool recursive) {
+    // 2026-03-xx 修复：切换目录时物理重置过滤器，解决因残留过滤器导致的“文件夹有内容但不显示”的问题。
+    m_currentFilter = FilterState{};
+    applyFilters();
+
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 

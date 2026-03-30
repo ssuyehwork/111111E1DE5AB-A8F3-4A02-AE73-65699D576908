@@ -73,7 +73,8 @@ private:
 // ─── FilterPanel ──────────────────────────────────────────────────
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
     setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 2026-03-xx 按照用户要求：为面板容器添加 1 像素边缘线条
+    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -81,8 +82,9 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
 
     // 顶部标题栏
     QWidget* topBar = new QWidget(this);
-    topBar->setFixedHeight(34);
-    topBar->setStyleSheet("QWidget { background: #252525; border-bottom: 1px solid #333; }");
+    // 2026-03-xx 按照用户要求：统一高度至 36px 并添加 1 像素全边缘线条
+    topBar->setFixedHeight(36);
+    topBar->setStyleSheet("QWidget { background: #252525; border: 1px solid #333333; }");
     QHBoxLayout* topL = new QHBoxLayout(topBar);
     topL->setContentsMargins(8, 0, 8, 0);
 
