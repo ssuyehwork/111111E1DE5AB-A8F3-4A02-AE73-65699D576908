@@ -24,8 +24,13 @@ void MetadataManager::initFromDatabase() {
     std::unique_lock<std::shared_mutex> lock(m_mutex);
     m_cache.clear();
 
+    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属的独立数据库连接，彻底消除跨线程访问警告。
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    if (!db.isOpen()) return;
+
     // 仅载入有元数据的项，减少内存占用
-    QSqlQuery query("SELECT path, rating, color, tags, pinned, encrypted FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1");
+    QSqlQuery query(db);
+    query.exec("SELECT path, rating, color, tags, pinned, encrypted FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1");
     
     while (query.next()) {
         std::wstring path = query.value(0).toString().toStdWString();

@@ -7,7 +7,9 @@
 namespace ArcMeta {
 
 bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta) {
-    QSqlQuery q;
+    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，确保在 SyncQueue 等后台线程中正常保存数据。
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare(R"sql(
         INSERT OR REPLACE INTO items 
         (volume, frn, path, parent_path, type, rating, color, tags, pinned, note, 
@@ -43,7 +45,8 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
 }
 
 bool ItemRepo::markAsDeleted(const std::wstring& volume, const std::wstring& frn) {
-    QSqlQuery q;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("UPDATE items SET deleted = 1 WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
@@ -51,7 +54,8 @@ bool ItemRepo::markAsDeleted(const std::wstring& volume, const std::wstring& frn
 }
 
 bool ItemRepo::removeByFrn(const std::wstring& volume, const std::wstring& frn) {
-    QSqlQuery q;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("DELETE FROM items WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
@@ -59,7 +63,8 @@ bool ItemRepo::removeByFrn(const std::wstring& volume, const std::wstring& frn) 
 }
 
 std::wstring ItemRepo::getPathByFrn(const std::wstring& volume, const std::wstring& frn) {
-    QSqlQuery q;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("SELECT path FROM items WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(frn));
@@ -70,7 +75,8 @@ std::wstring ItemRepo::getPathByFrn(const std::wstring& volume, const std::wstri
 }
 
 bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath) {
-    QSqlQuery q;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("UPDATE items SET path = ?, parent_path = ? WHERE volume = ? AND frn = ?");
     q.addBindValue(QString::fromStdWString(newPath));
     q.addBindValue(QString::fromStdWString(newParentPath));

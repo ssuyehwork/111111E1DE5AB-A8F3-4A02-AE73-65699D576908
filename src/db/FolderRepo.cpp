@@ -7,7 +7,9 @@
 namespace ArcMeta {
 
 bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
-    QSqlQuery q;
+    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，确保在后台同步任务中正确持久化。
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     q.addBindValue(QString::fromStdWString(path));
     q.addBindValue(meta.rating);
@@ -26,7 +28,8 @@ bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
 }
 
 bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
-    QSqlQuery q;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order FROM folders WHERE path = ?");
     q.addBindValue(QString::fromStdWString(path));
     
@@ -50,7 +53,8 @@ bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
 }
 
 bool FolderRepo::remove(const std::wstring& path) {
-    QSqlQuery q;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
     q.prepare("DELETE FROM folders WHERE path = ?");
     q.addBindValue(QString::fromStdWString(path));
     return q.exec();

@@ -4,6 +4,7 @@
 #include <QSqlQuery>
 #include <QDir>
 #include <QStandardPaths>
+#include <QThread>
 
 namespace ArcMeta {
 
@@ -40,6 +41,27 @@ bool Database::init(const std::wstring& dbPath) {
 
 std::wstring Database::getDbPath() const {
     return m_impl->dbPath;
+}
+
+QSqlDatabase Database::getThreadDatabase() {
+    QString connectionName = QString("conn_%1").arg((quintptr)QThread::currentThreadId());
+
+    // 如果该线程已经建立过连接，直接返回现有连接
+    if (QSqlDatabase::contains(connectionName)) {
+        return QSqlDatabase::database(connectionName);
+    }
+
+    // 否则，为新线程建立独立连接
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+    db.setDatabaseName(QString::fromStdWString(m_impl->dbPath));
+    if (db.open()) {
+        // 对新连接同样应用 WAL 优化，防止写入锁死
+        QSqlQuery query(db);
+        query.exec("PRAGMA journal_mode=WAL;");
+        query.exec("PRAGMA synchronous=NORMAL;");
+        query.exec("PRAGMA busy_timeout=5000;");
+    }
+    return db;
 }
 
 void Database::createTables() {

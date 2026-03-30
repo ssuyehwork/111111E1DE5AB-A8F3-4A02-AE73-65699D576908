@@ -26,14 +26,20 @@ SyncEngine& SyncEngine::instance() {
 void SyncEngine::runIncrementalSync() {
     double lastSyncTime = 0;
     
+    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，消除异步任务中的跨线程数据库警告。
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    if (!db.isOpen()) return;
+
     // 获取上次同步时间
-    QSqlQuery st("SELECT value FROM sync_state WHERE key = 'last_sync_time'");
+    QSqlQuery st(db);
+    st.exec("SELECT value FROM sync_state WHERE key = 'last_sync_time'");
     if (st.next()) {
         lastSyncTime = st.value(0).toDouble();
     }
 
     // 执行全表增量扫描逻辑
-    QSqlQuery query("SELECT path FROM folders");
+    QSqlQuery query(db);
+    query.exec("SELECT path FROM folders");
     while (query.next()) {
         std::wstring path = query.value(0).toString().toStdWString();
         std::wstring jsonPath = path + L"\\.am_meta.json";

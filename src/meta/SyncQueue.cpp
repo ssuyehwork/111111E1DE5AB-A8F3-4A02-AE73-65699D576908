@@ -83,17 +83,10 @@ bool SyncQueue::processBatch() {
 
     if (batch.empty()) return false;
 
-    // 关键红线修复：QtSql 连接不能跨线程，为后台线程创建独立连接
-    QString connName = "SyncWorkerConnection";
-    QSqlDatabase db;
-    if (QSqlDatabase::contains(connName)) {
-        db = QSqlDatabase::database(connName);
-    } else {
-        db = QSqlDatabase::addDatabase("QSQLITE", connName);
-        db.setDatabaseName(QString::fromStdWString(Database::instance().getDbPath()));
-    }
+    // 2026-03-xx 统一使用 getThreadDatabase 机制，修复后台同步线程的数据库连接警告。
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
 
-    if (!db.isOpen() && !db.open()) return false;
+    if (!db.isOpen()) return false;
 
     try {
         db.transaction();
