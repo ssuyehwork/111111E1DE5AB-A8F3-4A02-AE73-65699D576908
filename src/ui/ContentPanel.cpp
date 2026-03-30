@@ -166,7 +166,9 @@ ContentPanel::ContentPanel(QWidget* parent)
 
     // 还原 1px 焦点线
     m_focusLine = new QWidget(this);
+    m_focusLine->setObjectName("focusLine");
     m_focusLine->setFixedHeight(1);
+    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_focusLine->setStyleSheet("background-color: #2ecc71;");
     m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
@@ -182,13 +184,17 @@ ContentPanel::ContentPanel(QWidget* parent)
 
 void ContentPanel::initUi() {
     QWidget* titleBar = new QWidget(this);
-    titleBar->setStyleSheet("background: #252526; border-bottom: 1px solid #333;");
+    titleBar->setObjectName("ContainerHeader");
     titleBar->setFixedHeight(32);
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
-    titleL->setContentsMargins(12, 0, 12, 0);
+    titleL->setContentsMargins(15, 2, 15, 0);
+
+    QLabel* iconLabel = new QLabel(titleBar);
+    iconLabel->setPixmap(UiHelper::getIcon("eye", QColor("#41F2F2"), 18).pixmap(18, 18));
+    titleL->addWidget(iconLabel);
 
     QLabel* titleLabel = new QLabel("预览数据", titleBar);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #41F2F2; border: none;");
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #41F2F2; background: transparent; border: none;");
     
     QPushButton* btnLayers = new QPushButton(titleBar);
     btnLayers->setFixedSize(24, 24);

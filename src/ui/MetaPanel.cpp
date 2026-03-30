@@ -202,7 +202,9 @@ MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
 
     // 还原 1px 焦点线
     m_focusLine = new QWidget(this);
+    m_focusLine->setObjectName("focusLine");
     m_focusLine->setFixedHeight(1);
+    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_focusLine->setStyleSheet("background-color: #2ecc71;");
     m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
@@ -211,11 +213,37 @@ MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
 }
 
 void MetaPanel::initUi() {
-    // 面板标题
-    QLabel* titleLabel = new QLabel("元数据详情", this);
-    titleLabel->setFixedHeight(32);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
-    m_mainLayout->addWidget(titleLabel);
+    // 面板标题 (还原旧版架构：Layout + Icon + Text + CloseBtn)
+    QWidget* header = new QWidget(this);
+    header->setObjectName("ContainerHeader");
+    header->setFixedHeight(32);
+    QHBoxLayout* headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(15, 0, 4, 0);
+    headerLayout->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(header);
+    iconLabel->setPixmap(UiHelper::getIcon("all_data", QColor("#4a90e2"), 18).pixmap(18, 18));
+    headerLayout->addWidget(iconLabel);
+
+    QLabel* titleLabel = new QLabel("元数据", header);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; background: transparent; border: none;");
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+
+    QPushButton* closeBtn = new QPushButton(header);
+    closeBtn->setIcon(UiHelper::getIcon("x", QColor("#888888"), 16));
+    closeBtn->setFixedSize(24, 24);
+    closeBtn->setCursor(Qt::PointingHandCursor);
+    closeBtn->setStyleSheet(
+        "QPushButton { background: transparent; border: none; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #3e3e42; }"
+    );
+    connect(closeBtn, &QPushButton::clicked, [this]() {
+        this->hide();
+    });
+    headerLayout->addWidget(closeBtn);
+
+    m_mainLayout->addWidget(header);
 
     m_scrollArea = new QScrollArea(this); 
     m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);

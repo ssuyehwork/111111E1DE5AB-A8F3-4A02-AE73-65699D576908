@@ -82,29 +82,36 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
 
     // 还原 1px 焦点线
     m_focusLine = new QWidget(this);
+    m_focusLine->setObjectName("focusLine");
     m_focusLine->setFixedHeight(1);
+    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_focusLine->setStyleSheet("background-color: #2ecc71;");
     m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
 
     // 顶部标题栏
     QWidget* topBar = new QWidget(this);
+    topBar->setObjectName("ContainerHeader");
     topBar->setFixedHeight(32);
-    topBar->setStyleSheet("QWidget { background: #252526; border-bottom: 1px solid #333333; }");
     QHBoxLayout* topL = new QHBoxLayout(topBar);
-    topL->setContentsMargins(8, 0, 8, 0);
+    topL->setContentsMargins(15, 0, 4, 0);
+    topL->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(topBar);
+    iconLabel->setPixmap(UiHelper::getIcon("filter", QColor("#f1c40f"), 18).pixmap(18, 18));
+    topL->addWidget(iconLabel);
 
     QLabel* title = new QLabel("高级筛选", topBar);
-    title->setStyleSheet("font-size: 13px; font-weight: bold; color: #f1c40f;");
+    title->setStyleSheet("font-size: 13px; font-weight: bold; color: #f1c40f; background: transparent; border: none;");
 
     m_btnClearAll = new QPushButton("清除", topBar);
     m_btnClearAll->setFixedSize(42, 22);
     m_btnClearAll->setProperty("tooltipText", "重置所有筛选条件");
     m_btnClearAll->installEventFilter(this);
     m_btnClearAll->setStyleSheet(
-        "QPushButton { background: #2A2A2A; border: 1px solid #444; border-radius: 6px;"
+        "QPushButton { background: transparent; border: none; border-radius: 4px;"
         "              color: #AAAAAA; font-size: 11px; }"
-        "QPushButton:hover { background: #3A3A3A; color: #EEEEEE; }");
+        "QPushButton:hover { background: #3e3e42; color: #EEEEEE; }");
     connect(m_btnClearAll, &QPushButton::clicked, this, &FilterPanel::clearAllFilters);
 
     topL->addWidget(title);

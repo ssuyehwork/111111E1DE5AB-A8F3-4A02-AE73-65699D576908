@@ -34,7 +34,9 @@ CategoryPanel::CategoryPanel(QWidget* parent)
 
     // 还原 1px 焦点线
     m_focusLine = new QWidget(this);
+    m_focusLine->setObjectName("focusLine");
     m_focusLine->setFixedHeight(1);
+    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_focusLine->setStyleSheet("background-color: #2ecc71;");
     m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
@@ -47,11 +49,24 @@ CategoryPanel::CategoryPanel(QWidget* parent)
  * @brief 初始化整体 UI 结构
  */
 void CategoryPanel::initUi() {
-    // 面板标题
-    QLabel* titleLabel = new QLabel("数据分类", this);
-    titleLabel->setFixedHeight(32);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
-    m_mainLayout->addWidget(titleLabel);
+    // 面板标题 (还原旧版架构：Layout + Icon + Text)
+    QWidget* header = new QWidget(this);
+    header->setObjectName("ContainerHeader");
+    header->setFixedHeight(32);
+    QHBoxLayout* headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(15, 0, 15, 0);
+    headerLayout->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(header);
+    iconLabel->setPixmap(UiHelper::getIcon("category", QColor("#3498db"), 18).pixmap(18, 18));
+    headerLayout->addWidget(iconLabel);
+
+    QLabel* titleLabel = new QLabel("数据分类", header);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; background: transparent; border: none;");
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+
+    m_mainLayout->addWidget(header);
 
     initTopStats();
     

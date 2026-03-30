@@ -64,6 +64,12 @@ MainWindow::MainWindow(QWidget* parent)
             border-radius: 0px;
         }
 
+        /* 容器标题栏样式 (还原 252526 背景与 1px 下切割线) */
+        #ContainerHeader {
+            background-color: #252526;
+            border-bottom: 1px solid #333333;
+        }
+
         /* 全局滚动条美化 */
         QScrollBar:vertical {
             border: none;
@@ -141,6 +147,9 @@ MainWindow::MainWindow(QWidget* parent)
     QTimer::singleShot(100, [this]() {
         m_navPanel->selectPath("computer://");
     });
+
+    // 全局拦截以驱动容器 FocusLine 高亮显隐
+    if (qApp) qApp->installEventFilter(this);
 }
 
 void MainWindow::initUi() {
@@ -340,6 +349,12 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
         ToolTipOverlay::hideTip();
     }
+
+    // 监听全局焦点变化以更新容器高亮线
+    if (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut) {
+        updateFocusLines();
+    }
+
     return QMainWindow::eventFilter(watched, event);
 }
 
@@ -435,6 +450,32 @@ void MainWindow::initToolbar() {
 
 
 
+void MainWindow::updateFocusLines() {
+    QWidget* focus = QApplication::focusWidget();
+
+    // 逻辑：只有在容器可见且获焦时，显示顶部的物理绿色高亮线 (1px)
+    auto checkFocus = [&](QWidget* container, QWidget* focusLine) {
+        if (!container || !focusLine) return;
+
+        bool isChildFocused = false;
+        if (focus) {
+            QWidget* p = focus;
+            while (p) {
+                if (p == container) { isChildFocused = true; break; }
+                p = p->parentWidget();
+            }
+        }
+        focusLine->setVisible(isChildFocused && container->isVisible());
+    };
+
+    checkFocus(m_categoryPanel, m_sidebarFocusLine);
+    checkFocus(m_navPanel,      m_listFocusLine);
+    checkFocus(m_contentPanel,  m_editorFocusLine);
+    checkFocus(m_metaPanel,     m_metaFocusLine);
+    checkFocus(m_filterPanel,   m_filterFocusLine);
+
+}
+
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     centralC->setStyleSheet("background-color: #1E1E1E;"); // 强制还原背景色
@@ -462,18 +503,23 @@ void MainWindow::setupSplitters() {
 
     m_categoryPanel = new CategoryPanel(this);
     m_categoryPanel->setObjectName("SidebarContainer");
+    m_sidebarFocusLine = m_categoryPanel->findChild<QWidget*>("focusLine"); // 假设内部名称为 focusLine
     
     m_navPanel = new NavPanel(this);
     m_navPanel->setObjectName("ListContainer");
+    m_listFocusLine = m_navPanel->findChild<QWidget*>("focusLine");
     
     m_contentPanel = new ContentPanel(this);
     m_contentPanel->setObjectName("EditorContainer");
+    m_editorFocusLine = m_contentPanel->findChild<QWidget*>("focusLine");
     
     m_metaPanel = new MetaPanel(this);
     m_metaPanel->setObjectName("MetadataContainer");
+    m_metaFocusLine = m_metaPanel->findChild<QWidget*>("focusLine");
     
     m_filterPanel = new FilterPanel(this);
     m_filterPanel->setObjectName("FilterContainer");
+    m_filterFocusLine = m_filterPanel->findChild<QWidget*>("focusLine");
 
     // 为每个面板应用阴影效果 (1:1 还原旧版本参数)
     auto applyShadow = [this](QWidget* w) {

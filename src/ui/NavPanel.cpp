@@ -29,7 +29,9 @@ NavPanel::NavPanel(QWidget* parent)
 
     // 还原 1px 焦点线
     m_focusLine = new QWidget(this);
+    m_focusLine->setObjectName("focusLine");
     m_focusLine->setFixedHeight(1);
+    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_focusLine->setStyleSheet("background-color: #2ecc71;");
     m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
@@ -41,11 +43,24 @@ NavPanel::NavPanel(QWidget* parent)
  * @brief 初始化 UI 组件
  */
 void NavPanel::initUi() {
-    // 面板标题
-    QLabel* titleLabel = new QLabel("本地目录", this);
-    titleLabel->setFixedHeight(32);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
-    m_mainLayout->addWidget(titleLabel);
+    // 面板标题 (还原旧版架构：Layout + Icon + Text)
+    QWidget* header = new QWidget(this);
+    header->setObjectName("ContainerHeader");
+    header->setFixedHeight(32);
+    QHBoxLayout* headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(15, 0, 15, 0);
+    headerLayout->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(header);
+    iconLabel->setPixmap(UiHelper::getIcon("list_ul", QColor("#2ecc71"), 18).pixmap(18, 18));
+    headerLayout->addWidget(iconLabel);
+
+    QLabel* titleLabel = new QLabel("笔记列表", header);
+    titleLabel->setStyleSheet("color: #2ecc71; font-size: 13px; font-weight: bold; background: transparent; border: none;");
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+
+    m_mainLayout->addWidget(header);
 
     m_treeView = new QTreeView(this);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
