@@ -9,6 +9,8 @@
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
 #include <QMap>
+#include <QTimer>
+#include <QFileInfoList>
 #include "FilterPanel.h"
 
 namespace ArcMeta {
@@ -29,7 +31,6 @@ enum ItemRole {
 
 /**
  * @brief 内容面板（面板四）：核心业务展示区
- * 支持网格视图（QListView）与列表视图（QTreeView）切换
  */
 class ContentPanel : public QWidget {
     Q_OBJECT
@@ -43,17 +44,9 @@ public:
     explicit ContentPanel(QWidget* parent = nullptr);
     ~ContentPanel() override = default;
 
-    /**
-     * @brief 切换视图模式
-     */
     void setViewMode(ViewMode mode);
-
-    /**
-     * @brief 拦截空格键（红线：物理拦截 QEvent::KeyPress 且为 Key_Space）
-     */
     bool eventFilter(QObject* obj, QEvent* event) override;
 
-    // --- 业务接口 ---
     QAbstractItemModel* model() const { return m_model; }
     QSortFilterProxyModel* getProxyModel() const { return m_proxyModel; }
     QModelIndexList getSelectedIndexes() const {
@@ -63,22 +56,9 @@ public:
     }
 
 signals:
-    /**
-     * @brief 请求 QuickLook 预览信号
-     * @param path 物理路径
-     */
     void requestQuickLook(const QString& path);
-
-    /**
-     * @brief 选中项发生变化时通知元数据面板刷新
-     * @param paths 选中条目的物理路径列表
-     */
     void selectionChanged(const QStringList& paths);
     void directorySelected(const QString& path);
-
-    /**
-     * @brief 目录装载完成后发出，携带统计数据供 FilterPanel 填充
-     */
     void directoryStatsReady(
         const QMap<int, int>&     ratingCounts,
         const QMap<QString, int>& colorCounts,
@@ -87,31 +67,25 @@ signals:
         const QMap<QString, int>& createDateCounts,
         const QMap<QString, int>& modifyDateCounts);
 
+private slots:
+    void processLoadBatch(); // 分帧加载核心槽
+
 private:
     void initUi();
     void initGridView();
     void initListView();
-    void setupContextMenu();
 
     QVBoxLayout* m_mainLayout = nullptr;
     QStackedWidget* m_viewStack = nullptr;
-    
-    // 视图组件
     QListView* m_gridView = nullptr;
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
     QSortFilterProxyModel* m_proxyModel = nullptr;
 
     FilterState m_currentFilter;
-
     int m_zoomLevel = 64;
     QString m_currentPath;
     void updateGridSize();
-
-    /**
-     * @brief 分帧加载核心逻辑：从队列中取出并处理下一批次
-     */
-    void processLoadBatch();
 
     // 异步加载管理
     QTimer* m_loadTimer = nullptr;
@@ -122,7 +96,7 @@ private:
         unsigned long long frn;
         bool isDir;
     };
-    QList<MftLoadEntry> m_mftLoadQueue; // 用于搜索结果的异步加载
+    QList<MftLoadEntry> m_mftLoadQueue;
     bool m_isSearching = false;
 
     // 统计累加器
@@ -140,45 +114,24 @@ public slots:
     void onSelectionChanged();
     void onCustomContextMenuRequested(const QPoint& pos);
     void onDoubleClicked(const QModelIndex& index);
-
-    /**
-     * @brief 加载并显示目录内容
-     */
     void loadDirectory(const QString& path, bool recursive = false);
-
-    /**
-     * @brief 全局/本地搜索
-     */
     void search(const QString& query);
-
-    /**
-     * @brief 应用当前筛选器
-     */
     void applyFilters(const FilterState& state);
-    void applyFilters(); // 使用保存的状态重新应用
-
-    /**
-     * @brief 创建新条目（文件夹/Markdown/Txt）
-     */
+    void applyFilters();
     void createNewItem(const QString& type);
 
 protected:
     void wheelEvent(QWheelEvent* event) override;
 };
 
-/**
- * @brief 自定义 Delegate：处理网格视图下的图标、星级、颜色圆点及角标叠加
- */
 class GridItemDelegate : public QStyledItemDelegate {
     Q_OBJECT
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
-
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     bool eventFilter(QObject* obj, QEvent* event) override;
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
-
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     void setEditorData(QWidget* editor, const QModelIndex& index) const override;
     void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
