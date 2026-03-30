@@ -1,0 +1,35 @@
+#pragma once
+
+#include "Database.h"
+#include <string>
+#include <vector>
+
+namespace ArcMeta {
+
+struct Category {
+    int id = 0;
+    int parentId = 0;
+    std::wstring name;
+    std::wstring color;
+    std::vector<std::wstring> presetTags;
+    int sortOrder = 0;
+    bool pinned = false;
+    bool encrypted = false;
+};
+
+/**
+ * @brief 分类持久层
+ */
+class CategoryRepo {
+public:
+    static bool add(Category& cat);
+    static bool update(const Category& cat);
+    static bool remove(int id);
+    static std::vector<Category> getAll();
+
+    // 条目关联逻辑
+    static bool addItemToCategory(int categoryId, const std::wstring& itemPath);
+    static bool removeItemFromCategory(int categoryId, const std::wstring& itemPath);
+};
+
+} // namespace ArcMeta
