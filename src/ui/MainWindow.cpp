@@ -439,7 +439,7 @@ void MainWindow::initToolbar() {
 
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
-    m_searchEdit->setFixedWidth(200);
+    m_searchEdit->setMinimumWidth(230);
     // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
     m_searchEdit->setFixedHeight(32); 
     m_searchEdit->setStyleSheet(
@@ -487,7 +487,8 @@ void MainWindow::setupSplitters() {
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);
-    addrL->setSpacing(0);
+    // 2026-03-xx 按照用户授权：调整地址栏各组件（含搜索框）间距为 5 像素
+    addrL->setSpacing(5);
 
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);

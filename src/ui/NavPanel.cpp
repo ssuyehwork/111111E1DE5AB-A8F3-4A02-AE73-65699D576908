@@ -72,6 +72,13 @@ void NavPanel::initUi() {
 
     m_mainLayout->addWidget(header);
 
+    // 核心修正：为列表内容包裹容器，恢复旧版 (15, 8, 15, 8) 的呼吸边距
+    QWidget* contentWrapper = new QWidget(this);
+    contentWrapper->setStyleSheet("background: transparent; border: none;");
+    QVBoxLayout* contentLayout = new QVBoxLayout(contentWrapper);
+    contentLayout->setContentsMargins(15, 8, 15, 8);
+    contentLayout->setSpacing(0);
+
     m_treeView = new QTreeView(this);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -125,7 +132,8 @@ void NavPanel::initUi() {
 
     connect(m_treeView, &QTreeView::clicked, this, &NavPanel::onTreeClicked);
 
-    m_mainLayout->addWidget(m_treeView);
+    contentLayout->addWidget(m_treeView);
+    m_mainLayout->addWidget(contentWrapper, 1);
 }
 
 /**

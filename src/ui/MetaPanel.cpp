@@ -355,7 +355,8 @@ void MetaPanel::initUi() {
 void MetaPanel::addInfoRow(const QString& label, QLabel*& valueLabel) {
     QWidget* row = new QWidget(m_container); 
     QVBoxLayout* rl = new QVBoxLayout(row); 
-    rl->setContentsMargins(4, 0, 4, 0); // 物理缩减左右边距
+    // 2026-03-xx 回归：物理还原 12, 8, 12, 8 的旧版标准边距
+    rl->setContentsMargins(12, 8, 12, 8);
     rl->setSpacing(2);
     QLabel* kl = new QLabel(label, row); 
     kl->setStyleSheet("font-size: 11px; color: #5F5E5A;");

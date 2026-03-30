@@ -229,8 +229,8 @@ void ContentPanel::initUi() {
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
-    // 恢复旧版边距：水平 15px，垂直 8px，找回卡片呼吸感
-    contentWrapper->setContentsMargins(15, 8, 15, 8);
+    // 2026-03-xx 纠偏：预览面板回归微量对齐边距 (2, 2, 2, 2)
+    contentWrapper->setContentsMargins(2, 2, 2, 2);
     contentWrapper->setSpacing(0);
     contentWrapper->addWidget(m_viewStack);
     
