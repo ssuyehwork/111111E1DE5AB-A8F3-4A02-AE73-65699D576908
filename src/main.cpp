@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QMessageBox>
+#include <QDebug>
 #include <windows.h>
 #include <shellapi.h>
 #include "ui/MainWindow.h"
@@ -53,8 +54,11 @@ int main(int argc, char *argv[]) {
 
     // 4. 建立“万事俱备”联动逻辑：
     // 2026-03-xx 按照用户要求：必须等到数据库元数据载入、MFT 扫描、同步引擎启动等核心逻辑全部完成后，才打开主窗口。
-    // 使用信号槽机制监听初始化结束，确保窗口打开时自定义标题栏与各面板均处于可响应状态。
-    QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished, &w, &ArcMeta::MainWindow::show);
+    // 2026-03-xx 最终修复：明确指定 Qt::QueuedConnection 确保跨线程信号能正确排队投递到 UI 线程。
+    QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished, &w, [&w]() {
+        qDebug() << "[Main] 收到初始化完成信号，准备打开窗口...";
+        w.show();
+    }, Qt::QueuedConnection);
 
     // 5. 启动异步初始化中控
     ArcMeta::CoreController::instance().startSystem();

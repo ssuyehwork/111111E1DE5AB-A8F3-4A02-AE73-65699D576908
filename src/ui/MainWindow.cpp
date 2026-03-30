@@ -46,13 +46,10 @@ MainWindow::MainWindow(QWidget* parent)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
     // 初始应用置顶 (WinAPI)
+    // 2026-03-xx 关键修复：构造函数内不再调用 winId() 或 SetWindowPos 避免触发窗口提前显示
+    // 置顶逻辑现在改为按需由 external 或 showEvent 安全触发
     if (m_isPinned) {
-#ifdef Q_OS_WIN
-        HWND hwnd = (HWND)winId();
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-#else
         setWindowFlag(Qt::WindowStaysOnTopHint, true);
-#endif
     }
 
     // 应用全局样式（包括滚动条美化）
