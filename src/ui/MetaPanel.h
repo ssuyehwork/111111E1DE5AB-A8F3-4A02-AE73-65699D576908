@@ -135,6 +135,7 @@ private:
     QFrame* createSeparator();
 
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr;
     QScrollArea* m_scrollArea = nullptr;
     QWidget* m_container = nullptr;
     QVBoxLayout* m_containerLayout = nullptr;

@@ -39,6 +39,7 @@ private:
 
     // 内部组件
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr;
     
     // 统计项容器
     QWidget* m_statsWidget = nullptr;
