@@ -26,7 +26,7 @@ CategoryPanel::CategoryPanel(QWidget* parent)
     : QFrame(parent) {
     setObjectName("SidebarContainer");
     setAttribute(Qt::WA_StyledBackground, true);
-    setFixedWidth(230);
+    setMinimumWidth(230);
     
     // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
     setStyleSheet("color: #EEEEEE;");
@@ -56,8 +56,15 @@ void CategoryPanel::initUi() {
     QWidget* header = new QWidget(this);
     header->setObjectName("ContainerHeader");
     header->setFixedHeight(32);
+    // 重新注入标题栏样式，确保背景色和边框还原
+    header->setStyleSheet(
+        "QWidget#ContainerHeader {"
+        "  background-color: #252526;"
+        "  border-bottom: 1px solid #333;"
+        "}"
+    );
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
+    headerLayout->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);

@@ -181,8 +181,15 @@ void ContentPanel::initUi() {
     QWidget* titleBar = new QWidget(this);
     titleBar->setObjectName("ContainerHeader");
     titleBar->setFixedHeight(32);
+    // 重新注入标题栏样式，确保背景色和边框还原
+    titleBar->setStyleSheet(
+        "QWidget#ContainerHeader {"
+        "  background-color: #252526;"
+        "  border-bottom: 1px solid #333;"
+        "}"
+    );
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
-    titleL->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
+    titleL->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
 
     QLabel* iconLabel = new QLabel(titleBar);
     iconLabel->setPixmap(UiHelper::getIcon("eye", QColor("#41F2F2"), 18).pixmap(18, 18));
@@ -222,7 +229,8 @@ void ContentPanel::initUi() {
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
-    contentWrapper->setContentsMargins(0, 0, 0, 0);
+    // 恢复旧版边距：水平 15px，垂直 8px，找回卡片呼吸感
+    contentWrapper->setContentsMargins(15, 8, 15, 8);
     contentWrapper->setSpacing(0);
     contentWrapper->addWidget(m_viewStack);
     

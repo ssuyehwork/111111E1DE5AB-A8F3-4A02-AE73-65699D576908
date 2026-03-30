@@ -75,7 +75,7 @@ private:
 FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
     setObjectName("FilterContainer");
     setAttribute(Qt::WA_StyledBackground, true);
-    setFixedWidth(230);
+    setMinimumWidth(230);
     
     // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
     // 统一将文字颜色设为 #EEEEEE
@@ -90,8 +90,15 @@ FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
     QWidget* topBar = new QWidget(this);
     topBar->setObjectName("ContainerHeader");
     topBar->setFixedHeight(32);
+    // 重新注入标题栏样式，确保背景色和边框还原
+    topBar->setStyleSheet(
+        "QWidget#ContainerHeader {"
+        "  background-color: #252526;"
+        "  border-bottom: 1px solid #333;"
+        "}"
+    );
     QHBoxLayout* topL = new QHBoxLayout(topBar);
-    topL->setContentsMargins(15, 0, 4, 0); // 严格还原 15px 左边距
+    topL->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
     topL->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(topBar);
@@ -126,7 +133,8 @@ FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
     m_container = new QWidget(m_scrollArea);
     m_container->setStyleSheet("QWidget { background: transparent; }");
     m_containerLayout = new QVBoxLayout(m_container);
-    m_containerLayout->setContentsMargins(0, 0, 0, 0);
+    // 恢复旧版边距：右侧和底部留出 10px 缓冲空间
+    m_containerLayout->setContentsMargins(0, 0, 10, 10);
     m_containerLayout->setSpacing(0);
     m_containerLayout->addStretch();
 

@@ -65,6 +65,7 @@ MainWindow::MainWindow(QWidget* parent)
         }
 
         /* 容器标题栏样式 (还原旧版 #252526 实色背景与下边框) */
+        /* 2026-03-xx 回归修正：各面板已注入局部样式，此处保留全局 ID 匹配以作兜底 */
         #ContainerHeader {
             background-color: #252526;
             border-bottom: 1px solid #333333;
