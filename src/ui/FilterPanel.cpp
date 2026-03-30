@@ -1,4 +1,5 @@
 #include "FilterPanel.h"
+#include "UiHelper.h"
 #include "ToolTipOverlay.h"
 #include <QToolButton>
 #include <QMouseEvent>
@@ -72,22 +73,30 @@ private:
 
 // ─── FilterPanel ──────────────────────────────────────────────────
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
-    setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
+    setMinimumWidth(230);
+    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    // 顶部标题栏
+    // 2026-03-xx 按照旧版参数修复：标题栏样式对齐 (高度 32px, 背景 #252526, 底部边框 #333)
     QWidget* topBar = new QWidget(this);
-    topBar->setFixedHeight(34);
-    topBar->setStyleSheet("QWidget { background: #252525; border-bottom: 1px solid #333; }");
+    topBar->setFixedHeight(32);
+    topBar->setStyleSheet("background-color: #252526; border: none; border-bottom: 1px solid #333;");
     QHBoxLayout* topL = new QHBoxLayout(topBar);
-    topL->setContentsMargins(8, 0, 8, 0);
+    topL->setContentsMargins(15, 0, 15, 0);
+    topL->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(topBar);
+    iconLabel->setPixmap(UiHelper::getIcon("filter", QColor("#3498db"), 18).pixmap(18, 18));
+    iconLabel->setStyleSheet("border: none; background: transparent;");
 
     QLabel* title = new QLabel("高级筛选", topBar);
-    title->setStyleSheet("font-size: 12px; font-weight: bold; color: #CCCCCC;");
+    title->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; background: transparent; border: none;");
+
+    topL->addWidget(iconLabel);
 
     m_btnClearAll = new QPushButton("清除", topBar);
     m_btnClearAll->setFixedSize(42, 22);

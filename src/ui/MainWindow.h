@@ -7,10 +7,12 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QStackedWidget>
+#include <QResizeEvent>
 
 namespace ArcMeta {
 
 class BreadcrumbBar;
+class ResizeHandle;
 class CategoryPanel;
 class NavPanel;
 class ContentPanel;
@@ -29,6 +31,7 @@ public:
     ~MainWindow() override = default;
 
 protected:
+    void resizeEvent(QResizeEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -65,6 +68,7 @@ private:
     FilterPanel* m_filterPanel = nullptr;
 
     QSplitter* m_mainSplitter = nullptr;
+    ResizeHandle* m_resizeHandle = nullptr;
 
     // 工具栏组件
     QToolBar* m_toolbar = nullptr;

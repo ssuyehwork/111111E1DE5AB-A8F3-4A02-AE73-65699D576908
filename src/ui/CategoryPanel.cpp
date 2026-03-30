@@ -24,8 +24,9 @@ namespace ArcMeta {
  */
 CategoryPanel::CategoryPanel(QWidget* parent)
     : QWidget(parent) {
-    setFixedWidth(230);
-    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
+    // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
+    setMinimumWidth(230);
+    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
     
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -39,10 +40,25 @@ CategoryPanel::CategoryPanel(QWidget* parent)
  * @brief 初始化整体 UI 结构
  */
 void CategoryPanel::initUi() {
-    // 面板标题
-    QLabel* titleLabel = new QLabel("灵感归档", this);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526;");
-    m_mainLayout->addWidget(titleLabel);
+    // 2026-03-xx 按照旧版参数修复：标题栏样式对齐 (高度 32px, 背景 #252526, 底部边框 #333)
+    QWidget* header = new QWidget(this);
+    header->setFixedHeight(32);
+    header->setStyleSheet("background-color: #252526; border: none; border-bottom: 1px solid #333;");
+    QHBoxLayout* headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(15, 0, 15, 0);
+    headerLayout->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(header);
+    iconLabel->setPixmap(UiHelper::getIcon("category", QColor("#3498db"), 18).pixmap(18, 18));
+    iconLabel->setStyleSheet("border: none; background: transparent;");
+
+    QLabel* titleLabel = new QLabel("灵感归档", header);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; background: transparent; border: none;");
+
+    headerLayout->addWidget(iconLabel);
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+    m_mainLayout->addWidget(header);
 
     initTopStats();
     

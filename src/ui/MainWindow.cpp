@@ -1,4 +1,6 @@
 #include "MainWindow.h"
+#include <QResizeEvent>
+#include "ResizeHandle.h"
 #include "../core/CoreController.h"
 #include "BreadcrumbBar.h"
 #include "CategoryPanel.h"
@@ -427,6 +429,13 @@ void MainWindow::initToolbar() {
 
 
 
+void MainWindow::resizeEvent(QResizeEvent* event) {
+    QMainWindow::resizeEvent(event);
+    if (m_resizeHandle) {
+        m_resizeHandle->move(width() - m_resizeHandle->width(), height() - m_resizeHandle->height());
+    }
+}
+
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
@@ -450,18 +459,33 @@ void MainWindow::setupSplitters() {
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
     m_mainSplitter->setHandleWidth(5); // 拆分条 5px
     m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #2A2A2A; }");
+    m_mainSplitter->setChildrenCollapsible(false); // 2026-03-xx 按照用户要求：容器不可折叠
 
     m_categoryPanel = new CategoryPanel(this);
+    m_categoryPanel->setMinimumWidth(230);
+
     m_navPanel = new NavPanel(this);
+    m_navPanel->setMinimumWidth(230);
+
     m_contentPanel = new ContentPanel(this);
+    m_contentPanel->setMinimumWidth(230);
+
     m_metaPanel = new MetaPanel(this);
+    m_metaPanel->setMinimumWidth(230);
+
     m_filterPanel = new FilterPanel(this);
+    m_filterPanel->setMinimumWidth(230);
 
     m_mainSplitter->addWidget(m_categoryPanel);
     m_mainSplitter->addWidget(m_navPanel);
     m_mainSplitter->addWidget(m_contentPanel);
     m_mainSplitter->addWidget(m_metaPanel);
     m_mainSplitter->addWidget(m_filterPanel);
+
+    // 显式锁定所有容器不可折叠 (2026-03-xx 按照旧版参数恢复红线约束)
+    for (int i = 0; i < m_mainSplitter->count(); ++i) {
+        m_mainSplitter->setCollapsible(i, false);
+    }
 
     // --- 底部状态栏（28px） ---
     QWidget* statusBar = new QWidget(centralC);
@@ -502,6 +526,10 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusLeft, 1);
     statusL->addWidget(m_statusCenter, 1);
     statusL->addWidget(m_statusRight, 1);
+
+    // 修复：显式使用命名空间引用 ResizeHandle
+    m_resizeHandle = new ArcMeta::ResizeHandle(this, this);
+    m_resizeHandle->raise();
 
     mainL->addWidget(addressBar);
     mainL->addWidget(m_mainSplitter, 1);

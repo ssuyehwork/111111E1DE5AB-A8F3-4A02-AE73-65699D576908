@@ -156,8 +156,9 @@ protected:
 
 ContentPanel::ContentPanel(QWidget* parent)
     : QWidget(parent) {
-    setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1A1A1A; color: #EEEEEE; border: none; }");
+    // 2026-03-xx 按照旧版参数锁定：恢复 230px 最小宽度限制与 1 像素边缘像素轮廓
+    setMinimumWidth(230);
+    setStyleSheet("QWidget { background-color: #1A1A1A; color: #EEEEEE; border: 1px solid #333333; border-radius: 0px; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -173,14 +174,20 @@ ContentPanel::ContentPanel(QWidget* parent)
 }
 
 void ContentPanel::initUi() {
+    // 2026-03-xx 按照旧版参数修复：标题栏样式对齐 (高度 32px, 背景 #252526, 底部边框 #333)
     QWidget* titleBar = new QWidget(this);
-    titleBar->setStyleSheet("background: #252526; border-bottom: 1px solid #333;");
-    titleBar->setFixedHeight(38);
+    titleBar->setFixedHeight(32);
+    titleBar->setStyleSheet("background-color: #252526; border: none; border-bottom: 1px solid #333;");
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
-    titleL->setContentsMargins(12, 0, 12, 0);
+    titleL->setContentsMargins(15, 0, 15, 0);
+    titleL->setSpacing(8);
+
+    QLabel* iconLabel = new QLabel(titleBar);
+    iconLabel->setPixmap(UiHelper::getIcon("layers", QColor("#3498db"), 18).pixmap(18, 18));
+    iconLabel->setStyleSheet("border: none; background: transparent;");
 
     QLabel* titleLabel = new QLabel("内容（文件夹 / 文件）", titleBar);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; border: none;");
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; background: transparent; border: none;");
     
     QPushButton* btnLayers = new QPushButton(titleBar);
     btnLayers->setFixedSize(24, 24);
@@ -197,6 +204,7 @@ void ContentPanel::initUi() {
         }
     });
 
+    titleL->addWidget(iconLabel);
     titleL->addWidget(titleLabel);
     titleL->addStretch();
     titleL->addWidget(btnLayers);
@@ -904,7 +912,13 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QColor cardBg = isSelected ? QColor("#282828") : (isHovered ? QColor("#2A2A2A") : QColor("#2D2D2D"));
     painter->setPen(isSelected ? QPen(QColor("#3498db"), 2) : QPen(QColor("#333333"), 1));
     painter->setBrush(cardBg);
-    painter->drawRoundedRect(cardRect, 8, 8);
+    // 2026-03-xx 按照用户要求：卡片圆角由 8px 统一调整为 2px (恢复利落的精致感)
+    painter->drawRoundedRect(cardRect, 2, 2);
+
+    // 2026-03-xx 按照旧版参数：恢复卡片内部的 1px 细线描边
+    painter->setPen(QPen(QColor("#333333"), 1));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRoundedRect(cardRect, 2, 2);
 
     QString path = index.data(PathRole).toString();
     QFileInfo info(path);
