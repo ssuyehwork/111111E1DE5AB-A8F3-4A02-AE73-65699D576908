@@ -3,6 +3,7 @@
 #include "../db/ItemRepo.h"
 #include "AmMetaJson.h"
 #include "SyncQueue.h"
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QJsonDocument>
