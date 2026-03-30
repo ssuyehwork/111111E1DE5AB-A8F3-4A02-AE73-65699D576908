@@ -47,13 +47,16 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // 3. 启动异步初始化中控
-    // 2026-03-xx 架构重构：将原本阻塞在 main 的 MFT 扫描和增量同步移至后台线程
-    ArcMeta::CoreController::instance().startSystem();
-
-    // 4. 秒开主窗口
+    // 3. 2026-03-xx 按照用户要求重构启动时效：
+    // 初始化完毕后再打开窗口。先实例化窗口（此时默认隐藏），然后通过信号槽联动。
     ArcMeta::MainWindow w;
-    w.show();
+
+    // 核心握手连接：当后台初始化（MFT 扫描、元数据载入、增量同步）全部完成后，触发窗口显示
+    QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished,
+                     &w, &ArcMeta::MainWindow::show);
+
+    // 启动异步初始化中控
+    ArcMeta::CoreController::instance().startSystem();
 
     int ret = a.exec();
 
