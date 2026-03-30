@@ -18,8 +18,8 @@ namespace ArcMeta {
  */
 NavPanel::NavPanel(QWidget* parent)
     : QWidget(parent) {
-    // 设置面板宽度（遵循文档：导航面板 200px）
-    setFixedWidth(200);
+    // 设置面板宽度（遵循文档：导航面板 230px）
+    setFixedWidth(230);
     setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
@@ -35,7 +35,8 @@ NavPanel::NavPanel(QWidget* parent)
 void NavPanel::initUi() {
     // 面板标题
     QLabel* titleLabel = new QLabel("本地目录", this);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526;");
+    titleLabel->setFixedHeight(32);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
     m_mainLayout->addWidget(titleLabel);
 
     m_treeView = new QTreeView(this);

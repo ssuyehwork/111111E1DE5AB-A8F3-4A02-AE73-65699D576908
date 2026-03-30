@@ -40,8 +40,9 @@ CategoryPanel::CategoryPanel(QWidget* parent)
  */
 void CategoryPanel::initUi() {
     // 面板标题
-    QLabel* titleLabel = new QLabel("灵感归档", this);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526;");
+    QLabel* titleLabel = new QLabel("数据分类", this);
+    titleLabel->setFixedHeight(32);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
     m_mainLayout->addWidget(titleLabel);
 
     initTopStats();

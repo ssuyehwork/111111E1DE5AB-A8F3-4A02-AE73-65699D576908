@@ -34,8 +34,8 @@ namespace ArcMeta {
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
-    resize(1600, 900);
-    setMinimumSize(1280, 720);
+    resize(1200, 800);
+    setMinimumSize(1000, 600);
     setWindowTitle("ArcMeta");
 
     // 从设置读取置顶状态
@@ -54,7 +54,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 应用全局样式（包括滚动条美化）
     QString qss = R"(
-        QMainWindow { background-color: #1A1A1A; }
+        QMainWindow { background-color: #1E1E1E; }
         
         /* 全局滚动条美化 */
         QScrollBar:vertical {
@@ -101,17 +101,17 @@ MainWindow::MainWindow(QWidget* parent)
 
         /* 统一复选框样式：2026-03-xx 按照用户要求，仅保留蓝色勾选标记，背景保持深色 */
         QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
-        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1A1A1A; }
+        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1E1E1E; }
         QCheckBox::indicator:hover { border: 1px solid #666; }
         QCheckBox::indicator:checked { 
             border: 1px solid #378ADD; 
-            background: #1A1A1A; 
+            background: #1E1E1E;
             image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
         }
 
         /* 统一输入框样式 */
         QLineEdit {
-            background: #1A1A1A;
+            background: #1E1E1E;
             border: 1px solid #333333;
             border-radius: 6px;
             color: #EEEEEE;
@@ -140,9 +140,9 @@ void MainWindow::initUi() {
     setupSplitters();
     setupCustomTitleBarButtons();
     
-    // 设置默认权重分配: 230 | 200 | 弹性 | 240 | 230 (移除一个 200)
+    // 设置默认权重分配: 230 | 230 | 600 | 230 | 230
     QList<int> sizes;
-    sizes << 230 << 200 << 700 << 240 << 230;
+    sizes << 230 << 230 << 600 << 230 << 230;
     m_mainSplitter->setSizes(sizes);
 
     // 核心红线：建立各面板间的信号联动 (Data Linkage)
@@ -337,7 +337,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
 
 void MainWindow::initToolbar() {
     m_toolbar = addToolBar("MainToolbar");
-    m_toolbar->setFixedHeight(36);
+    m_toolbar->setFixedHeight(32);
     m_toolbar->setMovable(false);
     m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
 
@@ -378,8 +378,8 @@ void MainWindow::initToolbar() {
 
     // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
     m_pathStack = new QStackedWidget(this);
-    // 2026-03-xx 按照用户最新要求：地址栏高度由 40px 调整为更紧凑的 38px
-    m_pathStack->setFixedHeight(38); 
+    // 2026-03-xx 按照用户最新要求：地址栏高度还原为 32px
+    m_pathStack->setFixedHeight(32);
     m_pathStack->setMinimumWidth(300);
     m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
 
@@ -416,8 +416,8 @@ void MainWindow::initToolbar() {
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setFixedWidth(200);
-    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度也调整为 38px
-    m_searchEdit->setFixedHeight(38); 
+    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
+    m_searchEdit->setFixedHeight(32);
     m_searchEdit->setStyleSheet(
         "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"
@@ -429,12 +429,13 @@ void MainWindow::initToolbar() {
 
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
+    centralC->setStyleSheet("background-color: #1E1E1E;"); // 强制还原背景色
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
     mainL->setContentsMargins(5, 5, 5, 5); // 全局 5px 外边距
     mainL->setSpacing(5); // 各元素垂直间距统一 5px
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(38); // 2026-03-xx 按照最新要求：地址栏高度调整为 38px
+    addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);

@@ -193,7 +193,7 @@ void ColorPickerWidget::mousePressEvent(QMouseEvent* e) {
 
 // --- MetaPanel ---
 MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
-    setFixedWidth(240); 
+    setFixedWidth(230);
     setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
     m_mainLayout = new QVBoxLayout(this); 
     m_mainLayout->setContentsMargins(0, 0, 0, 0); 
@@ -204,7 +204,8 @@ MetaPanel::MetaPanel(QWidget* parent) : QWidget(parent) {
 void MetaPanel::initUi() {
     // 面板标题
     QLabel* titleLabel = new QLabel("元数据详情", this);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; padding: 10px 12px; background: #252526;");
+    titleLabel->setFixedHeight(32);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; padding-left: 12px; background: #252526; border-bottom: 1px solid #333;");
     m_mainLayout->addWidget(titleLabel);
 
     m_scrollArea = new QScrollArea(this); 

@@ -157,7 +157,7 @@ protected:
 ContentPanel::ContentPanel(QWidget* parent)
     : QWidget(parent) {
     setMinimumWidth(200);
-    setStyleSheet("QWidget { background-color: #1A1A1A; color: #EEEEEE; border: none; }");
+    setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -175,12 +175,12 @@ ContentPanel::ContentPanel(QWidget* parent)
 void ContentPanel::initUi() {
     QWidget* titleBar = new QWidget(this);
     titleBar->setStyleSheet("background: #252526; border-bottom: 1px solid #333;");
-    titleBar->setFixedHeight(38);
+    titleBar->setFixedHeight(32);
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
     titleL->setContentsMargins(12, 0, 12, 0);
 
-    QLabel* titleLabel = new QLabel("内容（文件夹 / 文件）", titleBar);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; border: none;");
+    QLabel* titleLabel = new QLabel("预览数据", titleBar);
+    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #41F2F2; border: none;");
     
     QPushButton* btnLayers = new QPushButton(titleBar);
     btnLayers->setFixedSize(24, 24);

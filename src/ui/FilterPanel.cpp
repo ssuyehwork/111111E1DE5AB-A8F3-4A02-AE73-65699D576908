@@ -72,7 +72,7 @@ private:
 
 // ─── FilterPanel ──────────────────────────────────────────────────
 FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
-    setMinimumWidth(200);
+    setFixedWidth(230);
     setStyleSheet("QWidget { background-color: #1E1E1E; color: #EEEEEE; border: none; }");
 
     m_mainLayout = new QVBoxLayout(this);
@@ -81,13 +81,13 @@ FilterPanel::FilterPanel(QWidget* parent) : QWidget(parent) {
 
     // 顶部标题栏
     QWidget* topBar = new QWidget(this);
-    topBar->setFixedHeight(34);
+    topBar->setFixedHeight(32);
     topBar->setStyleSheet("QWidget { background: #252525; border-bottom: 1px solid #333; }");
     QHBoxLayout* topL = new QHBoxLayout(topBar);
     topL->setContentsMargins(8, 0, 8, 0);
 
     QLabel* title = new QLabel("高级筛选", topBar);
-    title->setStyleSheet("font-size: 12px; font-weight: bold; color: #CCCCCC;");
+    title->setStyleSheet("font-size: 13px; font-weight: bold; color: #f1c40f;");
 
     m_btnClearAll = new QPushButton("清除", topBar);
     m_btnClearAll->setFixedSize(42, 22);
@@ -379,11 +379,11 @@ QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, 
     cb->setStyleSheet(
         "QCheckBox { spacing: 0px; }"
         "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444;"
-        "                       border-radius: 2px; background: #1A1A1A; }"
+        "                       border-radius: 2px; background: #1E1E1E; }"
         "QCheckBox::indicator:hover { border: 1px solid #666; }"
         "QCheckBox::indicator:checked { "
         "   border: 1px solid #378ADD; "
-        "   background: #1A1A1A; "
+        "   background: #1E1E1E; "
         "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
         "}"
     );
