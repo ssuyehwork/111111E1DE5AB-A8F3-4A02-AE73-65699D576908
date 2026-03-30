@@ -439,8 +439,8 @@ void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
     centralC->setStyleSheet("background-color: #1E1E1E;"); // 强制还原背景色
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 0, 0, 0); // 物理 0 边距
-    mainL->setSpacing(0); // 物理 0 间距
+    mainL->setContentsMargins(5, 5, 5, 5); // 物理还原 5px 边距
+    mainL->setSpacing(5); // 物理还原 5px 间距
 
     QWidget* addressBar = new QWidget(centralC);
     addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
@@ -457,7 +457,7 @@ void MainWindow::setupSplitters() {
 
     // --- 主拆分条（5px handleWidth） ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(1); // 拆分条 5px
+    m_mainSplitter->setHandleWidth(5); // 物理还原 5px 宽度
     m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #2A2A2A; }");
 
     m_categoryPanel = new CategoryPanel(this);
