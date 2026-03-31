@@ -98,7 +98,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent, Qt::FramelessWindo
     connect(&DatabaseManager::instance(), &DatabaseManager::noteAdded, this, &MainWindow::onNoteAdded);
 
     // 2. 全量刷新：修改、删除、分类变化（锁定状态）时才刷新全表 (通过 scheduleRefresh 节流)
-    connect(&DatabaseManager::instance(), &DatabaseManager::noteUpdated, this, QOverload<>::of(&MainWindow::scheduleRefresh));
+    connect(&DatabaseManager::instance(), &DatabaseManager::noteUpdated, this, [this](){ scheduleRefresh(); });
     connect(&DatabaseManager::instance(), &DatabaseManager::categoriesChanged, this, &MainWindow::scheduleRefresh, Qt::QueuedConnection);
 
     connect(&DatabaseManager::instance(), &DatabaseManager::activeCategoryIdChanged, this, [this](int id){

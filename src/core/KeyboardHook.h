@@ -21,7 +21,7 @@ signals:
     void digitPressed(int digit);
     void f4PressedInExplorer();
     void globalLockRequested();
-    void enterPressedInOtherApp();
+    void enterPressedInOtherApp(); // [FIX] 2026-03-xx 补全被意外还原掉的信号，解决 MainWindow 连接报错
 
 private:
     bool m_digitInterceptEnabled = false;

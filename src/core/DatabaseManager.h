@@ -13,25 +13,27 @@
 #include <QSet>
 #include <QMutex>
 #include <QTimer>
+#include <QDate>
+
+// [FIX] 2026-03-xx 提升 FilterState 作用域至全局，解决 UI 组件引用时的符号缺失报错
+struct FilterState {
+    QString keyword;
+    bool inTitle = true;
+    bool inContent = true;
+    bool inTags = true;
+    QStringList tags;
+    QDate startDate;
+    QDate endDate;
+    bool hasAttachment = false;
+    QString itemType = "all";
+    int minRating = 0;
+    bool onlyFavorite = false;
+    bool onlyPinned = false;
+};
 
 class DatabaseManager : public QObject {
     Q_OBJECT
 public:
-    struct FilterState {
-        QString keyword;
-        bool inTitle = true;
-        bool inContent = true;
-        bool inTags = true;
-        QStringList tags;
-        QDate startDate;
-        QDate endDate;
-        bool hasAttachment = false;
-        QString itemType = "all";
-        int minRating = 0;
-        bool onlyFavorite = false;
-        bool onlyPinned = false;
-    };
-
     enum MoveDirection { Up, Down, Top, Bottom };
     static constexpr int DEFAULT_PAGE_SIZE = 100;
 
