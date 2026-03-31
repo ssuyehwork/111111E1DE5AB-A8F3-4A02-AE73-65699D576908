@@ -122,6 +122,7 @@ private:
     QString m_currentKeyword;
     QString m_currentFilterType = "all";
     QVariant m_currentFilterValue = -1;
+    DatabaseManager::FilterState m_currentFilter;
     int m_currentPage = 1;
     int m_pageSize = DatabaseManager::DEFAULT_PAGE_SIZE;
     QTimer* m_searchTimer;

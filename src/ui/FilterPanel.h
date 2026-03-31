@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QGraphicsDropShadowEffect>
 #include <QFutureWatcher>
+#include "../core/DatabaseManager.h"
 
 class FilterPanel : public QWidget {
     Q_OBJECT

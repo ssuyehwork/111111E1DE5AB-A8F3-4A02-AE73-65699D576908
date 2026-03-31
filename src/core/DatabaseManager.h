@@ -17,6 +17,21 @@
 class DatabaseManager : public QObject {
     Q_OBJECT
 public:
+    struct FilterState {
+        QString keyword;
+        bool inTitle = true;
+        bool inContent = true;
+        bool inTags = true;
+        QStringList tags;
+        QDate startDate;
+        QDate endDate;
+        bool hasAttachment = false;
+        QString itemType = "all";
+        int minRating = 0;
+        bool onlyFavorite = false;
+        bool onlyPinned = false;
+    };
+
     enum MoveDirection { Up, Down, Top, Bottom };
     static constexpr int DEFAULT_PAGE_SIZE = 100;
 
