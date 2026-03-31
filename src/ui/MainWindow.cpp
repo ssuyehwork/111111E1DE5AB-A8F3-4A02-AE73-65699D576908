@@ -21,6 +21,8 @@
 #include <QApplication>
 #include <QSettings>
 #include <QCloseEvent>
+#include <QMenu>
+#include <QAction>
 #include <QGraphicsDropShadowEffect>
 #include "UiHelper.h"
 #include <QFileInfo>

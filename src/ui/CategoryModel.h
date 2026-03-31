@@ -23,7 +23,7 @@ public slots:
     bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
 
     Qt::DropActions supportedDropActions() const override;
-    bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
+    bool dropMimeData(const QMimeData* mimeData, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
 
 private:
     Type m_type;
