@@ -384,7 +384,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     hdr->setStyleSheet(
         "QToolButton { background: #252526; border: none; border-top: 1px solid #333333;"
         "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
-        "              padding-left: 12px; } "
+        "              padding-left: 0px; } "
         "QToolButton:hover { color: #EEEEEE; } "
         "QToolButton::menu-indicator { image: none; }"); // 彻底移除可能的菜单箭头占位
 

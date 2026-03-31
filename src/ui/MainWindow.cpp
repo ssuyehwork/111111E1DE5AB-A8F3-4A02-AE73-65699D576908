@@ -23,7 +23,6 @@
 #include <QCloseEvent>
 #include <QMenu>
 #include <QAction>
-#include <QGraphicsDropShadowEffect>
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>
@@ -460,7 +459,7 @@ void MainWindow::initToolbar() {
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setMinimumWidth(230);
     // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
-    m_searchEdit->setFixedHeight(32); 
+    m_searchEdit->setFixedHeight(32);
     m_searchEdit->setStyleSheet(
         "QLineEdit { background: transparent; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"
@@ -475,16 +474,16 @@ void MainWindow::setupSplitters() {
     centralC->setObjectName("CentralWidget");
     centralC->setStyleSheet("#CentralWidget { background-color: #1E1E1E; }"); 
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 0, 0, 0); 
+    mainL->setContentsMargins(0, 5, 0, 0);
     mainL->setSpacing(0); 
 
-    // --- 1. 顶部地址栏 (0 边距) ---
+    // --- 1. 顶部地址栏 (保持 5px 垂直间距) ---
     QWidget* addressBar = new QWidget(centralC);
     addressBar->setFixedHeight(32);
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(12, 0, 12, 0); // 左右呼吸间距
-    addrL->setSpacing(2);
+    addrL->setSpacing(5);
 
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);
@@ -520,22 +519,6 @@ void MainWindow::setupSplitters() {
     
     m_filterPanel = new FilterPanel(this);
     m_filterPanel->setObjectName("FilterContainer");
-
-    // 为每个面板应用阴影效果 (1:1 还原旧版本参数)
-    auto applyShadow = [this](QWidget* w) {
-        auto* shadow = new QGraphicsDropShadowEffect(w);
-        shadow->setBlurRadius(10);
-        shadow->setXOffset(0);
-        shadow->setYOffset(4);
-        shadow->setColor(QColor(0, 0, 0, 150));
-        w->setGraphicsEffect(shadow);
-    };
-
-    applyShadow(m_categoryPanel);
-    applyShadow(m_navPanel);
-    applyShadow(m_contentPanel);
-    applyShadow(m_metaPanel);
-    applyShadow(m_filterPanel);
 
     m_mainSplitter->addWidget(m_categoryPanel);
     m_mainSplitter->addWidget(m_navPanel);
