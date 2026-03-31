@@ -3,6 +3,10 @@
 #include <QDrag>
 #include <QPixmap>
 #include <QAbstractProxyModel>
+#include <QMimeData>
+#include <QUrl>
+#include <QDir>
+#include <QStringList>
 
 namespace ArcMeta {
 

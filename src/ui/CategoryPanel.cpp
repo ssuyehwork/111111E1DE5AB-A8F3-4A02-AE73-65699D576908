@@ -3,6 +3,7 @@
 #include "CategoryDelegate.h"
 #include "DropTreeView.h"
 #include "UiHelper.h"
+#include "ToolTipOverlay.h"
 #include "../db/CategoryRepo.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
