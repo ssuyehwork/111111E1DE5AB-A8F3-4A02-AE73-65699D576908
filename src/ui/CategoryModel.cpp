@@ -108,8 +108,15 @@ bool CategoryModel::setData(const QModelIndex& index, const QVariant& value, int
         QString newName = value.toString().trimmed();
         int id = index.data(IdRole).toInt();
         if (!newName.isEmpty() && id > 0) {
-            // 持久化到数据库
-            CategoryRepo::updateName(id, newName.toStdWString());
+            // 获取分类并更新名称
+            auto categories = CategoryRepo::getAll();
+            for (auto& cat : categories) {
+                if (cat.id == id) {
+                    cat.name = newName.toStdWString();
+                    CategoryRepo::update(cat);
+                    break;
+                }
+            }
             QTimer::singleShot(0, [this]() { this->refresh(); });
             return true;
         }
@@ -123,6 +130,11 @@ Qt::DropActions CategoryModel::supportedDropActions() const {
 }
 
 bool CategoryModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) {
+    Q_UNUSED(data);
+    Q_UNUSED(action);
+    Q_UNUSED(row);
+    Q_UNUSED(column);
+
     QModelIndex actualParent = parent;
     if (actualParent.isValid()) {
         QStandardItem* parentItem = itemFromIndex(actualParent);

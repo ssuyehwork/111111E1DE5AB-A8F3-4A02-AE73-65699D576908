@@ -31,7 +31,7 @@ public:
             QString colorHex = index.data(CategoryModel::ColorRole).toString();
             QColor baseColor = colorHex.isEmpty() ? QColor("#3498db") : QColor(colorHex);
             QColor bg = selected ? baseColor : QColor("#2a2d2e");
-            if (selected) bg.setAlphaF(0.2);
+            if (selected) bg.setAlphaF(0.2f);
 
             QStyle* style = option.widget ? option.widget->style() : QApplication::style();
             QRect decoRect = style->subElementRect(QStyle::SE_ItemViewItemDecoration, &option, option.widget);

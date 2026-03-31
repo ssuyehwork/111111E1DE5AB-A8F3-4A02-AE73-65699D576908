@@ -3,6 +3,7 @@
 #include "CategoryDelegate.h"
 #include "DropTreeView.h"
 #include "UiHelper.h"
+#include "../db/CategoryRepo.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -57,8 +58,11 @@ void CategoryPanel::setupContextMenu() {
 }
 
 void CategoryPanel::onCreateCategory() {
-    // 逻辑：向 CategoryRepo 添加并刷新 Model
-    CategoryRepo::add(L"未命名分类", 0, L"#aaaaaa");
+    Category cat;
+    cat.name = L"新分类";
+    cat.parentId = 0;
+    cat.color = L"#aaaaaa";
+    CategoryRepo::add(cat);
     m_partitionModel->refresh();
 }
 
@@ -72,7 +76,7 @@ void CategoryPanel::onDeleteCategory() {
     if (index.isValid()) {
         int id = index.data(CategoryModel::IdRole).toInt();
         if (id > 0) {
-            CategoryRepo::remove(id);
+            ArcMeta::CategoryRepo::remove(id);
             m_partitionModel->refresh();
         }
     }
