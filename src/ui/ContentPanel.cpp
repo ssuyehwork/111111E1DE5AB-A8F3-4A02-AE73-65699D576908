@@ -477,8 +477,8 @@ void ContentPanel::initGridView() {
     m_gridView->setStyleSheet(
         "QListView { background-color: transparent; border: none; outline: none; }"
         "QListView::item { background: transparent; }"
-        "QListView::item:selected { background-color: rgba(55, 138, 221, 0.2); border-radius: 8px; }"
-        "QListView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 8px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
+        "QListView::item:selected { background-color: rgba(55, 138, 221, 0.2); border-radius: 6px; }"
+        "QListView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 2px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
     connect(m_gridView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
@@ -947,8 +947,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
     painter->setPen(Qt::NoPen);
     painter->setBrush(badgeColor);
-    // 2026-03-xx 按照用户要求：卡片内圆角调整为 8px
-    painter->drawRoundedRect(extRect, 8, 8);
+    // 2026-03-xx 恢复为 2px，仅外围圆角为 8px
+    painter->drawRoundedRect(extRect, 2, 2);
     painter->setPen(QColor("#FFFFFF"));
     QFont extFont = painter->font();
     extFont.setPointSize(8);
@@ -1013,8 +1013,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         if (dotC.isValid()) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(dotC);
-            // 2026-03-xx 按照用户要求：卡片内圆角由 2px 调整为 8px
-            painter->drawRoundedRect(nameRect, 8, 8);
+            // 2026-03-xx 恢复为 2px，仅外围圆角为 8px
+            painter->drawRoundedRect(nameRect, 2, 2);
             painter->setPen(dotC.lightness() > 180 ? Qt::black : Qt::white);
         } else {
             painter->setPen(QColor("#CCCCCC"));
@@ -1136,7 +1136,7 @@ QWidget* GridItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewI
     QString textColor = tagColorStr.isEmpty() ? "#FFFFFF" : "#000000";
 
     editor->setStyleSheet(
-        QString("QLineEdit { background-color: %1; color: %2; border-radius: 8px; "
+        QString("QLineEdit { background-color: %1; color: %2; border-radius: 2px; "
                 "border: 2px solid #3498db; font-weight: bold; font-size: 8pt; padding: 0px; }")
         .arg(bgColor, textColor)
     );
