@@ -1,66 +1,246 @@
-cmake_minimum_required(VERSION 3.20)
-project(ArcMeta)
+cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_CXX_STANDARD 17)
+project(RapidNotes VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 修复：优先探测 QT_DIR 环境变量，若无则使用文档红线默认路径
-if(DEFINED ENV{QT_DIR})
-    set(CMAKE_PREFIX_PATH "$ENV{QT_DIR}")
-else()
+# 2026-03-xx 按照用户要求：彻底废除 MinGW 支持，锁定 MSVC (Visual Studio 2022) 环境
+if(NOT MSVC)
+    message(FATAL_ERROR "🔴 [编译器拦截] 此项目已废除 MinGW 支持，必须且只能使用 Visual Studio 2022 (MSVC) 进行编译。")
+endif()
+
+# 2026-03-xx 按照用户要求：MSVC/VS2022 专属编译环境深度优化
+add_compile_options(/utf-8)       # 解决中文字符集乱码
+add_compile_options(/MP)          # 启用多处理器并行编译，榨干 CPU 性能
+# [FIX] 2026-03-xx 移除 /permissive- 以兼容 Windows SDK/WinRT 的内部重定义冲突
+
+# 屏蔽 VS 的非标准警告并优化 Windows 头文件包含
+add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+# [FIX] 2026-03-xx 移除 WIN32_LEAN_AND_MEAN 以确保 COM/WinRT 所需的底层头文件完整加载
+add_definitions(-DNOMINMAX)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+# 2026-03-xx 按照用户要求：增加环境自检提示，协助解决 Qt6 路径未找到问题
+if(NOT Qt6_DIR AND NOT CMAKE_PREFIX_PATH)
+    message(STATUS "🔍 [环境检测] 正在尝试从默认路径定位 Qt6...")
     set(CMAKE_PREFIX_PATH "C:/Qt/6.10.2/msvc2022_64")
 endif()
 
-# 强制 MSVC 编译器及选项 (文档红线: /W4 /O2)
-if(MSVC)
-    add_compile_options(/W4 /O2 /utf-8)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Sql Network Concurrent Svg)
+
+# 2026-03-20 深度治理日志输出：
+# 1. 禁用调试日志 (qDebug)
+add_definitions(-DQT_NO_DEBUG_OUTPUT)
+# 2. 禁用普通信息日志 (qInfo)
+add_definitions(-DQT_NO_INFO_OUTPUT)
+# 3. 禁用警告日志 (qWarning)
+add_definitions(-DQT_NO_WARNING_OUTPUT)
+
+# 2026-03-xx 按照用户要求：将生成的 exe 强制输出到项目源码根目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+include_directories(src)
+
+# 源代码列表
+set(SOURCES
+    src/main.cpp
+    src/crypto/EncryptionManager.h
+    src/crypto/EncryptionManager.cpp
+    src/mft/UsnWatcher.cpp
+    src/mft/MftReader.h
+    src/mft/UsnWatcher.h
+    src/mft/MftReader.cpp
+    src/mft/PathBuilder.h
+    src/mft/PathBuilder.cpp
+    src/db/CategoryRepo.h
+    src/db/ItemRepo.cpp
+    src/db/SyncEngine.cpp
+    src/db/Database.cpp
+    src/db/CategoryRepo.cpp
+    src/db/SyncEngine.h
+    src/db/FavoritesRepo.h
+    src/db/FolderRepo.h
+    src/db/FolderRepo.cpp
+    src/db/ItemRepo.h
+    src/db/Database.h
+    src/db/FavoritesRepo.cpp
+    src/core/KeyboardHook.h
+    src/core/DatabaseManager.cpp
+    src/core/OCRManager.cpp
+    src/core/ActionRecorder.cpp
+    src/core/CoreController.cpp
+    src/core/HotkeyManager.cpp
+    src/core/ClipboardMonitor.cpp
+    src/core/DatabaseManager.h
+    src/core/MessageCaptureHandler.cpp
+    src/core/ShortcutManager.cpp
+    src/core/ShortcutManager.h
+    src/core/CoreController.h
+    src/core/FileCryptoHelper.h
+    src/core/FileCryptoHelper.cpp
+    src/core/FileStorageHelper.h
+    src/core/HotkeyManager.h
+    src/core/ActionRecorder.h
+    src/core/OCRManager.h
+    src/core/HttpServer.h
+    src/core/ReminderService.h
+    src/core/FileStorageHelper.cpp
+    src/core/AES.cpp
+    src/core/KeyboardHook.cpp
+    src/core/MessageCaptureHandler.h
+    src/core/ClipboardMonitor.h
+    src/core/HardwareInfoHelper.h
+    src/core/HttpServer.cpp
+    src/core/ReminderService.cpp
+    src/core/AES.h
+    src/core/HardwareInfoHelper.cpp
+    src/models/NoteModel.h
+    src/models/NoteModel.cpp
+    src/models/CategoryModel.h
+    src/models/CategoryModel.cpp
+    src/meta/BatchRenameEngine.h
+    src/meta/BatchRenameEngine.cpp
+    src/meta/SyncQueue.cpp
+    src/meta/MetadataManager.cpp
+    src/meta/MetadataManager.h
+    src/meta/AmMetaJson.cpp
+    src/meta/AmMetaJson.h
+    src/meta/SyncQueue.h
+    src/ui/FileSearchWindow.cpp
+    src/ui/CategoryLockWidget.h
+    src/ui/ScreenshotTool.cpp
+    src/ui/SystemTray.h
+    src/ui/CategoryPanel.h
+    src/ui/SearchAppWindow.cpp
+    src/ui/SearchAppWindow.h
+    src/ui/FileSearchHistoryPopup.h
+    src/ui/CategoryPanel.cpp
+    src/ui/MainWindow.cpp
+    src/ui/ActivationDialog.h
+    src/ui/MetadataPanel.h
+    src/ui/IconHelper.h
+    src/ui/FileSearchWidget.cpp
+    src/ui/ClickableLineEdit.h
+    src/ui/SettingsWindow.cpp
+    src/ui/SearchLineEdit.h
+    src/ui/TimePasteWindow.cpp
+    src/ui/FramelessDialog.cpp
+    src/ui/FileSearchWidget.h
+    src/ui/HelpWindow.cpp
+    src/ui/ActivationDialog.cpp
+    src/ui/TagManagerWindow.cpp
+    src/ui/ScreenshotTool.h
+    src/ui/FireworksOverlay.h
+    src/ui/TimePasteWindow.h
+    src/ui/ToolTipOverlay.h
+    src/ui/MetaPanel.cpp
+    src/ui/TagEditDialog.h
+    src/ui/TagEditorWidget.h
+    src/ui/CleanListView.h
+    src/ui/ColorPickerWindow.cpp
+    src/ui/OCRResultWindow.cpp
+    src/ui/FlowLayout.cpp
+    src/ui/KeywordSearchWidget.cpp
+    src/ui/TodoCalendarWindow.h
+    src/ui/QuickWindow.cpp
+    src/ui/UnifiedSearchWindow.h
+    src/ui/FireworksOverlay.cpp
+    src/ui/FilterPanel.cpp
+    src/ui/MetadataPanel.cpp
+    src/ui/CleanListView.cpp
+    src/ui/ContentPanel.h
+    src/ui/MainWindow.h
+    src/ui/ResizeHandle.cpp
+    src/ui/PasswordVerifyDialog.cpp
+    src/ui/ResizeHandle.h
+    src/ui/NoteDelegate.h
+    src/ui/MetaPanel.h
+    src/ui/PasswordGeneratorWindow.cpp
+    src/ui/TitleEditorDialog.h
+    src/ui/TagCapsule.h
+    src/ui/QuickWindow.h
+    src/ui/KeywordSearchWindow.h
+    src/ui/IntegratedSearchWindow.h
+    src/ui/PixelRulerOverlay.cpp
+    src/ui/SystemTray.cpp
+    src/ui/PasswordGeneratorWindow.h
+    src/ui/DropTreeView.cpp
+    src/ui/CategoryPasswordDialog.cpp
+    src/ui/KeywordSearchWindow.cpp
+    src/ui/FileStorageWindow.cpp
+    src/ui/IntegratedSearchWindow.cpp
+    src/ui/Editor.cpp
+    src/ui/FileStorageWindow.h
+    src/ui/CategoryDelegate.h
+    src/ui/OCRResultWindow.h
+    src/ui/OCRWindow.cpp
+    src/ui/KeywordSearchWidget.h
+    src/ui/ContentPanel.cpp
+    src/ui/CategoryLockWidget.cpp
+    src/ui/Toolbox.cpp
+    src/ui/AdvancedTagSelector.cpp
+    src/ui/UnifiedSearchWindow.cpp
+    src/ui/TagEditorWidget.cpp
+    src/ui/FlowLayout.h
+    src/ui/SecurityLockDialog.h
+    src/ui/HeaderBar.h
+    src/ui/NoteEditWindow.h
+    src/ui/NoteEditWindow.cpp
+    src/ui/SearchLineEdit.cpp
+    src/ui/FilterPanel.h
+    src/ui/FramelessDialog.h
+    src/ui/HeaderBar.cpp
+    src/ui/TodoCalendarWindow.cpp
+    src/ui/Editor.h
+    src/ui/QuickLookWindow.h
+    src/ui/SettingsWindow.h
+    src/ui/TagEditDialog.cpp
+    src/ui/ColorPickerWindow.h
+    src/ui/CategoryModel.h
+    src/ui/Toolbox.h
+    src/ui/FileSearchWindow.h
+    src/ui/SecurityLockDialog.cpp
+    src/ui/StringUtils.h
+    src/ui/HelpWindow.h
+    src/ui/PixelRulerOverlay.h
+    src/ui/TagManagerWindow.h
+    src/ui/AdvancedTagSelector.h
+    src/ui/CategoryModel.cpp
+    src/ui/QuickPreview.h
+    src/ui/DropTreeView.h
+    src/ui/QuickLookWindow.cpp
+    src/ui/PasswordVerifyDialog.h
+    src/ui/OCRWindow.h
+    src/ui/QuickNoteDelegate.h
+    src/ui/SvgIcons.h
+    src/ui/CategoryPasswordDialog.h
+)
+
+if(WIN32)
+    list(APPEND SOURCES resources/app_icon.rc)
 endif()
 
-# Qt 6 基础组件
-find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql Concurrent)
+add_executable(RapidNotes ${SOURCES})
 
-# 优化输出目录，生成的 exe 将位于 build 目录下
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-
-# 自动生成 MOC/UIC/RCC
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC OFF)
-set(CMAKE_AUTORCC ON)
-
-# 搜集源文件
-file(GLOB_RECURSE SOURCES 
-    "src/*.cpp"
-    "src/*.h"
-)
-# 修复：显式包含新添加的文件，防止 CMake 缓存导致 GLOB 滞后
-list(APPEND SOURCES 
-    "src/ui/BreadcrumbBar.h"
-    "src/ui/BreadcrumbBar.cpp"
-    "src/ui/CategoryModel.cpp"
-    "src/ui/CategoryModel.h"
-    "src/ui/CategoryDelegate.h"
-    "src/ui/DropTreeView.cpp"
-    "src/ui/DropTreeView.h"
-    "src/core/CoreController.h"
-    "src/core/CoreController.cpp"
-    "src/meta/MetadataManager.h"
-    "src/meta/MetadataManager.cpp"
-)
-
-# 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest")
-
-# 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
-target_link_libraries(ArcMeta PRIVATE
+target_link_libraries(RapidNotes PRIVATE
+    Qt6::Core
+    Qt6::Gui
     Qt6::Widgets
-    Qt6::Svg
     Qt6::Sql
+    Qt6::Network
     Qt6::Concurrent
-    ntdll
-    ole32
-    bcrypt
+    Qt6::Svg
 )
 
-# 声明管理员权限 Manifest (现代 CMake 方式通过直接将 ArcMeta.manifest 加入 add_executable 处理)
+if(WIN32)
+    # Added windowsapp for WinRT OCR API support
+    target_link_libraries(RapidNotes PRIVATE user32 shell32 psapi dwmapi windowsapp)
+    set_target_properties(RapidNotes PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+
+endif()

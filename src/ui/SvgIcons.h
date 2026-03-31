@@ -5,6 +5,7 @@
 #include <QMap>
 
 namespace SvgIcons {
+    #ifndef Q_MOC_RUN
     inline const QMap<QString, QString> icons = {
         {"text", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="11" x2="14" y2="11"></line><line x1="4" y1="16" x2="20" y2="16"></line><line x1="4" y1="21" x2="14" y2="21"></line></svg>)svg"},
         {"untagged", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line><path d="M11 11l4 4m0-4l-4 4" /></svg>)svg"},
@@ -433,11 +434,14 @@ namespace SvgIcons {
         {"wand_filled", R"svg(<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M15 4l5 5L7 21l-5-5z"/><circle cx="4" cy="4" r="1.2"/><circle cx="20" cy="16" r="1.2"/><circle cx="16" cy="2" r="1"/><circle cx="22" cy="10" r="1"/><circle cx="10" cy="2" r="0.8"/></svg>)svg"},
         {"x_circle_filled", R"svg(<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="9" x2="15" y2="15" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>)svg"},
         {"zap_filled", R"svg(<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>)svg"},
-        {"panel_sidebar", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="4"/><line x1="12" y1="2" x2="12" y2="22"/></svg>)svg"},
-        {"panel_sidebar_filled", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="4"/><clipPath id="c"><rect x="2" y="2" width="20" height="20" rx="4"/></clipPath><rect x="2" y="2" width="10" height="20" fill="currentColor" stroke="none" clip-path="url(#c)"/><line x1="12" y1="2" x2="12" y2="22"/></svg>)svg"},
-        {"panel_split", R"svg(<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="2" y="2" width="9.5" height="20" rx="3"/><rect x="12.5" y="2" width="9.5" height="20" rx="3"/></svg>)svg"},
         {"bell", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>)svg"},
-    };
+        {"paste", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 18h6"></path><path d="M9 10h6"></path></svg>)svg"},
+        {"copy_tags", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path><path d="M15.5 15.5l-2 2a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l2-2v-3h-3z"></path><circle cx="16.5" cy="16.5" r="0.5" fill="currentColor" stroke="none"></circle></svg>)svg"},
+        {"paste_tags", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M14 13l-3 3a1.5 1.5 0 0 0 0 2.1l2.1 2.1a1.5 1.5 0 0 0 2.1 0l3-3V13h-4.2z"></path><circle cx="15.5" cy="14.5" r="0.5" fill="currentColor" stroke="none"></circle></svg>)svg"},
+        {"box", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" y1="22" x2="12" y2="12"></line></svg>)svg"},
+        {"package_rnp", R"svg(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" y1="22" x2="12" y2="12"></line><rect x="15" y="15" width="6" height="6" rx="1.5" fill="currentColor" stroke="none"/><path d="M17 15v-1.5a1.5 1.5 0 0 1 3 0v1.5" stroke-width="1.5"/></svg>)svg"},
+        };
+#endif
 }
 
 #endif // SVGICONS_H
