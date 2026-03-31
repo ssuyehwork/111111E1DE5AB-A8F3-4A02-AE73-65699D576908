@@ -72,6 +72,10 @@ private:
 };
 
 // ─── FilterPanel ──────────────────────────────────────────────────
+void FilterPanel::setFocusHighlight(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
+}
+
 FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
     setObjectName("FilterContainer");
     setAttribute(Qt::WA_StyledBackground, true);
@@ -85,6 +89,12 @@ FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
+    // 物理还原：1px 翠绿高亮焦点线 (#2ecc71)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide(); // 初始隐藏
+    m_mainLayout->addWidget(m_focusLine);
 
     // 顶部标题栏
     QWidget* topBar = new QWidget(this);

@@ -21,6 +21,11 @@ public:
     ~NavPanel() override = default;
 
     /**
+     * @brief 物理还原：设置 1px 翠绿高亮线的显隐状态
+     */
+    void setFocusHighlight(bool visible);
+
+    /**
      * @brief 设置并跳转到指定目录
      * @param path 完整路径
      */

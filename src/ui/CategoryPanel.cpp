@@ -30,9 +30,6 @@ CategoryPanel::CategoryPanel(QWidget* parent)
 
     initUi();
     setupContextMenu();
-
-    // 监听全局焦点以驱动高亮线
-    if (qApp) qApp->installEventFilter(this);
 }
 
 void CategoryPanel::setupContextMenu() {
@@ -105,7 +102,18 @@ void CategoryPanel::onDeleteCategory() {
     }
 }
 
+void CategoryPanel::setFocusHighlight(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
+}
+
 void CategoryPanel::initUi() {
+    // 物理还原：1px 翠绿高亮焦点线 (#2ecc71)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide(); // 初始隐藏
+    m_mainLayout->addWidget(m_focusLine);
+
     // 1. 标题栏
     QWidget* header = new QWidget(this);
     header->setObjectName("ContainerHeader");

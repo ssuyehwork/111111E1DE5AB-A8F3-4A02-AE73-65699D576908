@@ -177,7 +177,18 @@ ContentPanel::ContentPanel(QWidget* parent)
     initUi();
 }
 
+void ContentPanel::setFocusHighlight(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
+}
+
 void ContentPanel::initUi() {
+    // 物理还原：1px 翠绿高亮焦点线 (#2ecc71)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide(); // 初始隐藏
+    m_mainLayout->addWidget(m_focusLine);
+
     QWidget* titleBar = new QWidget(this);
     titleBar->setObjectName("ContainerHeader");
     titleBar->setFixedHeight(32);

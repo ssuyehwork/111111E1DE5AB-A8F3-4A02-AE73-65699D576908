@@ -57,7 +57,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 应用全局样式（包括滚动条美化）
     QString qss = R"(
-        QMainWindow { background-color: #1A1A1A; }
+        QMainWindow { background-color: #1E1E1E; }
 
         /* 核心容器样式还原 - 强化 1 像素物理切割感 */
         #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
@@ -271,6 +271,30 @@ void MainWindow::initUi() {
         }
     });
 
+    // 物理还原：焦点切换监听逻辑，驱动 1px 翠绿高亮线
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget* old, QWidget* now) {
+        Q_UNUSED(old);
+        // 重置所有面板高亮
+        if (m_categoryPanel) m_categoryPanel->setFocusHighlight(false);
+        if (m_navPanel)      m_navPanel->setFocusHighlight(false);
+        if (m_contentPanel)  m_contentPanel->setFocusHighlight(false);
+        if (m_metaPanel)     m_metaPanel->setFocusHighlight(false);
+        if (m_filterPanel)   m_filterPanel->setFocusHighlight(false);
+
+        if (!now) return;
+
+        // 递归查找焦点所属面板
+        QWidget* p = now;
+        while (p) {
+            if (p == m_categoryPanel) { m_categoryPanel->setFocusHighlight(true); break; }
+            if (p == m_navPanel)      { m_navPanel->setFocusHighlight(true); break; }
+            if (p == m_contentPanel)  { m_contentPanel->setFocusHighlight(true); break; }
+            if (p == m_metaPanel)     { m_metaPanel->setFocusHighlight(true); break; }
+            if (p == m_filterPanel)   { m_filterPanel->setFocusHighlight(true); break; }
+            p = p->parentWidget();
+        }
+    });
+
     // 8. 响应元数据面板自己的星级/颜色变更
     connect(m_metaPanel, &MetaPanel::metadataChanged, [this](int rating, const std::wstring& color) {
         auto indexes = m_contentPanel->getSelectedIndexes();
@@ -448,18 +472,18 @@ void MainWindow::initToolbar() {
 
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
-    // 还原旧版紧凑布局：父容器背景透明，容器间无物理缝隙
-    centralC->setStyleSheet("background-color: transparent;"); 
+    centralC->setObjectName("CentralWidget");
+    centralC->setStyleSheet("#CentralWidget { background-color: #1E1E1E; }");
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 0, 0, 0); // 还原 0px 全局边距
-    mainL->setSpacing(0); // 还原 0px 垂直间距
+    mainL->setContentsMargins(0, 0, 0, 0);
+    mainL->setSpacing(0);
 
+    // --- 1. 顶部地址栏 (0 边距) ---
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
+    addressBar->setFixedHeight(32);
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
-    addrL->setContentsMargins(0, 0, 0, 0);
-    // 地址栏组件间距同步还原为紧凑型 (2px)
+    addrL->setContentsMargins(12, 0, 12, 0); // 左右呼吸间距
     addrL->setSpacing(2);
 
     addrL->addWidget(m_btnBack);
@@ -468,11 +492,18 @@ void MainWindow::setupSplitters() {
     addrL->addWidget(m_pathStack, 1);
     addrL->addWidget(m_searchEdit);
 
-    // --- 主拆分条 (还原 1px 物理缝隙，使容器边框重合) ---
-    m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(1);
+    // --- 2. 主体核心容器 (物理还原：5px 全局边距包裹) ---
+    QWidget* bodyWrapper = new QWidget(centralC);
+    QVBoxLayout* bodyLayout = new QVBoxLayout(bodyWrapper);
+    bodyLayout->setContentsMargins(5, 5, 5, 5); // 物理还原：5px 呼吸感
+    bodyLayout->setSpacing(0);
+
+    // --- 3. 主拆分条 (物理还原：5px 物理缝隙) ---
+    m_mainSplitter = new QSplitter(Qt::Horizontal, bodyWrapper);
+    m_mainSplitter->setHandleWidth(5);
     m_mainSplitter->setChildrenCollapsible(false);
-    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #333333; }");
+    // 物理还原：严禁脑补，背景完全透明，依靠容器边框实现视觉缝隙
+    m_mainSplitter->setStyleSheet("QSplitter { background: transparent; border: none; } QSplitter::handle { background: transparent; }");
 
     m_categoryPanel = new CategoryPanel(this);
     m_categoryPanel->setObjectName("SidebarContainer");
@@ -511,12 +542,14 @@ void MainWindow::setupSplitters() {
     m_mainSplitter->addWidget(m_metaPanel);
     m_mainSplitter->addWidget(m_filterPanel);
 
-    // --- 底部状态栏（28px） ---
+    bodyLayout->addWidget(m_mainSplitter);
+
+    // --- 4. 底部状态栏 (0 边距) ---
     QWidget* statusBar = new QWidget(centralC);
     statusBar->setFixedHeight(28);
     statusBar->setStyleSheet("QWidget { background-color: #252525; border-top: 1px solid #333333; }");
     QHBoxLayout* statusL = new QHBoxLayout(statusBar);
-    statusL->setContentsMargins(5, 0, 5, 0);
+    statusL->setContentsMargins(12, 0, 12, 0);
     statusL->setSpacing(0);
 
     m_statusLeft = new QLabel("就绪中...", statusBar);
@@ -525,7 +558,6 @@ void MainWindow::setupSplitters() {
     // 绑定 CoreController 状态到状态栏
     auto updateStatus = [this](const QString& text) {
         m_statusLeft->setText(text);
-        // 如果正在索引，改变颜色提示
         if (CoreController::instance().isIndexing()) {
             m_statusLeft->setStyleSheet("font-size: 11px; color: #4FACFE; background: transparent; font-weight: bold;");
         } else {
@@ -536,7 +568,6 @@ void MainWindow::setupSplitters() {
     connect(&CoreController::instance(), &CoreController::isIndexingChanged, this, [this, updateStatus]() {
         updateStatus(CoreController::instance().statusText());
     });
-    // 初始状态同步
     updateStatus(CoreController::instance().statusText());
 
     m_statusCenter = new QLabel("", statusBar);
@@ -552,7 +583,7 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusRight, 1);
 
     mainL->addWidget(addressBar);
-    mainL->addWidget(m_mainSplitter, 1);
+    mainL->addWidget(bodyWrapper, 1);
     mainL->addWidget(statusBar);
 
     setCentralWidget(centralC);

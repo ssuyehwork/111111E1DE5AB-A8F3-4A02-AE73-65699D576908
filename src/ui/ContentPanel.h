@@ -44,6 +44,11 @@ public:
     ~ContentPanel() override = default;
 
     /**
+     * @brief 物理还原：设置 1px 翠绿高亮线的显隐状态
+     */
+    void setFocusHighlight(bool visible);
+
+    /**
      * @brief 切换视图模式
      */
     void setViewMode(ViewMode mode);
@@ -94,6 +99,7 @@ private:
     void setupContextMenu();
 
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr;
     QStackedWidget* m_viewStack = nullptr;
     
     // 视图组件

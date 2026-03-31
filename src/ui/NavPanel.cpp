@@ -36,7 +36,18 @@ NavPanel::NavPanel(QWidget* parent)
 /**
  * @brief 初始化 UI 组件
  */
+void NavPanel::setFocusHighlight(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
+}
+
 void NavPanel::initUi() {
+    // 物理还原：1px 翠绿高亮焦点线 (#2ecc71)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide(); // 初始隐藏
+    m_mainLayout->addWidget(m_focusLine);
+
     // 面板标题 (还原旧版架构：Layout + Icon + Text)
     QWidget* header = new QWidget(this);
     header->setObjectName("ContainerHeader");

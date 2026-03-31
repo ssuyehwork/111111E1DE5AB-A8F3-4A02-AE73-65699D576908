@@ -108,6 +108,12 @@ class MetaPanel : public QFrame {
 public:
     explicit MetaPanel(QWidget* parent = nullptr);
     ~MetaPanel() override = default;
+
+    /**
+     * @brief 物理还原：设置 1px 翠绿高亮线的显隐状态
+     */
+    void setFocusHighlight(bool visible);
+
     void updateInfo(const QString& name, const QString& type, const QString& size,
                     const QString& ctime, const QString& mtime, const QString& atime,
                     const QString& path, bool encrypted);
@@ -135,6 +141,7 @@ private:
     QFrame* createSeparator();
 
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr;
     QScrollArea* m_scrollArea = nullptr;
     QWidget* m_container = nullptr;
     QVBoxLayout* m_containerLayout = nullptr;

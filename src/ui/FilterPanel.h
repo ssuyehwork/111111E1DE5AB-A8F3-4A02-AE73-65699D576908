@@ -34,6 +34,11 @@ public:
     explicit FilterPanel(QWidget* parent = nullptr);
     ~FilterPanel() override = default;
 
+    /**
+     * @brief 物理还原：设置 1px 翠绿高亮线的显隐状态
+     */
+    void setFocusHighlight(bool visible);
+
     void populate(
         const QMap<int, int>&        ratingCounts,
         const QMap<QString, int>&    colorCounts,
@@ -73,6 +78,7 @@ private:
     QMap<QString, int>  m_modifyDateCounts;
 
     QVBoxLayout*  m_mainLayout      = nullptr;
+    QWidget*      m_focusLine       = nullptr;
     QScrollArea*  m_scrollArea      = nullptr;
     QWidget*      m_container       = nullptr;
     QVBoxLayout*  m_containerLayout = nullptr;
