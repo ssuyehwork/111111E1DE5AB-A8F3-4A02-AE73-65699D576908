@@ -61,6 +61,8 @@ public:
     }
 
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+        Q_UNUSED(option);
+        Q_UNUSED(index);
         QLineEdit* editor = new QLineEdit(parent);
         editor->setStyleSheet(
             "QLineEdit {"
@@ -76,6 +78,7 @@ public:
     }
 
     void updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+        Q_UNUSED(index);
         QStyle* style = option.widget ? option.widget->style() : QApplication::style();
         QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &option, option.widget);
         textRect.adjust(0, -1, 0, 1);

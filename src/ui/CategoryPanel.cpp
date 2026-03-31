@@ -12,6 +12,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QApplication>
+#include <QInputDialog>
 
 namespace ArcMeta {
 
@@ -43,27 +44,55 @@ CategoryPanel::CategoryPanel(QWidget* parent)
 void CategoryPanel::setupContextMenu() {
     m_partitionTree->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_partitionTree, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
-        QMenu menu(this);
-        menu.setStyleSheet("QMenu { background: #2B2B2B; color: white; border: 1px solid #444; padding: 4px; border-radius: 4px; }");
-
         QModelIndex index = m_partitionTree->indexAt(pos);
-        if (index.isValid()) {
-            menu.addAction("重命名", this, &CategoryPanel::onRenameCategory);
-            menu.addAction("删除", this, &CategoryPanel::onDeleteCategory);
+
+        QMenu menu(this);
+        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; } "
+                           "QMenu::item { padding: 6px 10px 6px 10px; border-radius: 3px; } "
+                           "QMenu::icon { margin-left: 6px; } "
+                           "QMenu::item:selected { background-color: #3E3E42; color: white; }");
+
+        // 基于规范逻辑：如果没有选中项，或者选中了“我的分类”根节点
+        if (!index.isValid() || index.data(CategoryModel::NameRole).toString() == "我的分类") {
+            menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
+
+            auto* importMenu = menu.addMenu(UiHelper::getIcon("file_import", QColor("#1abc9c"), 18), "导入数据");
+            importMenu->setStyleSheet(menu.styleSheet());
+            importMenu->addAction(UiHelper::getIcon("file", QColor("#1abc9c"), 18), "导入文件(s)...");
+            importMenu->addAction(UiHelper::getIcon("folder", QColor("#1abc9c"), 18), "导入文件夹...");
         } else {
-            menu.addAction("新建分类", this, &CategoryPanel::onCreateCategory);
+            // 具体分类项的右键菜单
+            QString type = index.data(CategoryModel::TypeRole).toString();
+            if (type == "category") {
+                menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类");
+                menu.addAction(UiHelper::getIcon("edit", QColor("#3498db"), 18), "重命名", this, &CategoryPanel::onRenameCategory);
+                menu.addSeparator();
+
+                bool isPinned = index.data(CategoryModel::PinnedRole).toBool();
+                menu.addAction(UiHelper::getIcon("pin", isPinned ? QColor("#FF551C") : QColor("#aaaaaa"), 18),
+                               isPinned ? "取消置顶" : "置顶分类");
+
+                menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), "删除分类", this, &CategoryPanel::onDeleteCategory);
+            }
         }
-        menu.exec(m_partitionTree->viewport()->mapToGlobal(pos));
+
+        if (!menu.isEmpty()) {
+            menu.exec(m_partitionTree->viewport()->mapToGlobal(pos));
+        }
     });
 }
 
 void CategoryPanel::onCreateCategory() {
-    Category cat;
-    cat.name = L"新分类";
-    cat.parentId = 0;
-    cat.color = L"#aaaaaa";
-    CategoryRepo::add(cat);
-    m_partitionModel->refresh();
+    bool ok;
+    QString text = QInputDialog::getText(this, "新建分类", "名称:", QLineEdit::Normal, "", &ok);
+    if (ok && !text.isEmpty()) {
+        Category cat;
+        cat.name = text.toStdWString();
+        cat.parentId = 0;
+        cat.color = L"#3498db";
+        CategoryRepo::add(cat);
+        m_partitionModel->refresh();
+    }
 }
 
 void CategoryPanel::onRenameCategory() {

@@ -129,8 +129,8 @@ Qt::DropActions CategoryModel::supportedDropActions() const {
     return Qt::MoveAction;
 }
 
-bool CategoryModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) {
-    Q_UNUSED(data);
+bool CategoryModel::dropMimeData(const QMimeData* mimeData, Qt::DropAction action, int row, int column, const QModelIndex& parent) {
+    Q_UNUSED(mimeData);
     Q_UNUSED(action);
     Q_UNUSED(row);
     Q_UNUSED(column);
@@ -144,7 +144,7 @@ bool CategoryModel::dropMimeData(const QMimeData* data, Qt::DropAction action, i
             return false;
         }
     }
-    return QStandardItemModel::dropMimeData(data, action, row, column, actualParent);
+    return QStandardItemModel::dropMimeData(mimeData, action, row, column, actualParent);
 }
 
 } // namespace ArcMeta
