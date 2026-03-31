@@ -33,8 +33,8 @@ void DropTreeView::dragMoveEvent(QDragMoveEvent* event) {
 
 void DropTreeView::dropEvent(QDropEvent* event) {
     if (event->mimeData()->hasFormat("application/x-note-ids")) {
-        QByteArray data = event->mimeData()->data("application/x-note-ids");
-        QStringList idStrs = QString::fromUtf8(data).split(",", Qt::SkipEmptyParts);
+        QByteArray byteData = event->mimeData()->data("application/x-note-ids");
+        QStringList idStrs = QString::fromUtf8(byteData).split(",", Qt::SkipEmptyParts);
         QList<int> ids;
         for (const QString& s : idStrs) ids << s.toInt();
 
