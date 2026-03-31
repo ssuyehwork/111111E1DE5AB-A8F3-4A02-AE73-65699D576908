@@ -47,7 +47,10 @@ private:
     
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
+    void setFocusLineVisible(bool visible);
+
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr; // 物理聚焦线
 
 private slots:
     void onTreeClicked(const QModelIndex& index);

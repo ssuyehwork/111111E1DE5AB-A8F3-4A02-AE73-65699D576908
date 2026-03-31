@@ -128,6 +128,7 @@ public:
     void setColor(const std::wstring& color);
     void setPinned(bool pinned);
     void setTags(const QStringList& tags);
+    void setFocusLineVisible(bool visible);
 
 private:
     void initUi();
@@ -135,6 +136,7 @@ private:
     QFrame* createSeparator();
 
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr; // 物理聚焦线
     QScrollArea* m_scrollArea = nullptr;
     QWidget* m_container = nullptr;
     QVBoxLayout* m_containerLayout = nullptr;

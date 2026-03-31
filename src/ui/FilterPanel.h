@@ -44,6 +44,7 @@ public:
     );
 
     FilterState currentFilter() const { return m_filter; }
+    void setFocusLineVisible(bool visible);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -73,6 +74,7 @@ private:
     QMap<QString, int>  m_modifyDateCounts;
 
     QVBoxLayout*  m_mainLayout      = nullptr;
+    QWidget*      m_focusLine       = nullptr; // 物理聚焦线
     QScrollArea*  m_scrollArea      = nullptr;
     QWidget*      m_container       = nullptr;
     QVBoxLayout*  m_containerLayout = nullptr;

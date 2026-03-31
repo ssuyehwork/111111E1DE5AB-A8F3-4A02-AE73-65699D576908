@@ -77,13 +77,25 @@ FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
     setAttribute(Qt::WA_StyledBackground, true);
     setMinimumWidth(230);
     
-    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
-    // 统一将文字颜色设为 #EEEEEE
-    setStyleSheet("color: #EEEEEE;");
+    setStyleSheet(
+        "#FilterContainer {"
+        "  background-color: #1e1e1e;"
+        "  border: 1px solid #333333;"
+        "  border-radius: 0px;"
+        "}"
+        "QWidget { color: #EEEEEE; }"
+    );
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
+
+    // 1. 物理聚焦线 (复原：1px 绿线，默认隐藏)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
 
 
     // 顶部标题栏
@@ -98,7 +110,8 @@ FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
         "}"
     );
     QHBoxLayout* topL = new QHBoxLayout(topBar);
-    topL->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
+    // [CRITICAL] 视觉对齐锁定：此处顶部边距必须设为 2px，以配合 32px 的标题栏高度，使文字达到垂直居中。
+    topL->setContentsMargins(15, 2, 15, 0);
     topL->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(topBar);
@@ -441,6 +454,10 @@ QCheckBox* FilterPanel::addFilterRow(QVBoxLayout* layout, const QString& label, 
 }
 
 // ─── clearAllFilters ──────────────────────────────────────────────
+void FilterPanel::setFocusLineVisible(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
+}
+
 void FilterPanel::clearAllFilters() {
     m_filter = FilterState{};
     const auto cbs = m_container->findChildren<QCheckBox*>();

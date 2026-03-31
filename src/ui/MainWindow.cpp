@@ -59,7 +59,7 @@ MainWindow::MainWindow(QWidget* parent)
     QString qss = R"(
         QMainWindow { background-color: #1A1A1A; }
 
-        /* 核心容器样式还原 - 强化 1 像素物理切割感 */
+        /* 核心容器样式还原 - 复原：恢复各容器独立 1px 边框 */
         #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
             background-color: #1E1E1E;
             border: 1px solid #333333;
@@ -141,6 +141,11 @@ MainWindow::MainWindow(QWidget* parent)
     setStyleSheet(qss);
 
     initUi();
+
+    // 复原：监听全局焦点变化以刷新聚焦线
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget*, QWidget*){
+        updateFocusLines();
+    });
 
     // 启动时和顶级目录均显示“此电脑”（磁盘分区列表）
     navigateTo("computer://");
@@ -341,6 +346,10 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
 
 // 2026-03-xx 按照用户要求：物理拦截事件以实现自定义 ToolTipOverlay 的显隐控制
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut) {
+        updateFocusLines();
+    }
+
     if (event->type() == QEvent::HoverEnter) {
         QString text = watched->property("tooltipText").toString();
         if (!text.isEmpty()) {
@@ -448,18 +457,16 @@ void MainWindow::initToolbar() {
 
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
-    // 还原旧版紧凑布局：父容器背景透明，容器间无物理缝隙
     centralC->setStyleSheet("background-color: transparent;"); 
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 0, 0, 0); // 还原 0px 全局边距
-    mainL->setSpacing(0); // 还原 0px 垂直间距
+    mainL->setContentsMargins(5, 5, 5, 5); // 复原：恢复窗口四周 5px 留白
+    mainL->setSpacing(0);
 
     QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
+    addressBar->setFixedHeight(32);
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);
-    // 地址栏组件间距同步还原为紧凑型 (2px)
     addrL->setSpacing(2);
 
     addrL->addWidget(m_btnBack);
@@ -468,11 +475,12 @@ void MainWindow::setupSplitters() {
     addrL->addWidget(m_pathStack, 1);
     addrL->addWidget(m_searchEdit);
 
-    // --- 主拆分条 (还原 1px 物理缝隙，使容器边框重合) ---
+    // --- 主拆分条 ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(1); 
+    m_mainSplitter->setHandleWidth(5); // 复原：恢复 5px 物理空隙
     m_mainSplitter->setChildrenCollapsible(false);
-    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #333333; }");
+    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: transparent; }"); // 复原：恢复透明间隙
+    connect(m_mainSplitter, &QSplitter::splitterMoved, this, &MainWindow::updateFocusLines);
 
     m_categoryPanel = new CategoryPanel(this);
     m_categoryPanel->setObjectName("SidebarContainer");
@@ -499,6 +507,7 @@ void MainWindow::setupSplitters() {
         w->setGraphicsEffect(shadow);
     };
 
+    // [CRITICAL] 还原：容器阴影参数 (模糊 10, Y偏移 4)
     applyShadow(m_categoryPanel);
     applyShadow(m_navPanel);
     applyShadow(m_contentPanel);
@@ -739,6 +748,21 @@ void MainWindow::updateStatusBar() {
     m_statusLeft->setText(QString("%1 个项目").arg(visibleCount));
     m_statusCenter->setText(m_currentPath == "computer://" ? "此电脑" : m_currentPath);
     m_statusRight->setText(""); // 选中时由 selectionChanged 更新
+}
+
+void MainWindow::updateFocusLines() {
+    // 复原：实现随焦点实时切换的 1px 绿线
+    QWidget* focus = QApplication::focusWidget();
+
+    // 侧边栏可见性与宽度检查
+    bool categoryVisible = m_categoryPanel && m_categoryPanel->isVisible() && m_categoryPanel->width() > 10;
+    bool navVisible = m_navPanel && m_navPanel->isVisible() && m_navPanel->width() > 10;
+
+    if (m_categoryPanel) m_categoryPanel->setFocusLineVisible(categoryVisible && m_categoryPanel->isAncestorOf(focus));
+    if (m_navPanel) m_navPanel->setFocusLineVisible(navVisible && m_navPanel->isAncestorOf(focus));
+    if (m_contentPanel) m_contentPanel->setFocusLineVisible(m_contentPanel->isVisible() && m_contentPanel->isAncestorOf(focus));
+    if (m_metaPanel) m_metaPanel->setFocusLineVisible(m_metaPanel->isVisible() && m_metaPanel->isAncestorOf(focus));
+    if (m_filterPanel) m_filterPanel->setFocusLineVisible(m_filterPanel->isVisible() && m_filterPanel->isAncestorOf(focus));
 }
 
 void MainWindow::onPinToggled(bool checked) {

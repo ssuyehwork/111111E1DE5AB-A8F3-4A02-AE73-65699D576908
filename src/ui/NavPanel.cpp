@@ -23,12 +23,25 @@ NavPanel::NavPanel(QWidget* parent)
     // 设置面板宽度（遵循文档：导航面板 230px）
     setMinimumWidth(230);
     
-    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
-    setStyleSheet("color: #EEEEEE;");
+    setStyleSheet(
+        "#ListContainer {"
+        "  background-color: #1e1e1e;"
+        "  border: 1px solid #333333;"
+        "  border-radius: 0px;"
+        "}"
+        "QWidget { color: #EEEEEE; }"
+    );
 
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
+
+    // 1. 物理聚焦线 (复原：1px 绿线，默认隐藏)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
 
     initUi();
 }
@@ -37,19 +50,19 @@ NavPanel::NavPanel(QWidget* parent)
  * @brief 初始化 UI 组件
  */
 void NavPanel::initUi() {
-    // 面板标题 (还原旧版架构：Layout + Icon + Text)
+    // 面板标题 (复原：列表标题栏全宽下划线方案)
     QWidget* header = new QWidget(this);
     header->setObjectName("ContainerHeader");
     header->setFixedHeight(32);
-    // 重新注入标题栏样式，确保背景色和边框还原
     header->setStyleSheet(
-        "QWidget#ContainerHeader {"
-        "  background-color: #252526;"
-        "  border-bottom: 1px solid #333;"
-        "}"
+        "background-color: #252526; "
+        "border-top-left-radius: 0px; "
+        "border-top-right-radius: 0px; "
+        "border-bottom: 1px solid #333;"
     );
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
+    // [CRITICAL] 视觉对齐锁定：此处顶部边距必须设为 2px，以配合 32px 的标题栏高度，使文字达到垂直居中。
+    headerLayout->setContentsMargins(15, 2, 15, 0);
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);
@@ -156,6 +169,10 @@ void NavPanel::onTreeClicked(const QModelIndex& index) {
     } else if (path == "computer://") {
         emit directorySelected("computer://");
     }
+}
+
+void NavPanel::setFocusLineVisible(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
 }
 
 void NavPanel::onItemExpanded(const QModelIndex& index) {

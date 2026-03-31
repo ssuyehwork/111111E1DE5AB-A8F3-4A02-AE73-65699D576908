@@ -22,11 +22,25 @@ CategoryPanel::CategoryPanel(QWidget* parent)
     setObjectName("SidebarContainer");
     setAttribute(Qt::WA_StyledBackground, true);
     setMinimumWidth(230);
-    setStyleSheet("color: #EEEEEE;");
+    setStyleSheet(
+        "#SidebarContainer {"
+        "  background-color: #1e1e1e;"
+        "  border: 1px solid #333333;"
+        "  border-radius: 0px;"
+        "}"
+        "QWidget { color: #EEEEEE; }"
+    );
     
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
+
+    // 1. 物理聚焦线 (复原：1px 绿线，默认隐藏)
+    m_focusLine = new QWidget(this);
+    m_focusLine->setFixedHeight(1);
+    m_focusLine->setStyleSheet("background-color: #2ecc71;");
+    m_focusLine->hide();
+    m_mainLayout->addWidget(m_focusLine);
 
     initUi();
     setupContextMenu();
@@ -106,18 +120,19 @@ void CategoryPanel::onDeleteCategory() {
 }
 
 void CategoryPanel::initUi() {
-    // 1. 标题栏
+    // 1. 标题栏 (复原：侧边栏标题栏全宽下划线方案)
     QWidget* header = new QWidget(this);
     header->setObjectName("ContainerHeader");
     header->setFixedHeight(32);
     header->setStyleSheet(
-        "QWidget#ContainerHeader {"
-        "  background-color: #252526;"
-        "  border-bottom: 1px solid #333;"
-        "}"
+        "background-color: #252526; "
+        "border-top-left-radius: 0px; "
+        "border-top-right-radius: 0px; "
+        "border-bottom: 1px solid #333;"
     );
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 15, 0);
+    // [CRITICAL] 视觉对齐锁定：此处顶部边距必须设为 2px，以配合 32px 的标题栏高度，使文字达到垂直居中。
+    headerLayout->setContentsMargins(15, 2, 15, 0);
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);
@@ -153,7 +168,7 @@ void CategoryPanel::initUi() {
     m_systemTree->setModel(m_systemModel);
     m_systemTree->setHeaderHidden(true);
     m_systemTree->setRootIsDecorated(false);
-    m_systemTree->setIndentation(10);
+    m_systemTree->setIndentation(12); // 复原：恢复 12px 缩进
     m_systemTree->setFixedHeight(176); // 8 items * 22px
     m_systemTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_systemTree->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -166,7 +181,7 @@ void CategoryPanel::initUi() {
     m_partitionTree->setModel(m_partitionModel);
     m_partitionTree->setHeaderHidden(true);
     m_partitionTree->setRootIsDecorated(true);
-    m_partitionTree->setIndentation(10);
+    m_partitionTree->setIndentation(16); // 复原：恢复 16px 缩进
     m_partitionTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_partitionTree->setDragEnabled(true);
     m_partitionTree->setAcceptDrops(true);
@@ -210,6 +225,10 @@ void CategoryPanel::initUi() {
 
 bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
     return QFrame::eventFilter(obj, event);
+}
+
+void CategoryPanel::setFocusLineVisible(bool visible) {
+    if (m_focusLine) m_focusLine->setVisible(visible);
 }
 
 } // namespace ArcMeta

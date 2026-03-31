@@ -93,7 +93,10 @@ private:
     void initListView();
     void setupContextMenu();
 
+    void setFocusLineVisible(bool visible);
+
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr; // 物理聚焦线
     QStackedWidget* m_viewStack = nullptr;
     
     // 视图组件

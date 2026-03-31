@@ -48,6 +48,7 @@ private:
     void initUi();
     void updateNavButtons();
     void updateStatusBar();
+    void updateFocusLines();
     void navigateTo(const QString& path, bool record = true);
     void initToolbar();
     void setupSplitters();

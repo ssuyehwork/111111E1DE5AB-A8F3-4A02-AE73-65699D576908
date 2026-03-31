@@ -44,7 +44,7 @@ public:
             
             painter->setBrush(bg);
             painter->setPen(Qt::NoPen);
-            painter->drawRect(contentRect);
+            painter->drawRoundedRect(contentRect, 5, 5);
             painter->restore();
         }
 

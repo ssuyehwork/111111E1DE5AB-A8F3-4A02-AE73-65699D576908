@@ -20,6 +20,8 @@ public:
     explicit CategoryPanel(QWidget* parent = nullptr);
     ~CategoryPanel() override = default;
 
+    void setFocusLineVisible(bool visible);
+
 signals:
     void categorySelected(const QString& name);
 
@@ -36,6 +38,7 @@ private:
     void setupContextMenu();
 
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr; // 物理聚焦线
     
     DropTreeView* m_systemTree = nullptr;
     CategoryModel* m_systemModel = nullptr;
