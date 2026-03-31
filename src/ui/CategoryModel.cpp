@@ -103,9 +103,9 @@ QVariant CategoryModel::data(const QModelIndex& index, int role) const {
     return QStandardItemModel::data(index, role);
 }
 
-bool CategoryModel::setData(const QModelIndex& index, const QVariant& value, int role) {
+bool CategoryModel::setData(const QModelIndex& index, const QVariant& val, int role) {
     if (role == Qt::EditRole) {
-        QString newName = value.toString().trimmed();
+        QString newName = val.toString().trimmed();
         int id = index.data(IdRole).toInt();
         if (!newName.isEmpty() && id > 0) {
             // 获取分类并更新名称
@@ -122,7 +122,7 @@ bool CategoryModel::setData(const QModelIndex& index, const QVariant& value, int
         }
         return false;
     }
-    return QStandardItemModel::setData(index, value, role);
+    return QStandardItemModel::setData(index, val, role);
 }
 
 Qt::DropActions CategoryModel::supportedDropActions() const {

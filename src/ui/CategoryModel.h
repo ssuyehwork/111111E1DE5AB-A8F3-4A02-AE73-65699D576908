@@ -20,7 +20,7 @@ public slots:
     void refresh();
 
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
-    bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
+    bool setData(const QModelIndex& index, const QVariant& val, int role = Qt::EditRole) override;
 
     Qt::DropActions supportedDropActions() const override;
     bool dropMimeData(const QMimeData* mimeData, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;

@@ -29,6 +29,18 @@ bool CategoryRepo::add(Category& cat) {
     return false;
 }
 
+bool CategoryRepo::update(const Category& cat) {
+    QSqlQuery q;
+    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ? WHERE id = ?");
+    q.addBindValue(cat.parentId);
+    q.addBindValue(QString::fromStdWString(cat.name));
+    q.addBindValue(QString::fromStdWString(cat.color));
+    q.addBindValue(cat.sortOrder);
+    q.addBindValue(cat.pinned ? 1 : 0);
+    q.addBindValue(cat.id);
+    return q.exec();
+}
+
 bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPath) {
     QSqlQuery q;
     q.prepare("INSERT OR IGNORE INTO category_items (category_id, item_path, added_at) VALUES (?, ?, ?)");
