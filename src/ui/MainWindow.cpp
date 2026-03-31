@@ -159,9 +159,7 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::initUi() {
-    initToolbar();
     setupSplitters();
-    setupCustomTitleBarButtons();
     
     // 设置默认权重分配: 230 | 230 | 600 | 230 | 230
     QList<int> sizes;
@@ -363,22 +361,32 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     return QMainWindow::eventFilter(watched, event);
 }
 
-void MainWindow::initToolbar() {
-    m_toolbar = addToolBar("MainToolbar");
-    m_toolbar->setFixedHeight(32);
-    m_toolbar->setMovable(false);
-    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
 
-    auto createBtn = [this](const QString& iconKey, const QString& tip) {
+
+
+void MainWindow::setupSplitters() {
+    QWidget* centralC = new QWidget(this);
+    centralC->setStyleSheet("background-color: transparent;");
+    QVBoxLayout* mainL = new QVBoxLayout(centralC);
+    mainL->setContentsMargins(5, 5, 5, 5); // 窗口四周 5px 留白
+    mainL->setSpacing(5); // [CRITICAL] 统人间距：顶栏、容器、底栏间 5px 间距
+
+    // --- 顶部 Header 整合区域 ---
+    QWidget* headerWidget = new QWidget(centralC);
+    headerWidget->setFixedHeight(32);
+    headerWidget->setStyleSheet("QWidget { background: transparent; border: none; }");
+    QHBoxLayout* headerL = new QHBoxLayout(headerWidget);
+    headerL->setContentsMargins(0, 0, 0, 0);
+    headerL->setSpacing(5); // [CRITICAL] 组件间距：5px
+
+    // 1. 导航按钮组
+    auto createNavBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
-        btn->setFixedSize(32, 28); // 极致精简宽度
-        
-        QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
-        btn->setIcon(icon);
+        btn->setFixedSize(32, 28);
+        btn->setIcon(UiHelper::getIcon(iconKey, QColor("#EEEEEE")));
         btn->setIconSize(QSize(18, 18));
-        
-        btn->setToolTip(tip);
-        // 极致精简样式：无边框，仅悬停可见背景
+        btn->setProperty("tooltipText", tip);
+        btn->installEventFilter(this);
         btn->setStyleSheet(
             "QPushButton { background: transparent; border: none; border-radius: 4px; }"
             "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
@@ -388,43 +396,34 @@ void MainWindow::initToolbar() {
         return btn;
     };
 
-    m_btnBack = createBtn("nav_prev", "");
-    m_btnBack->setProperty("tooltipText", "后退");
-    m_btnBack->installEventFilter(this);
-
-    m_btnForward = createBtn("nav_next", "");
-    m_btnForward->setProperty("tooltipText", "前进");
-    m_btnForward->installEventFilter(this);
-
-    m_btnUp = createBtn("arrow_up", "");
-    m_btnUp->setProperty("tooltipText", "上级");
-    m_btnUp->installEventFilter(this);
+    m_btnBack = createNavBtn("nav_prev", "后退");
+    m_btnForward = createNavBtn("nav_next", "前进");
+    m_btnUp = createNavBtn("arrow_up", "上级");
 
     connect(m_btnBack, &QPushButton::clicked, this, &MainWindow::onBackClicked);
     connect(m_btnForward, &QPushButton::clicked, this, &MainWindow::onForwardClicked);
     connect(m_btnUp, &QPushButton::clicked, this, &MainWindow::onUpClicked);
 
-    // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
+    headerL->addWidget(m_btnBack);
+    headerL->addWidget(m_btnForward);
+    headerL->addWidget(m_btnUp);
+
+    // 2. 地址栏 (Breadcrumb Stack)
     m_pathStack = new QStackedWidget(this);
-    // 2026-03-xx 按照用户最新要求：地址栏高度还原为 32px
     m_pathStack->setFixedHeight(32); 
     m_pathStack->setMinimumWidth(300);
     m_pathStack->setStyleSheet("QStackedWidget { background: transparent; border: 1px solid #444444; border-radius: 4px; }");
 
-    // A. 面包屑视图
     m_breadcrumbBar = new BreadcrumbBar(m_pathStack);
     m_pathStack->addWidget(m_breadcrumbBar);
 
-    // B. 编辑视图
     m_pathEdit = new QLineEdit(m_pathStack);
     m_pathEdit->setPlaceholderText("输入路径...");
     m_pathEdit->setFixedHeight(34);
     m_pathEdit->setStyleSheet("QLineEdit { background: transparent; border: none; color: #EEEEEE; padding-left: 8px; }");
     m_pathStack->addWidget(m_pathEdit);
-
     m_pathStack->setCurrentWidget(m_breadcrumbBar);
 
-    // 交互逻辑
     connect(m_breadcrumbBar, &BreadcrumbBar::blankAreaClicked, [this]() {
         m_pathEdit->setText(QDir::toNativeSeparators(m_currentPath));
         m_pathStack->setCurrentWidget(m_pathEdit);
@@ -432,7 +431,6 @@ void MainWindow::initToolbar() {
         m_pathEdit->selectAll();
     });
     connect(m_pathEdit, &QLineEdit::editingFinished, [this]() {
-        // 只有在失去焦点或按回车后切回面包屑 (如果不是由于 confirm 跳转)
         if (m_pathStack->currentWidget() == m_pathEdit) {
             m_pathStack->setCurrentWidget(m_breadcrumbBar);
         }
@@ -440,40 +438,90 @@ void MainWindow::initToolbar() {
     connect(m_breadcrumbBar, &BreadcrumbBar::pathClicked, [this](const QString& path) {
         navigateTo(path);
     });
+    headerL->addWidget(m_pathStack, 1);
 
+    // 3. 搜索框
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setMinimumWidth(230);
-    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
     m_searchEdit->setFixedHeight(32); 
     m_searchEdit->setStyleSheet(
         "QLineEdit { background: transparent; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
         "QLineEdit:focus { border: 1px solid #FFFFFF; }"
     );
+    headerL->addWidget(m_searchEdit);
 
-}
+    // 4. 自定义标题栏按钮组
+    QWidget* titleBtns = new QWidget(this);
+    QHBoxLayout* titleL = new QHBoxLayout(titleBtns);
+    titleL->setContentsMargins(0, 0, 0, 0);
+    titleL->setSpacing(5); // [CRITICAL] 统人间距：5px
 
+    auto createTitleBtn = [this](const QString& iconKey, const QString& hoverColor = "rgba(255, 255, 255, 0.1)") {
+        QPushButton* btn = new QPushButton(this);
+        btn->setFixedSize(24, 24);
+        QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
+        btn->setIcon(icon);
+        btn->setIconSize(QSize(18, 18));
+        btn->setStyleSheet(QString(
+            "QPushButton { background: transparent; border: none; border-radius: 4px; padding: 0; }"
+            "QPushButton:hover { background: %1; }"
+            "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
+        ).arg(hoverColor));
+        return btn;
+    };
 
+    m_btnCreate = createTitleBtn("add");
+    m_btnCreate->setProperty("tooltipText", "新建...");
+    m_btnCreate->installEventFilter(this);
+    QMenu* createMenu = new QMenu(m_btnCreate);
+    createMenu->setStyleSheet(
+        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 6px; }"
+        "QMenu::item { height: 24px; padding: 0 20px 0 10px; border-radius: 3px; font-size: 12px; }"
+        "QMenu::item:selected { background-color: #505050; }"
+    );
+    createMenu->addAction(UiHelper::getIcon("folder", QColor("#EEEEEE")), "创建文件夹", [this](){ m_contentPanel->createNewItem("folder"); });
+    createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建 Markdown", [this](){ m_contentPanel->createNewItem("md"); });
+    createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)", [this](){ m_contentPanel->createNewItem("txt"); });
+    connect(m_btnCreate, &QPushButton::clicked, [this, createMenu]() {
+        createMenu->popup(m_btnCreate->mapToGlobal(QPoint(0, m_btnCreate->height())));
+    });
 
-void MainWindow::setupSplitters() {
-    QWidget* centralC = new QWidget(this);
-    centralC->setStyleSheet("background-color: transparent;"); 
-    QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(5, 5, 5, 5); // 复原：恢复窗口四周 5px 留白
-    mainL->setSpacing(0);
+    m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
+    m_btnPinTop->setProperty("tooltipText", "置顶窗口");
+    m_btnPinTop->installEventFilter(this);
+    m_btnPinTop->setCheckable(true);
+    m_btnPinTop->setChecked(m_isPinned);
+    if (m_isPinned) m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
+    connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);
 
-    QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(32);
-    addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
-    QHBoxLayout* addrL = new QHBoxLayout(addressBar);
-    addrL->setContentsMargins(0, 0, 0, 0);
-    addrL->setSpacing(2);
+    m_btnMin = createTitleBtn("minimize");
+    m_btnMin->setProperty("tooltipText", "最小化");
+    m_btnMin->installEventFilter(this);
+    connect(m_btnMin, &QPushButton::clicked, this, &MainWindow::showMinimized);
 
-    addrL->addWidget(m_btnBack);
-    addrL->addWidget(m_btnForward);
-    addrL->addWidget(m_btnUp);
-    addrL->addWidget(m_pathStack, 1);
-    addrL->addWidget(m_searchEdit);
+    m_btnMax = createTitleBtn("maximize");
+    m_btnMax->setProperty("tooltipText", "最大化/还原");
+    m_btnMax->installEventFilter(this);
+    connect(m_btnMax, &QPushButton::clicked, [this]() {
+        if (isMaximized()) showNormal(); else showMaximized();
+    });
+
+    m_btnClose = createTitleBtn("close", "#e81123");
+    m_btnClose->setProperty("tooltipText", "关闭项目");
+    m_btnClose->installEventFilter(this);
+    connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
+
+    titleL->addWidget(m_btnCreate);
+    titleL->addWidget(m_btnPinTop);
+    titleL->addWidget(m_btnMin);
+    titleL->addWidget(m_btnMax);
+    titleL->addWidget(m_btnClose);
+
+    headerL->addWidget(titleBtns);
+
+    // [CRITICAL] 统人间距：将 Header 容器添加到主布局，并保持 5px 留白
+    mainL->addWidget(headerWidget);
 
     // --- 主拆分条 ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
@@ -520,6 +568,9 @@ void MainWindow::setupSplitters() {
     m_mainSplitter->addWidget(m_metaPanel);
     m_mainSplitter->addWidget(m_filterPanel);
 
+    // [CRITICAL] 统人间距：将主拆分容器添加到主布局，并保持 5px 留白
+    mainL->addWidget(m_mainSplitter, 1);
+
     // --- 底部状态栏（28px） ---
     QWidget* statusBar = new QWidget(centralC);
     statusBar->setFixedHeight(28);
@@ -560,112 +611,12 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusCenter, 1);
     statusL->addWidget(m_statusRight, 1);
 
-    mainL->addWidget(addressBar);
-    mainL->addWidget(m_mainSplitter, 1);
+    // [CRITICAL] 统人间距：将状态栏添加到主布局，并保持 5px 留白
     mainL->addWidget(statusBar);
 
     setCentralWidget(centralC);
 }
 
-/**
- * @brief 实现符合 funcBtnStyle 规范的自定义按钮组
- */
-void MainWindow::setupCustomTitleBarButtons() {
-    QWidget* titleBarBtns = new QWidget(this);
-    QHBoxLayout* layout = new QHBoxLayout(titleBarBtns);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(4);
-
-    auto createTitleBtn = [this](const QString& iconKey, const QString& hoverColor = "rgba(255, 255, 255, 0.1)") {
-        QPushButton* btn = new QPushButton(this);
-        btn->setFixedSize(24, 24); // 固定 24x24px
-        
-        // 使用 UiHelper 全局辅助类
-        QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
-        btn->setIcon(icon);
-        btn->setIconSize(QSize(18, 18));
-        
-        btn->setStyleSheet(QString(
-            "QPushButton { background: transparent; border: none; border-radius: 4px; padding: 0; }"
-            "QPushButton:hover { background: %1; }"
-            "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
-        ).arg(hoverColor));
-        return btn;
-    };
-
-    m_btnCreate = createTitleBtn("add"); // 2026-03-xx 规范化：“+”按钮图标修正
-    m_btnCreate->setProperty("tooltipText", "新建...");
-    QMenu* createMenu = new QMenu(m_btnCreate);
-    createMenu->setStyleSheet(
-        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 6px; }"
-        "QMenu::item { height: 24px; padding: 0 20px 0 10px; border-radius: 3px; font-size: 12px; }"
-        "QMenu::item:selected { background-color: #505050; }"
-        "QMenu::right-arrow { image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRUVFRUVFIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iOSAxOCAxNSAxMiA5IDYiPjwvcG9seWxpbmU+PC9zdmc+); width: 12px; height: 12px; right: 8px; }"
-    );
-    
-    QAction* actNewFolder = createMenu->addAction(UiHelper::getIcon("folder", QColor("#EEEEEE")), "创建文件夹");
-    QAction* actNewMd     = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建 Markdown");
-    QAction* actNewTxt    = createMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)");
-    
-    // 2026-03-xx 按照用户要求修正居中对齐：
-    // 不再使用 setMenu，避免按钮进入“菜单模式”从而为指示器预留空间导致图标偏左。
-    // 采用手动 popup 方式展示菜单。
-    connect(m_btnCreate, &QPushButton::clicked, [this, createMenu]() {
-        createMenu->popup(m_btnCreate->mapToGlobal(QPoint(0, m_btnCreate->height())));
-    });
-
-    auto handleCreate = [this](const QString& type) {
-        m_contentPanel->createNewItem(type);
-    };
-    connect(actNewFolder, &QAction::triggered, [handleCreate](){ handleCreate("folder"); });
-    connect(actNewMd,     &QAction::triggered, [handleCreate](){ handleCreate("md"); });
-    connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
-
-    m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
-    m_btnPinTop->setProperty("tooltipText", "置顶窗口");
-    m_btnPinTop->installEventFilter(this);
-    m_btnPinTop->setCheckable(true);
-    m_btnPinTop->setChecked(m_isPinned);
-    if (m_isPinned) {
-        m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
-    }
-
-    m_btnMin = createTitleBtn("minimize");
-    m_btnMin->setProperty("tooltipText", "最小化");
-    m_btnMin->installEventFilter(this);
-
-    m_btnMax = createTitleBtn("maximize");
-    m_btnMax->setProperty("tooltipText", "最大化/还原");
-    m_btnMax->installEventFilter(this);
-
-    m_btnClose = createTitleBtn("close", "#e81123"); // 关闭按钮悬停红色
-    m_btnClose->setProperty("tooltipText", "关闭项目");
-    m_btnClose->installEventFilter(this);
-
-    m_btnCreate->installEventFilter(this);
-    layout->addWidget(m_btnCreate);
-    layout->addWidget(m_btnPinTop);
-    layout->addWidget(m_btnMin);
-    layout->addWidget(m_btnMax);
-    layout->addWidget(m_btnClose);
-
-    // 绑定基础逻辑
-    connect(m_btnMin, &QPushButton::clicked, this, &MainWindow::showMinimized);
-    connect(m_btnMax, &QPushButton::clicked, [this]() {
-        if (isMaximized()) showNormal();
-        else showMaximized();
-    });
-    connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
-
-    // 将按钮组添加到工具栏最右侧 (QToolBar 不支持 addStretch，改用弹簧 Widget)
-    QWidget* spacer = new QWidget(this);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_toolbar->addWidget(spacer);
-    m_toolbar->addWidget(titleBarBtns);
-
-    // 逻辑：置顶切换
-    connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);
-}
 
 void MainWindow::navigateTo(const QString& path, bool record) {
     if (path.isEmpty()) return;

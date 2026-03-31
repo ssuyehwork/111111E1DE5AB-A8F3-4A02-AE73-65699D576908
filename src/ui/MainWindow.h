@@ -50,9 +50,7 @@ private:
     void updateStatusBar();
     void updateFocusLines();
     void navigateTo(const QString& path, bool record = true);
-    void initToolbar();
     void setupSplitters();
-    void setupCustomTitleBarButtons();
 
     // 面包屑地址栏
     BreadcrumbBar* m_breadcrumbBar = nullptr;
@@ -68,7 +66,6 @@ private:
     QSplitter* m_mainSplitter = nullptr;
 
     // 工具栏组件
-    QToolBar* m_toolbar = nullptr;
     QLineEdit* m_pathEdit = nullptr;
     QLineEdit* m_searchEdit = nullptr;
     QPushButton* m_btnBack = nullptr;
