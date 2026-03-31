@@ -378,11 +378,6 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
 }
 
 void MainWindow::initToolbar() {
-    m_toolbar = addToolBar("MainToolbar");
-    m_toolbar->setFixedHeight(32);
-    m_toolbar->setMovable(false);
-    m_toolbar->setStyleSheet("QToolBar { background-color: #252525; border: none; padding-left: 12px; padding-right: 12px; spacing: 8px; border-bottom: 1px solid #333; }");
-
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
         btn->setFixedSize(32, 28); // 极致精简宽度
@@ -423,7 +418,7 @@ void MainWindow::initToolbar() {
     // 2026-03-xx 按照用户最新要求：地址栏高度还原为 32px
     m_pathStack->setFixedHeight(32); 
     m_pathStack->setMinimumWidth(300);
-    m_pathStack->setStyleSheet("QStackedWidget { background: transparent; border: 1px solid #444444; border-radius: 4px; }");
+    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
 
     // A. 面包屑视图
     m_breadcrumbBar = new BreadcrumbBar(m_pathStack);
@@ -460,9 +455,11 @@ void MainWindow::initToolbar() {
     m_searchEdit->setMinimumWidth(230);
     // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
     m_searchEdit->setFixedHeight(32);
+    // [脑补优化] 为搜索框添加图标，并统一圆角为 4px
+    m_searchEdit->addAction(UiHelper::getIcon("search", QColor("#888888")), QLineEdit::LeadingPosition);
     m_searchEdit->setStyleSheet(
-        "QLineEdit { background: transparent; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 8px; }"
-        "QLineEdit:focus { border: 1px solid #FFFFFF; }"
+        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 5px; }"
+        "QLineEdit:focus { border: 1px solid #378ADD; }"
     );
 
 }
@@ -474,22 +471,24 @@ void MainWindow::setupSplitters() {
     centralC->setObjectName("CentralWidget");
     centralC->setStyleSheet("#CentralWidget { background-color: #1E1E1E; }"); 
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 5, 0, 0);
+    mainL->setContentsMargins(0, 0, 0, 0);
     mainL->setSpacing(0); 
 
-    // --- 1. 顶部地址栏 (保持 5px 垂直间距) ---
-    QWidget* addressBar = new QWidget(centralC);
-    addressBar->setFixedHeight(32);
-    addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
-    QHBoxLayout* addrL = new QHBoxLayout(addressBar);
-    addrL->setContentsMargins(12, 0, 12, 0); // 左右呼吸间距
-    addrL->setSpacing(5);
+    // --- 1. 统一顶栏 (物理还原：上下保持 5px 间距) ---
+    QWidget* headerWidget = new QWidget(centralC);
+    headerWidget->setFixedHeight(42); // 32px content + 5px top + 5px bottom
+    headerWidget->setStyleSheet("QWidget { background-color: #252525; border-bottom: 1px solid #333; }");
 
-    addrL->addWidget(m_btnBack);
-    addrL->addWidget(m_btnForward);
-    addrL->addWidget(m_btnUp);
-    addrL->addWidget(m_pathStack, 1);
-    addrL->addWidget(m_searchEdit);
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerWidget);
+    headerLayout->setContentsMargins(12, 5, 12, 5);
+    headerLayout->setSpacing(5);
+    headerLayout->setAlignment(Qt::AlignVCenter);
+
+    headerLayout->addWidget(m_btnBack);
+    headerLayout->addWidget(m_btnForward);
+    headerLayout->addWidget(m_btnUp);
+    headerLayout->addWidget(m_pathStack, 1);
+    headerLayout->addWidget(m_searchEdit);
 
     // --- 2. 主体核心容器 (物理还原：5px 全局边距包裹) ---
     QWidget* bodyWrapper = new QWidget(centralC);
@@ -566,7 +565,7 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusCenter, 1);
     statusL->addWidget(m_statusRight, 1);
 
-    mainL->addWidget(addressBar);
+    mainL->addWidget(headerWidget);
     mainL->addWidget(bodyWrapper, 1);
     mainL->addWidget(statusBar);
 
@@ -663,11 +662,7 @@ void MainWindow::setupCustomTitleBarButtons() {
     });
     connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
 
-    // 将按钮组添加到工具栏最右侧 (QToolBar 不支持 addStretch，改用弹簧 Widget)
-    QWidget* spacer = new QWidget(this);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_toolbar->addWidget(spacer);
-    m_toolbar->addWidget(titleBarBtns);
+    headerLayout->addWidget(titleBarBtns);
 
     // 逻辑：置顶切换
     connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);

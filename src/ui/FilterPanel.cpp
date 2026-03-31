@@ -374,19 +374,30 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
     wl->setSpacing(0);
 
     QToolButton* hdr = new QToolButton(wrapper);
-    hdr->setText(title); // 2026-03-xx 按照用户要求，移除硬编码空格，统一使用 QSS 边距控制
+    hdr->setText(title);
     hdr->setCheckable(true);
     hdr->setChecked(true);
-    // hdr->setArrowType(Qt::DownArrow); // 核心红线：禁止使用或显示三角形
-    hdr->setToolButtonStyle(Qt::ToolButtonTextOnly); // 2026-03-xx 强制仅文本，防止图标空间干扰左对齐
+    hdr->setToolButtonStyle(Qt::ToolButtonTextOnly);
     hdr->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     hdr->setFixedHeight(24);
+    // 关键修正：通过 padding-left 和 text-align 强制文字绝对向左靠齐，解决伪居中问题
     hdr->setStyleSheet(
-        "QToolButton { background: #252526; border: none; border-top: 1px solid #333333;"
-        "              color: #AAAAAA; font-size: 11px; font-weight: 600; text-align: left; "
-        "              padding-left: 0px; } "
+        "QToolButton { "
+        "  background: #252526; "
+        "  border: none; "
+        "  border-top: 1px solid #333333;"
+        "  color: #AAAAAA; "
+        "  font-size: 11px; "
+        "  font-weight: 600; "
+        "  text-align: left; "
+        "  padding-left: 2px; "
+        "  padding-right: 0px; "
+        "  padding-top: 0px; "
+        "  padding-bottom: 0px; "
+        "  margin: 0px; "
+        "} "
         "QToolButton:hover { color: #EEEEEE; } "
-        "QToolButton::menu-indicator { image: none; }"); // 彻底移除可能的菜单箭头占位
+        "QToolButton::menu-indicator { image: none; }");
 
     QWidget* content = new QWidget(wrapper);
     content->setStyleSheet("QWidget { background: transparent; }");
