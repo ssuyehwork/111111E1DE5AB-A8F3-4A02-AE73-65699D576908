@@ -158,7 +158,7 @@ ContentPanel::ContentPanel(QWidget* parent)
     : QFrame(parent) {
     setObjectName("EditorContainer");
     setAttribute(Qt::WA_StyledBackground, true);
-    setMinimumWidth(200);
+    setMinimumWidth(230);
     
     // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
     setStyleSheet("color: #EEEEEE;");
