@@ -11,7 +11,7 @@
 #include <QMouseEvent>
 #include <QGraphicsDropShadowEffect>
 #include <QFutureWatcher>
-#include "../core/DatabaseManager.h"
+#include "../core/NoteTypes.h" // [FIX] 物理隔离基础类型，防止包含循环
 
 class FilterPanel : public QWidget {
     Q_OBJECT

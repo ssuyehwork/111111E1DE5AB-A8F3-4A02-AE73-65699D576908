@@ -19,6 +19,7 @@
 #include "FilterPanel.h"
 #include "CategoryLockWidget.h"
 #include "../core/DatabaseManager.h"
+#include "../core/NoteTypes.h" // [FIX] 物理隔离基础类型定义
 
 #ifdef Q_OS_WIN
 #include <windows.h>
