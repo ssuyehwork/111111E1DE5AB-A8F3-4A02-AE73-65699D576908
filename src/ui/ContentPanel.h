@@ -48,6 +48,8 @@ public:
      */
     void setViewMode(ViewMode mode);
 
+    void setFocusLineVisible(bool visible);
+
     /**
      * @brief 拦截空格键（红线：物理拦截 QEvent::KeyPress 且为 Key_Space）
      */
@@ -92,8 +94,6 @@ private:
     void initGridView();
     void initListView();
     void setupContextMenu();
-
-    void setFocusLineVisible(bool visible);
 
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr; // 物理聚焦线

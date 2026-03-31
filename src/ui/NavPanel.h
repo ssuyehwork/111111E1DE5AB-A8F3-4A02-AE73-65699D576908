@@ -20,6 +20,8 @@ public:
     explicit NavPanel(QWidget* parent = nullptr);
     ~NavPanel() override = default;
 
+    void setFocusLineVisible(bool visible);
+
     /**
      * @brief 设置并跳转到指定目录
      * @param path 完整路径
@@ -47,7 +49,6 @@ private:
     
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
-    void setFocusLineVisible(bool visible);
 
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr; // 物理聚焦线
