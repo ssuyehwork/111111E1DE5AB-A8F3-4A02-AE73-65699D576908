@@ -220,7 +220,7 @@ void MetaPanel::initUi() {
         "}"
     );
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
+    headerLayout->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);

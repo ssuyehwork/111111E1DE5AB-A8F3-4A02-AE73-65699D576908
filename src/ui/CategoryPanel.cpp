@@ -125,7 +125,7 @@ void CategoryPanel::initUi() {
         "}"
     );
     QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 0, 15, 0);
+    headerLayout->setContentsMargins(15, 2, 15, 0);
     headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);

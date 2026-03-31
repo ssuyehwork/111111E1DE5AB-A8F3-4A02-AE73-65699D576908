@@ -200,7 +200,7 @@ void ContentPanel::initUi() {
         "}"
     );
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
-    titleL->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
+    titleL->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
 
     QLabel* iconLabel = new QLabel(titleBar);
     iconLabel->setPixmap(UiHelper::getIcon("eye", QColor("#41F2F2"), 18).pixmap(18, 18));
@@ -936,7 +936,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QColor cardBg = isSelected ? QColor("#282828") : (isHovered ? QColor("#2A2A2A") : QColor("#2D2D2D"));
     painter->setPen(isSelected ? QPen(QColor("#3498db"), 2) : QPen(QColor("#333333"), 1));
     painter->setBrush(cardBg);
-    painter->drawRoundedRect(cardRect, 8, 8);
+    painter->drawRoundedRect(cardRect, 2, 2);
 
     QString path = index.data(PathRole).toString();
     QFileInfo info(path);

@@ -108,7 +108,7 @@ FilterPanel::FilterPanel(QWidget* parent) : QFrame(parent) {
         "}"
     );
     QHBoxLayout* topL = new QHBoxLayout(topBar);
-    topL->setContentsMargins(15, 0, 15, 0); // 严格还原 15px 左右边距
+    topL->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
     topL->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(topBar);

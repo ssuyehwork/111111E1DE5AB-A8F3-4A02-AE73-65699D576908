@@ -53,6 +53,7 @@ private:
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
     QVBoxLayout* m_mainLayout = nullptr;
+    QWidget* m_focusLine = nullptr;
 
 private slots:
     void onTreeClicked(const QModelIndex& index);

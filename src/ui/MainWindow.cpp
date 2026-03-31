@@ -494,6 +494,7 @@ void MainWindow::setupSplitters() {
 
     // --- 2. 主体核心容器 (物理还原：5px 全局边距包裹) ---
     QWidget* bodyWrapper = new QWidget(centralC);
+    bodyWrapper->setStyleSheet("background: transparent;"); // 确保背景透明不遮挡阴影
     QVBoxLayout* bodyLayout = new QVBoxLayout(bodyWrapper);
     bodyLayout->setContentsMargins(5, 5, 5, 5); // 物理还原：5px 呼吸感
     bodyLayout->setSpacing(0);
