@@ -28,13 +28,6 @@ CategoryPanel::CategoryPanel(QWidget* parent)
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    m_focusLine = new QWidget(this);
-    m_focusLine->setObjectName("focusLine");
-    m_focusLine->setFixedHeight(1);
-    m_focusLine->setStyleSheet("background-color: #2ecc71; border: none;");
-    m_focusLine->hide();
-    m_mainLayout->addWidget(m_focusLine);
-    
     initUi();
     setupContextMenu();
 
@@ -209,25 +202,13 @@ void CategoryPanel::initUi() {
                 QString("<b style='color:#2ecc71;'>已收藏 %1 个项目到 [%2]</b>").arg(count).arg(categoryName), 1200);
         }
     });
-    
+
     sbContentLayout->addWidget(m_systemTree);
     sbContentLayout->addWidget(m_partitionTree);
     m_mainLayout->addWidget(sbContent, 1);
 }
 
 bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
-    if (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut) {
-        QWidget* focus = QApplication::focusWidget();
-        bool isChildFocused = false;
-        if (focus) {
-            QWidget* p = focus;
-            while (p) {
-                if (p == this) { isChildFocused = true; break; }
-                p = p->parentWidget();
-            }
-        }
-        m_focusLine->setVisible(isChildFocused);
-    }
     return QFrame::eventFilter(obj, event);
 }
 

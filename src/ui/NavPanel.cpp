@@ -30,15 +30,6 @@ NavPanel::NavPanel(QWidget* parent)
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
 
-    // 还原 1px 焦点线 (物理逻辑：统一绿色 #2ecc71，且无边框以防视觉重叠)
-    m_focusLine = new QWidget(this);
-    m_focusLine->setObjectName("focusLine");
-    m_focusLine->setFixedHeight(1);
-    m_focusLine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_focusLine->setStyleSheet("background-color: #2ecc71; border: none;");
-    m_focusLine->hide();
-    m_mainLayout->addWidget(m_focusLine);
-
     initUi();
 }
 

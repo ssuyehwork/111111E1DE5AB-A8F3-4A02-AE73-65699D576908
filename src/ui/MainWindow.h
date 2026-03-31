@@ -52,7 +52,6 @@ private:
     void initToolbar();
     void setupSplitters();
     void setupCustomTitleBarButtons();
-    void updateFocusLines();
 
     // 面包屑地址栏
     BreadcrumbBar* m_breadcrumbBar = nullptr;
@@ -64,10 +63,6 @@ private:
     ContentPanel* m_contentPanel = nullptr;
     MetaPanel* m_metaPanel = nullptr;
     FilterPanel* m_filterPanel = nullptr;
-
-    // 焦点线架构 (1px 边缘高亮 - 仅前二面板具备)
-    QWidget* m_sidebarFocusLine = nullptr;
-    QWidget* m_listFocusLine = nullptr;
 
     QSplitter* m_mainSplitter = nullptr;
 

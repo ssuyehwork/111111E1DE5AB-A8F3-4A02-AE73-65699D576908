@@ -94,7 +94,6 @@ private:
     void setupContextMenu();
 
     QVBoxLayout* m_mainLayout = nullptr;
-    QWidget* m_focusLine = nullptr;
     QStackedWidget* m_viewStack = nullptr;
     
     // 视图组件

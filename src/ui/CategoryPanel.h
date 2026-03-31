@@ -36,7 +36,6 @@ private:
     void setupContextMenu();
 
     QVBoxLayout* m_mainLayout = nullptr;
-    QWidget* m_focusLine = nullptr;
     
     DropTreeView* m_systemTree = nullptr;
     CategoryModel* m_systemModel = nullptr;

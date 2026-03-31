@@ -151,8 +151,6 @@ MainWindow::MainWindow(QWidget* parent)
         m_navPanel->selectPath("computer://");
     });
 
-    // 全局拦截以驱动容器 FocusLine 高亮显隐
-    if (qApp) qApp->installEventFilter(this);
 }
 
 void MainWindow::initUi() {
@@ -353,11 +351,6 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
         ToolTipOverlay::hideTip();
     }
 
-    // 监听全局焦点变化以更新容器高亮线
-    if (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut) {
-        updateFocusLines();
-    }
-
     return QMainWindow::eventFilter(watched, event);
 }
 
@@ -453,44 +446,21 @@ void MainWindow::initToolbar() {
 
 
 
-void MainWindow::updateFocusLines() {
-    QWidget* focus = QApplication::focusWidget();
-    
-    // 逻辑：只有在容器可见且获焦时，显示顶部的物理绿色高亮线 (1px)
-    auto checkFocus = [&](QWidget* container, QWidget* focusLine) {
-        if (!container || !focusLine) return;
-        
-        bool isChildFocused = false;
-        if (focus) {
-            QWidget* p = focus;
-            while (p) {
-                if (p == container) { isChildFocused = true; break; }
-                p = p->parentWidget();
-            }
-        }
-        focusLine->setVisible(isChildFocused && container->isVisible());
-    };
-
-    checkFocus(m_categoryPanel, m_sidebarFocusLine);
-    checkFocus(m_navPanel,      m_listFocusLine);
-
-}
-
 void MainWindow::setupSplitters() {
     QWidget* centralC = new QWidget(this);
-    // 核心修正：父容器背景必须透明或匹配主色，以便 Splitter 的 5px 物理缝隙能显示出底色差异
+    // 还原旧版紧凑布局：父容器背景透明，容器间无物理缝隙
     centralC->setStyleSheet("background-color: transparent;"); 
     QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(5, 5, 5, 5); // 物理还原 5px 全局边距
-    mainL->setSpacing(5); // 物理还原 5px 垂直间距
+    mainL->setContentsMargins(0, 0, 0, 0); // 还原 0px 全局边距
+    mainL->setSpacing(0); // 还原 0px 垂直间距
 
     QWidget* addressBar = new QWidget(centralC);
     addressBar->setFixedHeight(32); // 2026-03-xx 按照最新要求：地址栏高度还原为 32px
     addressBar->setStyleSheet("QWidget { background: transparent; border: none; }");
     QHBoxLayout* addrL = new QHBoxLayout(addressBar);
     addrL->setContentsMargins(0, 0, 0, 0);
-    // 2026-03-xx 按照用户授权：调整地址栏各组件（含搜索框）间距为 5 像素
-    addrL->setSpacing(5);
+    // 地址栏组件间距同步还原为紧凑型 (2px)
+    addrL->setSpacing(2);
 
     addrL->addWidget(m_btnBack);
     addrL->addWidget(m_btnForward);
@@ -498,19 +468,17 @@ void MainWindow::setupSplitters() {
     addrL->addWidget(m_pathStack, 1);
     addrL->addWidget(m_searchEdit);
 
-    // --- 主拆分条 (严格 5px 物理缝隙，Handle 透明以突出容器 1px 边框) ---
+    // --- 主拆分条 (还原 1px 物理缝隙，使容器边框重合) ---
     m_mainSplitter = new QSplitter(Qt::Horizontal, centralC);
-    m_mainSplitter->setHandleWidth(5); 
+    m_mainSplitter->setHandleWidth(1);
     m_mainSplitter->setChildrenCollapsible(false);
-    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: transparent; }");
+    m_mainSplitter->setStyleSheet("QSplitter::handle { background-color: #333333; }");
 
     m_categoryPanel = new CategoryPanel(this);
     m_categoryPanel->setObjectName("SidebarContainer");
-    m_sidebarFocusLine = m_categoryPanel->findChild<QWidget*>("focusLine"); // 假设内部名称为 focusLine
     
     m_navPanel = new NavPanel(this);
     m_navPanel->setObjectName("ListContainer");
-    m_listFocusLine = m_navPanel->findChild<QWidget*>("focusLine");
     
     m_contentPanel = new ContentPanel(this);
     m_contentPanel->setObjectName("EditorContainer");
