@@ -188,6 +188,26 @@ void CategoryPanel::initUi() {
     connect(m_partitionTree, &QTreeView::clicked, [this](const QModelIndex& index) {
         emit categorySelected(index.data(CategoryModel::NameRole).toString());
     });
+
+    connect(m_partitionTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
+        if (!index.isValid()) return;
+
+        int categoryId = index.data(CategoryModel::IdRole).toInt();
+        QString categoryName = index.data(CategoryModel::NameRole).toString();
+
+        // 核心红线：仅对具体分类执行“建立引用收藏”逻辑
+        if (categoryId > 0) {
+            int count = 0;
+            for (const QString& path : paths) {
+                if (CategoryRepo::addItemToCategory(categoryId, path.toStdWString())) {
+                    count++;
+                }
+            }
+            // 物理反馈：提示收藏成功
+            ToolTipOverlay::instance()->showText(QCursor::pos(),
+                QString("<b style='color:#2ecc71;'>已收藏 %1 个项目到 [%2]</b>").arg(count).arg(categoryName), 1200);
+        }
+    });
     
     sbContentLayout->addWidget(m_systemTree);
     sbContentLayout->addWidget(m_partitionTree);

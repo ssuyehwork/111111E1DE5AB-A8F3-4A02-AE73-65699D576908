@@ -15,6 +15,7 @@ public:
 
 signals:
     void notesDropped(const QList<int>& noteIds, const QModelIndex& targetIndex);
+    void pathsDropped(const QStringList& paths, const QModelIndex& targetIndex);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
