@@ -6,8 +6,6 @@
 #include <QDropEvent>
 #include <QMimeData>
 
-namespace ArcMeta {
-
 class DropTreeView : public QTreeView {
     Q_OBJECT
 public:
@@ -15,7 +13,6 @@ public:
 
 signals:
     void notesDropped(const QList<int>& noteIds, const QModelIndex& targetIndex);
-    void pathsDropped(const QStringList& paths, const QModelIndex& targetIndex);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
@@ -23,9 +20,10 @@ protected:
     void dropEvent(QDropEvent* event) override;
     void startDrag(Qt::DropActions supportedActions) override;
 
+    // [COMPAT] 2026-03-xx 兼容性修复：重写键盘搜索逻辑
+    // 通过将此函数留空，可以彻底禁用 QTreeView 的“按名搜索”功能，
+    // 同时避免使用 Qt 6.3+ 才支持的 setKeyboardSearchEnabled 导致的编译错误。
     void keyboardSearch(const QString& search) override;
 };
-
-} // namespace ArcMeta
 
 #endif // DROPTREEVIEW_H
