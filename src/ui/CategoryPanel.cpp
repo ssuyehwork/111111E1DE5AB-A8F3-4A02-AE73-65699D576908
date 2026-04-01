@@ -394,11 +394,21 @@ void CategoryPanel::initUi() {
 
     QString treeStyle = R"(
         QTreeView { background-color: transparent; border: none; color: #CCC; outline: none; }
-        QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); }
-        QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); }
-        /* 针对不同状态的补全，确保三角形图标在任何情况下都可见 */
-        QTreeView::branch:has-children:closed:has-siblings { image: url(:/icons/arrow_right.svg); }
-        QTreeView::branch:has-children:open:has-siblings   { image: url(:/icons/arrow_down.svg); }
+
+        /* 物理还原：复原三角形折叠图标 (资源系统路径) */
+        QTreeView::branch:has-children:closed {
+            image: url(:/icons/arrow_right.svg);
+        }
+        QTreeView::branch:has-children:open {
+            image: url(:/icons/arrow_down.svg);
+        }
+        QTreeView::branch:has-children:closed:has-siblings {
+            image: url(:/icons/arrow_right.svg);
+        }
+        QTreeView::branch:has-children:open:has-siblings {
+            image: url(:/icons/arrow_down.svg);
+        }
+
         QTreeView::item { height: 26px; padding-left: 0px; }
     )";
 
@@ -410,7 +420,7 @@ void CategoryPanel::initUi() {
     // 使用 Both 模式同时加载系统项与用户分类
     m_categoryModel = new CategoryModel(CategoryModel::Both, this);
     m_categoryTree->setModel(m_categoryModel);
-    
+
     m_categoryTree->setHeaderHidden(true);
     m_categoryTree->setRootIsDecorated(true);
     m_categoryTree->setIndentation(20);
