@@ -274,7 +274,6 @@ void MainWindow::initUi() {
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget* old, QWidget* now) {
         Q_UNUSED(old);
         // 重置所有面板高亮
-        if (m_categoryPanel) m_categoryPanel->setFocusHighlight(false);
         if (m_navPanel)      m_navPanel->setFocusHighlight(false);
         if (m_contentPanel)  m_contentPanel->setFocusHighlight(false);
         if (m_metaPanel)     m_metaPanel->setFocusHighlight(false);
@@ -285,7 +284,6 @@ void MainWindow::initUi() {
         // 递归查找焦点所属面板
         QWidget* p = now;
         while (p) {
-            if (p == m_categoryPanel) { m_categoryPanel->setFocusHighlight(true); break; }
             if (p == m_navPanel)      { m_navPanel->setFocusHighlight(true); break; }
             if (p == m_contentPanel)  { m_contentPanel->setFocusHighlight(true); break; }
             if (p == m_metaPanel)     { m_metaPanel->setFocusHighlight(true); break; }

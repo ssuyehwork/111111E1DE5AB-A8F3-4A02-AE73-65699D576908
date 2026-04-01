@@ -221,55 +221,17 @@ void CategoryPanel::onDeleteCategory() {
     }
 }
 
-void CategoryPanel::setFocusHighlight(bool visible) {
-    if (m_focusLine) m_focusLine->setVisible(visible);
-}
-
 void CategoryPanel::initUi() {
-    // 物理还原：1px 翠绿高亮焦点线 (#2ecc71)
-    m_focusLine = new QWidget(this);
-    m_focusLine->setFixedHeight(1);
-    m_focusLine->setStyleSheet("background-color: #2ecc71;");
-    m_focusLine->hide(); // 初始隐藏
-    m_mainLayout->addWidget(m_focusLine);
-
-    // 1. 标题栏
-    QWidget* header = new QWidget(this);
-    header->setObjectName("ContainerHeader");
-    header->setFixedHeight(32);
-    header->setStyleSheet(
-        "QWidget#ContainerHeader {"
-        "  background-color: #252526;"
-        "  border-bottom: 1px solid #333;"
-        "}"
-    );
-    QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 2, 15, 0);
-    headerLayout->setSpacing(8);
-
-    QLabel* iconLabel = new QLabel(header);
-    iconLabel->setPixmap(UiHelper::getIcon("category", QColor("#3498db"), 18).pixmap(18, 18));
-    headerLayout->addWidget(iconLabel);
-
-    QLabel* titleLabel = new QLabel("数据分类", header);
-    titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #3498db; background: transparent; border: none;");
-    headerLayout->addWidget(titleLabel);
-    headerLayout->addStretch();
-
-    m_mainLayout->addWidget(header);
-
-    // 2. 内容区包裹容器 (物理还原 10, 10, 10, 10 呼吸边距)
-    QWidget* sbContent = new QWidget(this);
-    sbContent->setStyleSheet("background: transparent; border: none;");
-    auto* sbContentLayout = new QVBoxLayout(sbContent);
-    sbContentLayout->setContentsMargins(10, 10, 10, 10);
-    sbContentLayout->setSpacing(0);
+    // 物理还原：根据用户要求，分类容器保持左侧 10 像素边距，上方同样保持 10 像素边距
+    m_mainLayout->setContentsMargins(10, 10, 10, 10);
+    m_mainLayout->setSpacing(0);
 
     QString treeStyle = R"(
         QTreeView { background-color: transparent; border: none; color: #CCC; outline: none; }
-        QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); }
-        QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); }
-        QTreeView::item { height: 22px; padding-left: 0px; }
+        QTreeView::branch { width: 0px; }
+        QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); width: 12px; }
+        QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); width: 12px; }
+        QTreeView::item { height: 22px; padding-left: 0px; margin-left: 0px; }
     )";
 
     // 系统树
@@ -330,9 +292,8 @@ void CategoryPanel::initUi() {
         }
     });
     
-    sbContentLayout->addWidget(m_systemTree);
-    sbContentLayout->addWidget(m_partitionTree);
-    m_mainLayout->addWidget(sbContent, 1);
+    m_mainLayout->addWidget(m_systemTree);
+    m_mainLayout->addWidget(m_partitionTree, 1);
 }
 
 bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
