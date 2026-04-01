@@ -390,7 +390,7 @@ QWidget* FilterPanel::buildGroup(const QString& title, QVBoxLayout*& outContentL
         "  font-size: 11px; "
         "  font-weight: 600; "
         "  text-align: left; "
-        "  padding-left: 2px; "
+        "  padding-left: 12px; "
         "  padding-right: 0px; "
         "  padding-top: 0px; "
         "  padding-bottom: 0px; "

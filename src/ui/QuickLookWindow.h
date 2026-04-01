@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include "FramelessDialog.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QGraphicsView>
@@ -11,9 +11,9 @@ namespace ArcMeta {
 
 /**
  * @brief 专业快速预览窗口
- * 硬件加速图片预览、大文件 Markdown 内存映射极速加载
+ * 继承自 FramelessDialog，遵循项目标准架构规范
  */
-class QuickLookWindow : public QWidget {
+class QuickLookWindow : public FramelessDialog {
     Q_OBJECT
 
 public:

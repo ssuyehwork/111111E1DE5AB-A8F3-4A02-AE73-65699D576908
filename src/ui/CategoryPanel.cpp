@@ -42,8 +42,8 @@ void CategoryPanel::setupContextMenu() {
         auto selected = m_partitionTree->selectionModel()->selectedIndexes();
         
         QMenu menu(this);
-        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; } "
-                           "QMenu::item { padding: 6px 10px 6px 10px; border-radius: 3px; } "
+        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; } "
+                           "QMenu::item { padding: 6px 10px 6px 10px; border-radius: 4px; } "
                            "QMenu::icon { margin-left: 6px; } "
                            "QMenu::item:selected { background-color: #3E3E42; color: white; }");
 

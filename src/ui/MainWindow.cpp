@@ -36,9 +36,10 @@ namespace ArcMeta {
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
-    resize(1200, 800);
-    setMinimumSize(1000, 600);
+    resize(1600, 900);
+    setMinimumSize(1200, 720);
     setWindowTitle("ArcMeta");
+    setAttribute(Qt::WA_TranslucentBackground);
 
     // 从设置读取置顶状态
     QSettings settings("ArcMeta团队", "ArcMeta");
@@ -47,94 +48,63 @@ MainWindow::MainWindow(QWidget* parent)
     // 设置基础窗口标志 (保持无边框)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    // 初始应用置顶 (WinAPI)
-    // 2026-03-xx 关键修复：构造函数内不再调用 winId() 或 SetWindowPos 避免触发窗口提前显示
-    // 置顶逻辑现在改为按需由 external 或 showEvent 安全触发
     if (m_isPinned) {
         setWindowFlag(Qt::WindowStaysOnTopHint, true);
     }
 
-    // 应用全局样式（包括滚动条美化）
+    // 应用全局样式
     QString qss = R"(
-        QMainWindow { background-color: #1E1E1E; }
+        QMainWindow { background-color: transparent; }
 
-        /* 核心容器样式还原 - 强化 1 像素物理切割感 */
-        #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
-            background-color: #1E1E1E;
+        /* 核心架构样式 (Memories.md 规范) */
+        QFrame#DialogContainer {
+            background-color: #1e1e1e;
             border: 1px solid #333333;
-            border-radius: 0px;
+            border-radius: 12px;
         }
 
-        /* 容器标题栏样式 (还原旧版 #252526 实色背景与下边框) */
-        /* 2026-03-xx 回归修正：各面板已注入局部样式，此处保留全局 ID 匹配以作兜底 */
-        #ContainerHeader {
+        QWidget#TitleBar {
             background-color: #252526;
             border-bottom: 1px solid #333333;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
         }
+
+        #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
+            background-color: #1E1E1E;
+            border-right: 1px solid #333333;
+            border-radius: 0px;
+        }
+        #FilterContainer { border-right: none; }
 
         /* 全局滚动条美化 */
-        QScrollBar:vertical {
-            border: none;
-            background: transparent;
-            width: 4px;
-            margin: 0px;
-        }
-        QScrollBar::handle:vertical {
-            background: #333333;
-            min-height: 20px;
-            border-radius: 2px;
-        }
-        QScrollBar::handle:vertical:hover {
-            background: #444444;
-        }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-            background: none;
-        }
+        QScrollBar:vertical { border: none; background: transparent; width: 4px; margin: 0px; }
+        QScrollBar::handle:vertical { background: #333333; min-height: 20px; border-radius: 2px; }
+        QScrollBar::handle:vertical:hover { background: #444444; }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
 
-        QScrollBar:horizontal {
-            border: none;
-            background: transparent;
-            height: 4px;
-            margin: 0px;
-        }
-        QScrollBar::handle:horizontal {
-            background: #333333;
-            min-width: 20px;
-            border-radius: 2px;
-        }
-        QScrollBar::handle:horizontal:hover {
-            background: #444444;
-        }
-        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-            width: 0px;
-        }
-        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-            background: none;
-        }
+        QScrollBar:horizontal { border: none; background: transparent; height: 4px; margin: 0px; }
+        QScrollBar::handle:horizontal { background: #333333; min-width: 20px; border-radius: 2px; }
+        QScrollBar::handle:horizontal:hover { background: #444444; }
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0px; }
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: none; }
 
-        /* 统一复选框样式 */
-        QCheckBox { color: #EEEEEE; font-size: 12px; spacing: 5px; }
-        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1E1E1E; }
-        QCheckBox::indicator:hover { border: 1px solid #666; }
-        QCheckBox::indicator:checked { 
-            border: 1px solid #378ADD; 
-            background: #1E1E1E; 
-            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
-        }
-
-        /* 统一输入框样式 */
+        /* 规范对齐：QLineEdit 圆角 6px (AGENTS.md) */
         QLineEdit {
-            background: #1E1E1E;
+            background: #1A1A1A;
             border: 1px solid #333333;
-            border-radius: 4px;
+            border-radius: 6px;
             color: #EEEEEE;
             padding-left: 8px;
         }
-        QLineEdit:focus {
-            border: 1px solid #378ADD;
+        QLineEdit:focus { border: 1px solid #378ADD; }
+
+        /* 规范对齐：复选框指示器 */
+        QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #444; border-radius: 2px; background: #1A1A1A; }
+        QCheckBox::indicator:checked {
+            border: 1px solid #378ADD; background: #1A1A1A;
+            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
         }
     )";
     setStyleSheet(qss);
@@ -153,6 +123,7 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::initUi() {
+    initBaseLayout();
     initToolbar();
     setupSplitters();
     setupCustomTitleBarButtons();
@@ -375,9 +346,46 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     return QMainWindow::eventFilter(watched, event);
 }
 
+void MainWindow::initBaseLayout() {
+    // 1. 外层布局 (20px 呼吸感)
+    m_outerLayout = new QVBoxLayout();
+    m_outerLayout->setContentsMargins(20, 20, 20, 20);
+    m_outerLayout->setSpacing(0);
+
+    // 2. 主容器
+    m_container = new QFrame();
+    m_container->setObjectName("DialogContainer");
+
+    m_mainLayout = new QVBoxLayout(m_container);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
+    m_mainLayout->setSpacing(0);
+
+    // 3. 标题栏
+    m_titleBar = new QWidget(m_container);
+    m_titleBar->setObjectName("TitleBar");
+    m_titleBar->setFixedHeight(32);
+
+    m_titleLayout = new QHBoxLayout(m_titleBar);
+    m_titleLayout->setContentsMargins(12, 0, 2, 0);
+    m_titleLayout->setSpacing(5);
+
+    m_mainLayout->addWidget(m_titleBar);
+
+    // 4. 内容区
+    m_contentArea = new QWidget(m_container);
+    m_contentArea->setObjectName("DialogContentArea");
+    m_mainLayout->addWidget(m_contentArea, 1);
+
+    m_outerLayout->addWidget(m_container);
+
+    QWidget* centralC = new QWidget(this);
+    centralC->setLayout(m_outerLayout);
+    setCentralWidget(centralC);
+}
+
 void MainWindow::initToolbar() {
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
-        QPushButton* btn = new QPushButton(this);
+        QPushButton* btn = new QPushButton(m_titleBar);
         btn->setFixedSize(32, 28); // 极致精简宽度
         
         QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
@@ -412,9 +420,9 @@ void MainWindow::initToolbar() {
     connect(m_btnUp, &QPushButton::clicked, this, &MainWindow::onUpClicked);
 
     // --- 路径地址栏重构 (Stack: Breadcrumb + QLineEdit) ---
-    m_pathStack = new QStackedWidget(this);
+    m_pathStack = new QStackedWidget(m_titleBar);
     // 2026-03-xx 按照用户最新要求：地址栏高度还原为 32px
-    m_pathStack->setFixedHeight(32); 
+    m_pathStack->setFixedHeight(28); // 在 32px 标题栏中略缩以垂直居中
     m_pathStack->setMinimumWidth(300);
     m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
 
@@ -448,58 +456,29 @@ void MainWindow::initToolbar() {
         navigateTo(path);
     });
 
-    m_searchEdit = new QLineEdit(this);
+    m_searchEdit = new QLineEdit(m_titleBar);
     m_searchEdit->setPlaceholderText("过滤内容...");
     m_searchEdit->setMinimumWidth(230);
-    // 2026-03-xx 按照用户要求：对齐地址栏，将搜索框高度还原为 32px
-    m_searchEdit->setFixedHeight(32);
-    // [脑补优化] 为搜索框添加图标，并统一圆角为 4px
+    m_searchEdit->setFixedHeight(28);
     m_searchEdit->addAction(UiHelper::getIcon("search", QColor("#888888")), QLineEdit::LeadingPosition);
-    m_searchEdit->setStyleSheet(
-        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 5px; }"
-        "QLineEdit:focus { border: 1px solid #378ADD; }"
-    );
 
+    m_titleLayout->addWidget(m_btnBack);
+    m_titleLayout->addWidget(m_btnForward);
+    m_titleLayout->addWidget(m_btnUp);
+    m_titleLayout->addWidget(m_pathStack, 1);
+    m_titleLayout->addWidget(m_searchEdit);
 }
 
 
 
 void MainWindow::setupSplitters() {
-    QWidget* centralC = new QWidget(this);
-    centralC->setObjectName("CentralWidget");
-    centralC->setStyleSheet("#CentralWidget { background-color: #1E1E1E; }"); 
-    QVBoxLayout* mainL = new QVBoxLayout(centralC);
-    mainL->setContentsMargins(0, 0, 0, 0); 
-    mainL->setSpacing(0); 
-
-    // --- 1. 统一顶栏 (物理还原：上下保持 5px 间距) ---
-    QWidget* headerWidget = new QWidget(centralC);
-    headerWidget->setFixedHeight(42); // 32px content + 5px top + 5px bottom
-    headerWidget->setStyleSheet("QWidget { background-color: #252525; border-bottom: 1px solid #333; }");
-    
-    m_headerLayout = new QHBoxLayout(headerWidget);
-    m_headerLayout->setContentsMargins(12, 5, 12, 5); 
-    m_headerLayout->setSpacing(5);
-    m_headerLayout->setAlignment(Qt::AlignVCenter);
-
-    m_headerLayout->addWidget(m_btnBack);
-    m_headerLayout->addWidget(m_btnForward);
-    m_headerLayout->addWidget(m_btnUp);
-    m_headerLayout->addWidget(m_pathStack, 1);
-    m_headerLayout->addWidget(m_searchEdit);
-
-    // --- 2. 主体核心容器 (物理还原：5px 全局边距包裹) ---
-    QWidget* bodyWrapper = new QWidget(centralC);
-    bodyWrapper->setStyleSheet("background: transparent;"); // 确保背景透明不遮挡阴影
-    QVBoxLayout* bodyLayout = new QVBoxLayout(bodyWrapper);
-    bodyLayout->setContentsMargins(5, 5, 5, 5); // 物理还原：5px 呼吸感
+    QVBoxLayout* bodyLayout = new QVBoxLayout(m_contentArea);
+    bodyLayout->setContentsMargins(5, 5, 5, 5);
     bodyLayout->setSpacing(0);
 
-    // --- 3. 主拆分条 (物理还原：5px 物理缝隙) ---
-    m_mainSplitter = new QSplitter(Qt::Horizontal, bodyWrapper);
+    m_mainSplitter = new QSplitter(Qt::Horizontal, m_contentArea);
     m_mainSplitter->setHandleWidth(5); 
     m_mainSplitter->setChildrenCollapsible(false);
-    // 物理还原：严禁脑补，背景完全透明，依靠容器边框实现视觉缝隙
     m_mainSplitter->setStyleSheet("QSplitter { background: transparent; border: none; } QSplitter::handle { background: transparent; }");
 
     m_categoryPanel = new CategoryPanel(this);
@@ -525,8 +504,8 @@ void MainWindow::setupSplitters() {
 
     bodyLayout->addWidget(m_mainSplitter);
 
-    // --- 4. 底部状态栏 (0 边距) ---
-    QWidget* statusBar = new QWidget(centralC);
+    // --- 4. 底部状态栏 ---
+    QWidget* statusBar = new QWidget(m_contentArea);
     statusBar->setFixedHeight(28);
     statusBar->setStyleSheet("QWidget { background-color: #252525; border-top: 1px solid #333333; }");
     QHBoxLayout* statusL = new QHBoxLayout(statusBar);
@@ -563,27 +542,17 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusCenter, 1);
     statusL->addWidget(m_statusRight, 1);
 
-    mainL->addWidget(headerWidget);
-    mainL->addWidget(bodyWrapper, 1);
-    mainL->addWidget(statusBar);
-
-    setCentralWidget(centralC);
+    bodyLayout->addWidget(statusBar);
 }
 
 /**
- * @brief 实现符合 funcBtnStyle 规范的自定义按钮组
+ * @brief 实现符合架构规范的系统按钮组
  */
 void MainWindow::setupCustomTitleBarButtons() {
-    QWidget* titleBarBtns = new QWidget(this);
-    QHBoxLayout* layout = new QHBoxLayout(titleBarBtns);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(4);
-
     auto createTitleBtn = [this](const QString& iconKey, const QString& hoverColor = "rgba(255, 255, 255, 0.1)") {
-        QPushButton* btn = new QPushButton(this);
-        btn->setFixedSize(24, 24); // 固定 24x24px
+        QPushButton* btn = new QPushButton(m_titleBar);
+        btn->setFixedSize(28, 28);
         
-        // 使用 UiHelper 全局辅助类
         QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
         btn->setIcon(icon);
         btn->setIconSize(QSize(18, 18));
@@ -596,7 +565,7 @@ void MainWindow::setupCustomTitleBarButtons() {
         return btn;
     };
 
-    m_btnCreate = createTitleBtn("add"); // 2026-03-xx 规范化：“+”按钮图标修正
+    m_btnCreate = createTitleBtn("add");
     m_btnCreate->setProperty("tooltipText", "新建...");
     QMenu* createMenu = new QMenu(m_btnCreate);
     createMenu->setStyleSheet(
@@ -624,48 +593,49 @@ void MainWindow::setupCustomTitleBarButtons() {
     connect(actNewMd,     &QAction::triggered, [handleCreate](){ handleCreate("md"); });
     connect(actNewTxt,    &QAction::triggered, [handleCreate](){ handleCreate("txt"); });
 
-    m_btnPinTop = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
-    m_btnPinTop->setProperty("tooltipText", "置顶窗口");
-    m_btnPinTop->installEventFilter(this);
-    m_btnPinTop->setCheckable(true);
-    m_btnPinTop->setChecked(m_isPinned);
+    m_btnPin = createTitleBtn(m_isPinned ? "pin_vertical" : "pin_tilted");
+    m_btnPin->setProperty("tooltipText", "置顶窗口");
+    m_btnPin->installEventFilter(this);
+    m_btnPin->setCheckable(true);
+    m_btnPin->setChecked(m_isPinned);
     if (m_isPinned) {
-        m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
+        m_btnPin->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
     }
 
-    m_btnMin = createTitleBtn("minimize");
-    m_btnMin->setProperty("tooltipText", "最小化");
-    m_btnMin->installEventFilter(this);
+    m_minBtn = createTitleBtn("minimize");
+    m_minBtn->setProperty("tooltipText", "最小化");
+    m_minBtn->installEventFilter(this);
 
-    m_btnMax = createTitleBtn("maximize");
-    m_btnMax->setProperty("tooltipText", "最大化/还原");
-    m_btnMax->installEventFilter(this);
+    m_maxBtn = createTitleBtn("maximize");
+    m_maxBtn->setProperty("tooltipText", "最大化/还原");
+    m_maxBtn->installEventFilter(this);
 
-    m_btnClose = createTitleBtn("close", "#e81123"); // 关闭按钮悬停红色
-    m_btnClose->setProperty("tooltipText", "关闭项目");
-    m_btnClose->installEventFilter(this);
+    m_closeBtn = createTitleBtn("close", "#e81123");
+    m_closeBtn->setProperty("tooltipText", "关闭");
+    m_closeBtn->installEventFilter(this);
 
     m_btnCreate->installEventFilter(this);
-    layout->addWidget(m_btnCreate);
-    layout->addWidget(m_btnPinTop);
-    layout->addWidget(m_btnMin);
-    layout->addWidget(m_btnMax);
-    layout->addWidget(m_btnClose);
+
+    // 添加顺序 (Memories.md 规范：从右向左为 关闭 -> 最大化 -> 最小化 -> 置顶)
+    m_titleLayout->addSpacing(10);
+    m_titleLayout->addWidget(m_btnCreate);
+    m_titleLayout->addStretch(); // 弹簧
+    m_titleLayout->addWidget(m_btnPin);
+    m_titleLayout->addWidget(m_minBtn);
+    m_titleLayout->addWidget(m_maxBtn);
+    m_titleLayout->addWidget(m_closeBtn);
 
     // 绑定基础逻辑
-    connect(m_btnMin, &QPushButton::clicked, this, &MainWindow::showMinimized);
-    connect(m_btnMax, &QPushButton::clicked, [this]() {
-        if (isMaximized()) showNormal();
-        else showMaximized();
-    });
-    connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
+    connect(m_minBtn, &QPushButton::clicked, this, &MainWindow::showMinimized);
+    connect(m_maxBtn, &QPushButton::clicked, this, &MainWindow::toggleMaximize);
+    connect(m_closeBtn, &QPushButton::clicked, this, &MainWindow::close);
+    connect(m_btnPin, &QPushButton::toggled, this, &MainWindow::onPinToggled);
 
-    if (m_headerLayout) {
-        m_headerLayout->addWidget(titleBarBtns);
-    }
-
-    // 逻辑：置顶切换
-    connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);
+    // 补全系统按钮的事件过滤器安装 (ToolTip 迁移)
+    m_minBtn->installEventFilter(this);
+    m_maxBtn->installEventFilter(this);
+    m_closeBtn->installEventFilter(this);
+    m_btnPin->installEventFilter(this);
 }
 
 void MainWindow::navigateTo(const QString& path, bool record) {
@@ -751,32 +721,106 @@ void MainWindow::updateStatusBar() {
     m_statusRight->setText(""); // 选中时由 selectionChanged 更新
 }
 
+void MainWindow::toggleMaximize() {
+    if (isMaximized()) showNormal();
+    else showMaximized();
+}
+
 void MainWindow::onPinToggled(bool checked) {
-    // 2026-03-xx 按照用户要求优化置顶逻辑：
-    // 避免重复调用导致卡顿，并优化 WinAPI 标志位以减少冗余消息推送
     if (m_isPinned == checked) return;
     m_isPinned = checked;
 
 #ifdef Q_OS_WIN
     HWND hwnd = (HWND)winId();
-    // 使用 SWP_NOSENDCHANGING 拦截冗余消息，减少 UI 线程的消息风暴，从而解决卡顿
     SetWindowPos(hwnd, checked ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 #else
     setWindowFlag(Qt::WindowStaysOnTopHint, checked);
-    show(); // 非 Windows 平台修改 Flag 后通常需要重新显示
+    show();
 #endif
 
-    // 更新图标和颜色 (按下置顶为品牌橙色)
-    if (m_isPinned) {
-        m_btnPinTop->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C")));
-    } else {
-        m_btnPinTop->setIcon(UiHelper::getIcon("pin_tilted", QColor("#EEEEEE")));
+    if (m_btnPin) {
+        m_btnPin->setIcon(UiHelper::getIcon(checked ? "pin_vertical" : "pin_tilted",
+                          checked ? QColor("#FF551C") : QColor("#EEEEEE")));
     }
 
-    // 持久化存储
     QSettings settings("ArcMeta团队", "ArcMeta");
     settings.setValue("MainWindow/AlwaysOnTop", m_isPinned);
+}
+
+void MainWindow::changeEvent(QEvent* event) {
+    if (event->type() == QEvent::WindowStateChange) {
+        bool max = isMaximized();
+        m_maxBtn->setIcon(UiHelper::getIcon(max ? "restore" : "maximize", QColor("#EEEEEE")));
+
+        m_outerLayout->setContentsMargins(max ? 0 : 20, max ? 0 : 20, max ? 0 : 20, max ? 0 : 20);
+        m_container->setStyleSheet(
+            QString("QFrame#DialogContainer { background-color: #1e1e1e; border: %1; border-radius: %2; }")
+            .arg(max ? "none" : "1px solid #333333")
+            .arg(max ? "0px" : "12px")
+        );
+        m_titleBar->setStyleSheet(
+            QString("QWidget#TitleBar { background-color: #252526; border-bottom: 1px solid #333333; "
+                    "border-top-left-radius: %1; border-top-right-radius: %1; }")
+            .arg(max ? "0px" : "12px")
+        );
+    }
+    QMainWindow::changeEvent(event);
+}
+
+#ifdef Q_OS_WIN
+bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result) {
+    MSG* msg = static_cast<MSG*>(message);
+    if (msg->message == WM_NCHITTEST) {
+        int x = GET_X_LPARAM(msg->lParam);
+        int y = GET_Y_LPARAM(msg->lParam);
+        QPoint pos = mapFromGlobal(QPoint(x, y));
+
+        ResizeEdge edge = getEdge(pos);
+        if (edge != None && !isMaximized()) {
+            switch (edge) {
+                case Top:         *result = HTTOP; break;
+                case Bottom:      *result = HTBOTTOM; break;
+                case Left:        *result = HTLEFT; break;
+                case Right:       *result = HTRIGHT; break;
+                case TopLeft:     *result = HTTOPLEFT; break;
+                case TopRight:    *result = HTTOPRIGHT; break;
+                case BottomLeft:  *result = HTBOTTOMLEFT; break;
+                case BottomRight: *result = HTBOTTOMRIGHT; break;
+                default: break;
+            }
+            return true;
+        }
+
+        if (m_titleBar && m_titleBar->geometry().contains(pos)) {
+            QWidget* child = childAt(pos);
+            if (child && (child->inherits("QPushButton") || child->inherits("QToolButton") || child->inherits("QLineEdit") || child->inherits("QStackedWidget"))) {
+                return false;
+            }
+            *result = HTCAPTION;
+            return true;
+        }
+    }
+    return QMainWindow::nativeEvent(eventType, message, result);
+}
+#endif
+
+MainWindow::ResizeEdge MainWindow::getEdge(const QPoint& pos) {
+    int border = 5;
+    bool t = pos.y() <= border;
+    bool b = pos.y() >= height() - border;
+    bool l = pos.x() <= border;
+    bool r = pos.x() >= width() - border;
+
+    if (t && l) return TopLeft;
+    if (t && r) return TopRight;
+    if (b && l) return BottomLeft;
+    if (b && r) return BottomRight;
+    if (t) return Top;
+    if (b) return Bottom;
+    if (l) return Left;
+    if (r) return Right;
+    return None;
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
