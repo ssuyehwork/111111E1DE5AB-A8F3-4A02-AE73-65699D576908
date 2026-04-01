@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QStackedWidget>
+#include <QHBoxLayout>
 
 namespace ArcMeta {
 
