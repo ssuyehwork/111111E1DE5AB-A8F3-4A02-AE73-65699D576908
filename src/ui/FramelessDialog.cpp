@@ -1,0 +1,211 @@
+#include "FramelessDialog.h"
+#include "UiHelper.h"
+#include <QGraphicsDropShadowEffect>
+#include <QMouseEvent>
+#include <QKeyEvent>
+#include <QTimer>
+#include <QApplication>
+
+namespace ArcMeta {
+
+// ============================================================================
+// FramelessDialog 基类实现
+// ============================================================================
+FramelessDialog::FramelessDialog(const QString& title, QWidget* parent)
+    : QDialog(parent, Qt::FramelessWindowHint | Qt::Window)
+{
+    setAttribute(Qt::WA_TranslucentBackground);
+    setMouseTracking(true);
+
+    setWindowTitle(title);
+
+    m_outerLayout = new QVBoxLayout(this);
+    m_outerLayout->setContentsMargins(20, 20, 20, 20);
+
+    m_container = new QWidget(this);
+    m_container->setObjectName("DialogContainer");
+    m_container->setAttribute(Qt::WA_StyledBackground);
+    m_container->setStyleSheet(
+        "#DialogContainer {"
+        "  background-color: #1E1E1E;"
+        "  border: 1px solid #333333;"
+        "  border-radius: 12px;"
+        "}"
+    );
+    m_outerLayout->addWidget(m_container);
+
+    m_shadow = new QGraphicsDropShadowEffect(this);
+    m_shadow->setBlurRadius(20);
+    m_shadow->setXOffset(0);
+    m_shadow->setYOffset(4);
+    m_shadow->setColor(QColor(0, 0, 0, 150));
+    m_container->setGraphicsEffect(m_shadow);
+
+    m_mainLayout = new QVBoxLayout(m_container);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
+    m_mainLayout->setSpacing(0);
+
+    // --- 标题栏 ---
+    auto* titleBar = new QWidget();
+    titleBar->setObjectName("TitleBar");
+    titleBar->setFixedHeight(38);
+    // 标题栏背景保持与主界面一致的深色，作为整体容器的一部分
+    titleBar->setStyleSheet("background-color: transparent; border-bottom: 1px solid #2D2D2D;");
+    auto* titleLayout = new QHBoxLayout(titleBar);
+    titleLayout->setContentsMargins(12, 0, 5, 0);
+    titleLayout->setSpacing(4);
+
+    m_titleLabel = new QLabel(title);
+    m_titleLabel->setStyleSheet("color: #AAAAAA; font-size: 12px; font-weight: bold; border: none;");
+    titleLayout->addWidget(m_titleLabel);
+    titleLayout->addStretch();
+
+    m_closeBtn = new QPushButton();
+    m_closeBtn->setObjectName("closeBtn");
+    m_closeBtn->setFixedSize(28, 28);
+    m_closeBtn->setIcon(UiHelper::getIcon("close", QColor("#888888"), 18));
+    m_closeBtn->setAutoDefault(false);
+    m_closeBtn->setCursor(Qt::PointingHandCursor);
+    m_closeBtn->setStyleSheet(
+        "QPushButton { background: transparent; border: none; border-radius: 4px; } "
+        "QPushButton:hover { background-color: #E81123; }"
+    );
+    connect(m_closeBtn, &QPushButton::clicked, this, &QDialog::reject);
+    titleLayout->addWidget(m_closeBtn);
+
+    m_mainLayout->addWidget(titleBar);
+
+    m_contentArea = new QWidget();
+    m_contentArea->setObjectName("DialogContentArea");
+    m_contentArea->setStyleSheet("QWidget#DialogContentArea { background: transparent; border: none; }");
+    m_mainLayout->addWidget(m_contentArea, 1);
+}
+
+void FramelessDialog::showEvent(QShowEvent* event) {
+    QDialog::showEvent(event);
+}
+
+void FramelessDialog::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        // 判定是否在标题栏区域拖拽
+        QWidget* child = childAt(event->pos());
+        if (child) {
+            bool inTitleBar = false;
+            QWidget* p = child;
+            while (p && p != m_container) {
+                if (p->objectName() == "TitleBar") {
+                    inTitleBar = true;
+                    break;
+                }
+                p = p->parentWidget();
+            }
+
+            // 排除掉标题栏上的按钮
+            if (inTitleBar && !qobject_cast<QPushButton*>(child)) {
+                m_isDragging = true;
+                m_dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
+                event->accept();
+                return;
+            }
+        }
+    }
+    QDialog::mousePressEvent(event);
+}
+
+void FramelessDialog::mouseMoveEvent(QMouseEvent* event) {
+    if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
+        move(event->globalPosition().toPoint() - m_dragPos);
+        event->accept();
+        return;
+    }
+    QDialog::mouseMoveEvent(event);
+}
+
+void FramelessDialog::mouseReleaseEvent(QMouseEvent* event) {
+    m_isDragging = false;
+    QDialog::mouseReleaseEvent(event);
+}
+
+void FramelessDialog::keyPressEvent(QKeyEvent* event) {
+    if (event->key() == Qt::Key_Escape) {
+        reject();
+    } else {
+        QDialog::keyPressEvent(event);
+    }
+}
+
+bool FramelessDialog::eventFilter(QObject* watched, QEvent* event) {
+    return QDialog::eventFilter(watched, event);
+}
+
+// ============================================================================
+// FramelessInputDialog 实现
+// ============================================================================
+FramelessInputDialog::FramelessInputDialog(const QString& title, const QString& label,
+                                           const QString& initial, QWidget* parent)
+    : FramelessDialog(title, parent)
+{
+    // 严格复原 RapidNotes 原始尺寸与间距
+    resize(500, 260);
+    setMinimumSize(400, 240);
+
+    auto* layout = new QVBoxLayout(m_contentArea);
+    layout->setContentsMargins(20, 15, 20, 20);
+    layout->setSpacing(7);
+
+    auto* lbl = new QLabel(label);
+    lbl->setStyleSheet("color: #EEEEEE; font-size: 13px;");
+    layout->addWidget(lbl);
+
+    m_edit = new QLineEdit(initial);
+    m_edit->setMinimumHeight(38);
+    // 严格对齐 RapidNotes 输入框风格：深色背景 + 蓝色聚焦边框
+    m_edit->setStyleSheet(
+        "QLineEdit {"
+        "  background-color: #2D2D2D; border: 1px solid #444; border-radius: 4px;"
+        "  padding: 0px 10px; color: white; selection-background-color: #4A90E2;"
+        "  font-size: 14px;"
+        "}"
+        "QLineEdit:focus { border: 1px solid #4A90E2; }"
+    );
+    layout->addWidget(m_edit);
+
+    connect(m_edit, &QLineEdit::returnPressed, this, &QDialog::accept);
+
+    layout->addStretch();
+
+    auto* btnLayout = new QHBoxLayout();
+    btnLayout->addStretch();
+
+    auto* btnCancel = new QPushButton("取消");
+    btnCancel->setFixedSize(80, 32);
+    btnCancel->setCursor(Qt::PointingHandCursor);
+    btnCancel->setStyleSheet(
+        "QPushButton { background-color: transparent; color: #888; border: 1px solid #444; border-radius: 4px; } "
+        "QPushButton:hover { color: #EEE; background-color: #333; }"
+    );
+    connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
+    btnLayout->addWidget(btnCancel);
+
+    auto* btnOk = new QPushButton("确定");
+    btnOk->setFixedSize(80, 32);
+    btnOk->setCursor(Qt::PointingHandCursor);
+    btnOk->setStyleSheet(
+        "QPushButton { background-color: #4A90E2; color: white; border: none; border-radius: 4px; font-weight: bold; } "
+        "QPushButton:hover { background-color: #3E3E42; }" // 统一悬停色
+    );
+    connect(btnOk, &QPushButton::clicked, this, &QDialog::accept);
+    btnLayout->addWidget(btnOk);
+
+    layout->addLayout(btnLayout);
+
+    m_edit->setFocus();
+    m_edit->selectAll();
+}
+
+void FramelessInputDialog::showEvent(QShowEvent* event) {
+    FramelessDialog::showEvent(event);
+    QTimer::singleShot(50, m_edit, qOverload<>(&QWidget::setFocus));
+}
+
+} // namespace ArcMeta

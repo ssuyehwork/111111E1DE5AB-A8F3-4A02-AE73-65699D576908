@@ -4,6 +4,7 @@
 #include "DropTreeView.h"
 #include "UiHelper.h"
 #include "ToolTipOverlay.h"
+#include "FramelessDialog.h"
 #include "../db/CategoryRepo.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -13,7 +14,6 @@
 #include <QMenu>
 #include <QAction>
 #include <QApplication>
-#include <QInputDialog>
 
 namespace ArcMeta {
 
@@ -74,15 +74,17 @@ void CategoryPanel::setupContextMenu() {
 }
 
 void CategoryPanel::onCreateCategory() {
-    bool ok;
-    QString text = QInputDialog::getText(this, "新建分类", "名称:", QLineEdit::Normal, "", &ok);
-    if (ok && !text.isEmpty()) {
-        Category cat;
-        cat.name = text.toStdWString();
-        cat.parentId = 0;
-        cat.color = L"#3498db";
-        CategoryRepo::add(cat);
-        m_partitionModel->refresh();
+    FramelessInputDialog dlg("新建分类", "请输入分类名称:", "", this);
+    if (dlg.exec() == QDialog::Accepted) {
+        QString text = dlg.text();
+        if (!text.isEmpty()) {
+            Category cat;
+            cat.name = text.toStdWString();
+            cat.parentId = 0;
+            cat.color = L"#3498db";
+            CategoryRepo::add(cat);
+            m_partitionModel->refresh();
+        }
     }
 }
 
