@@ -52,11 +52,8 @@ private:
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     
-    DropTreeView* m_systemTree = nullptr;
-    CategoryModel* m_systemModel = nullptr;
-
-    DropTreeView* m_partitionTree = nullptr;
-    CategoryModel* m_partitionModel = nullptr;
+    DropTreeView* m_categoryTree = nullptr;
+    CategoryModel* m_categoryModel = nullptr;
 };
 
 } // namespace ArcMeta

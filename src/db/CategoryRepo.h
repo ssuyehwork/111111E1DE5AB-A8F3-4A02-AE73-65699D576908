@@ -27,6 +27,9 @@ public:
     static bool remove(int id);
     static std::vector<Category> getAll();
     static std::vector<std::pair<int, int>> getCounts();
+    static int getUniqueItemCount();
+    static int getUncategorizedItemCount();
+    static QMap<QString, int> getSystemCounts();
 
     // 条目关联逻辑
     static bool addItemToCategory(int categoryId, const std::wstring& itemPath);

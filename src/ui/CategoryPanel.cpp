@@ -16,6 +16,7 @@
 #include <QApplication>
 #include <QRandomGenerator>
 #include <QSet>
+#include <QSettings>
 
 namespace ArcMeta {
 
@@ -35,9 +36,9 @@ CategoryPanel::CategoryPanel(QWidget* parent)
 }
 
 void CategoryPanel::setupContextMenu() {
-    m_partitionTree->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_partitionTree, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
-        QModelIndex index = m_partitionTree->indexAt(pos);
+    m_categoryTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_categoryTree, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
+        QModelIndex index = m_categoryTree->indexAt(pos);
         
         QMenu menu(this);
         // [PHYSICAL RESTORATION] 8px radius for context menu
@@ -66,17 +67,17 @@ void CategoryPanel::setupContextMenu() {
                 
                 menu.addAction(UiHelper::getIcon("palette", QColor("#f39c12"), 18), "设置颜色", this, &CategoryPanel::onSetColor);
                 menu.addAction(UiHelper::getIcon("random_color", QColor("#e91e63"), 18), "随机颜色", this, &CategoryPanel::onRandomColor);
-                menu.addAction(UiHelper::getIcon("tag", QColor("#e91e63"), 18), "设置预设标签", this, &CategoryPanel::onSetPresetTags);
+                menu.addAction(UiHelper::getIcon("tag_filled", QColor("#9b59b6"), 18), "设置预设标签", this, &CategoryPanel::onSetPresetTags);
 
                 menu.addSeparator();
 
                 menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
-                menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类", this, &CategoryPanel::onCreateSubCategory);
+                menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建子分类", this, &CategoryPanel::onCreateSubCategory);
 
                 menu.addSeparator();
 
                 bool isPinned = index.data(CategoryModel::PinnedRole).toBool();
-                menu.addAction(UiHelper::getIcon("pin", isPinned ? QColor("#FF551C") : QColor("#aaaaaa"), 18), 
+                menu.addAction(UiHelper::getIcon("pin_vertical", isPinned ? QColor("#FF551C") : QColor("#aaaaaa"), 18),
                                isPinned ? "取消置顶" : "置顶分类", this, &CategoryPanel::onTogglePin);
                                
                 menu.addAction(UiHelper::getIcon("edit", QColor("#aaaaaa"), 18), "重命名分类", this, &CategoryPanel::onRenameCategory);
@@ -97,7 +98,7 @@ void CategoryPanel::setupContextMenu() {
         }
         
         if (!menu.isEmpty()) {
-            menu.exec(m_partitionTree->viewport()->mapToGlobal(pos));
+            menu.exec(m_categoryTree->viewport()->mapToGlobal(pos));
         }
     });
 }
@@ -105,14 +106,14 @@ void CategoryPanel::setupContextMenu() {
 /**
  * @brief 递归保存 QTreeView 的展开状态
  */
-static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<int>& expandedIds) {
+static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<int>& expandedIds, QStringList& expandedNames) {
     for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
         QModelIndex idx = tree->model()->index(i, 0, parent);
         if (tree->isExpanded(idx)) {
             int id = idx.data(CategoryModel::IdRole).toInt();
             if (id > 0) expandedIds.insert(id);
-            // 递归处理子项
-            saveExpandedState(tree, idx, expandedIds);
+            else expandedNames << idx.data(CategoryModel::NameRole).toString();
+            saveExpandedState(tree, idx, expandedIds, expandedNames);
         }
     }
 }
@@ -120,18 +121,20 @@ static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<i
 /**
  * @brief 递归恢复 QTreeView 的展开状态
  */
-static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds) {
+static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds, const QStringList& expandedNames) {
     for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
         QModelIndex idx = tree->model()->index(i, 0, parent);
         int id = idx.data(CategoryModel::IdRole).toInt();
+        QString name = idx.data(CategoryModel::NameRole).toString();
 
-        // “我的分类”根节点强制展开
-        if (idx.data(CategoryModel::NameRole).toString() == "我的分类") {
+        bool shouldExpand = false;
+        if (expandedNames.contains(name) || (id > 0 && expandedIds.contains(id)) || name == "我的分类") {
+            shouldExpand = true;
+        }
+
+        if (shouldExpand) {
             tree->setExpanded(idx, true);
-            restoreExpandedState(tree, idx, expandedIds);
-        } else if (id > 0 && expandedIds.contains(id)) {
-            tree->setExpanded(idx, true);
-            restoreExpandedState(tree, idx, expandedIds);
+            restoreExpandedState(tree, idx, expandedIds, expandedNames);
         }
     }
 }
@@ -147,20 +150,22 @@ void CategoryPanel::onCreateCategory() {
             cat.color = L"#3498db";
 
             QSet<int> expandedIds;
-            saveExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+            QStringList expandedNames;
+            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
             CategoryRepo::add(cat);
-            m_partitionModel->refresh();
+            m_categoryModel->refresh();
 
-            restoreExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
         }
     }
 }
 
 void CategoryPanel::onCreateSubCategory() {
-    QModelIndex index = m_partitionTree->currentIndex();
+    QModelIndex index = m_categoryTree->currentIndex();
     if (!index.isValid()) return;
-    int parentId = index.data(CategoryModel::IdRole).toInt();
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
 
     FramelessInputDialog dlg("新建子分类", "请输入子分类名称:", "", this);
     if (dlg.exec() == QDialog::Accepted) {
@@ -168,18 +173,18 @@ void CategoryPanel::onCreateSubCategory() {
         if (!text.isEmpty()) {
             Category cat;
             cat.name = text.toStdWString();
-            cat.parentId = parentId;
+            cat.parentId = id;
             cat.color = L"#3498db";
 
             QSet<int> expandedIds;
-            saveExpandedState(m_partitionTree, QModelIndex(), expandedIds);
-            // 确保父分类在列表中也被标记为展开
-            if (parentId > 0) expandedIds.insert(parentId);
+            QStringList expandedNames;
+            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+            expandedIds.insert(id);
 
             CategoryRepo::add(cat);
-            m_partitionModel->refresh();
+            m_categoryModel->refresh();
 
-            restoreExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
         }
     }
 }
@@ -189,19 +194,59 @@ void CategoryPanel::onAddData() {
 }
 
 void CategoryPanel::onClassifyToCategory() {
-    ToolTipOverlay::instance()->showText(QCursor::pos(), "归类功能开发中...", 1000);
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
+
+    QSettings settings("ArcMeta团队", "ArcMeta");
+    settings.setValue("Category/ExtensionTargetId", id);
+
+    QSet<int> expandedIds;
+    QStringList expandedNames;
+    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
+    m_categoryModel->refresh();
+
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
+    QString name = index.data(CategoryModel::NameRole).toString();
+    ToolTipOverlay::instance()->showText(QCursor::pos(), QString("已设为归类目标: %1").arg(name), 1000);
 }
 
 void CategoryPanel::onSetColor() {
-    ToolTipOverlay::instance()->showText(QCursor::pos(), "设置颜色功能开发中...", 1000);
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
+
+    auto all = CategoryRepo::getAll();
+    for(auto& cat : all) {
+        if(cat.id == id) {
+            cat.color = L"#3498db";
+            CategoryRepo::update(cat);
+            break;
+        }
+    }
+
+    QSet<int> expandedIds;
+    QStringList expandedNames;
+    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
+    m_categoryModel->refresh();
+
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "分类颜色已重置为默认蓝", 1000);
 }
 
 void CategoryPanel::onRandomColor() {
-    QModelIndex index = m_partitionTree->currentIndex();
+    QModelIndex index = m_categoryTree->currentIndex();
     if (!index.isValid()) return;
     int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
 
-    QStringList colors = {"#3498db", "#2ecc71", "#e74c3c", "#f1c40f", "#9b59b6", "#1abc9c", "#e67e22"};
+    QStringList colors = {"#3498db", "#2ecc71", "#e74c3c", "#f1c40f", "#9b59b6", "#1abc9c", "#e67e22", "#E24B4A", "#EF9F27", "#FAC775", "#639922", "#1D9E75", "#378ADD", "#7F77DD", "#62BAC1", "#F2B705", "#E91E63", "#FF551C"};
     QString color = colors[QRandomGenerator::global()->bounded(static_cast<int>(colors.size()))];
 
     auto all = CategoryRepo::getAll();
@@ -214,11 +259,12 @@ void CategoryPanel::onRandomColor() {
     }
 
     QSet<int> expandedIds;
-    saveExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+    QStringList expandedNames;
+    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
-    m_partitionModel->refresh();
+    m_categoryModel->refresh();
 
-    restoreExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 }
 
 void CategoryPanel::onSetPresetTags() {
@@ -226,9 +272,10 @@ void CategoryPanel::onSetPresetTags() {
 }
 
 void CategoryPanel::onTogglePin() {
-    QModelIndex index = m_partitionTree->currentIndex();
+    QModelIndex index = m_categoryTree->currentIndex();
     if (!index.isValid()) return;
     int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
     bool isPinned = index.data(CategoryModel::PinnedRole).toBool();
 
     auto all = CategoryRepo::getAll();
@@ -241,11 +288,12 @@ void CategoryPanel::onTogglePin() {
     }
 
     QSet<int> expandedIds;
-    saveExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+    QStringList expandedNames;
+    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
-    m_partitionModel->refresh();
+    m_categoryModel->refresh();
 
-    restoreExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 }
 
 void CategoryPanel::onSetPassword() {
@@ -253,9 +301,10 @@ void CategoryPanel::onSetPassword() {
 }
 
 void CategoryPanel::onClearPassword() {
-    QModelIndex index = m_partitionTree->currentIndex();
+    QModelIndex index = m_categoryTree->currentIndex();
     if (!index.isValid()) return;
     int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
 
     auto all = CategoryRepo::getAll();
     for(auto& cat : all) {
@@ -267,30 +316,34 @@ void CategoryPanel::onClearPassword() {
     }
 
     QSet<int> expandedIds;
-    saveExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+    QStringList expandedNames;
+    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
-    m_partitionModel->refresh();
+    m_categoryModel->refresh();
 
-    restoreExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 }
 
 void CategoryPanel::onRenameCategory() {
-    QModelIndex index = m_partitionTree->currentIndex();
-    if (index.isValid()) m_partitionTree->edit(index);
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (index.isValid() && index.data(CategoryModel::IdRole).toInt() > 0) {
+        m_categoryTree->edit(index);
+    }
 }
 
 void CategoryPanel::onDeleteCategory() {
-    QModelIndex index = m_partitionTree->currentIndex();
+    QModelIndex index = m_categoryTree->currentIndex();
     if (index.isValid()) {
         int id = index.data(CategoryModel::IdRole).toInt();
         if (id > 0) {
             QSet<int> expandedIds;
-            saveExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+            QStringList expandedNames;
+            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
             ArcMeta::CategoryRepo::remove(id);
-            m_partitionModel->refresh();
+            m_categoryModel->refresh();
 
-            restoreExpandedState(m_partitionTree, QModelIndex(), expandedIds);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
         }
     }
 }
@@ -343,50 +396,50 @@ void CategoryPanel::initUi() {
         QTreeView { background-color: transparent; border: none; color: #CCC; outline: none; }
         QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); }
         QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); }
+        /* 针对不同状态的补全，确保三角形图标在任何情况下都可见 */
         QTreeView::branch:has-children:closed:has-siblings { image: url(:/icons/arrow_right.svg); }
         QTreeView::branch:has-children:open:has-siblings   { image: url(:/icons/arrow_down.svg); }
         QTreeView::item { height: 26px; padding-left: 0px; }
     )";
 
-    // 系统树
-    m_systemTree = new DropTreeView(this);
-    m_systemTree->setStyleSheet(treeStyle); 
-    m_systemTree->setItemDelegate(new CategoryDelegate(this));
-    m_systemModel = new CategoryModel(CategoryModel::System, this);
-    m_systemTree->setModel(m_systemModel);
-    m_systemTree->setHeaderHidden(true);
-    m_systemTree->setRootIsDecorated(false);
-    m_systemTree->setIndentation(10);
-    m_systemTree->setFixedHeight(176); // 8 items * 22px
-    m_systemTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_systemTree->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // 物理还原：单树架构，合并系统项与用户分类
+    m_categoryTree = new DropTreeView(this);
+    m_categoryTree->setStyleSheet(treeStyle);
+    m_categoryTree->setItemDelegate(new CategoryDelegate(this));
+
+    // 使用 Both 模式同时加载系统项与用户分类
+    m_categoryModel = new CategoryModel(CategoryModel::Both, this);
+    m_categoryTree->setModel(m_categoryModel);
     
-    // 分区树
-    m_partitionTree = new DropTreeView(this);
-    m_partitionTree->setStyleSheet(treeStyle);
-    m_partitionTree->setItemDelegate(new CategoryDelegate(this));
-    m_partitionModel = new CategoryModel(CategoryModel::User, this);
-    m_partitionTree->setModel(m_partitionModel);
-    m_partitionTree->setHeaderHidden(true);
-    m_partitionTree->setRootIsDecorated(true);
-    m_partitionTree->setIndentation(20);
-    m_partitionTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_partitionTree->setDragEnabled(true);
-    m_partitionTree->setAcceptDrops(true);
-    m_partitionTree->setDropIndicatorShown(true);
-    m_partitionTree->setDragDropMode(QAbstractItemView::InternalMove);
-    m_partitionTree->setDefaultDropAction(Qt::MoveAction);
-    m_partitionTree->expandAll();
-    m_partitionTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    m_categoryTree->setHeaderHidden(true);
+    m_categoryTree->setRootIsDecorated(true);
+    m_categoryTree->setIndentation(20);
+    m_categoryTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_categoryTree->setDragEnabled(true);
+    m_categoryTree->setAcceptDrops(true);
+    m_categoryTree->setDropIndicatorShown(true);
+    m_categoryTree->setDragDropMode(QAbstractItemView::InternalMove);
+    m_categoryTree->setDefaultDropAction(Qt::MoveAction);
+    m_categoryTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
-    connect(m_systemTree, &QTreeView::clicked, [this](const QModelIndex& index) {
-        emit categorySelected(index.data(CategoryModel::NameRole).toString());
-    });
-    connect(m_partitionTree, &QTreeView::clicked, [this](const QModelIndex& index) {
-        emit categorySelected(index.data(CategoryModel::NameRole).toString());
+    // 默认展开“我的分类”
+    for (int i = 0; i < m_categoryModel->rowCount(); ++i) {
+        QModelIndex idx = m_categoryModel->index(i, 0);
+        if (idx.data(CategoryModel::NameRole).toString() == "我的分类") {
+            m_categoryTree->setExpanded(idx, true);
+        }
+    }
+
+    connect(m_categoryTree, &QTreeView::clicked, [this](const QModelIndex& index) {
+        QString type = index.data(CategoryModel::TypeRole).toString();
+        QString name = index.data(CategoryModel::NameRole).toString();
+        // 只有具体分类或系统项触发选中事件
+        if (type == "category" || type != "") {
+             emit categorySelected(name);
+        }
     });
 
-    connect(m_partitionTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
+    connect(m_categoryTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
         if (!index.isValid()) return;
         
         int categoryId = index.data(CategoryModel::IdRole).toInt();
@@ -406,12 +459,22 @@ void CategoryPanel::initUi() {
         }
     });
     
-    sbContentLayout->addWidget(m_systemTree);
-    sbContentLayout->addWidget(m_partitionTree);
+    sbContentLayout->addWidget(m_categoryTree);
     m_mainLayout->addWidget(sbContent, 1);
 }
 
 bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Escape) {
+            // [UX] 两段式：查找对话框内的第一个非空输入框
+            QLineEdit* edit = findChild<QLineEdit*>();
+            if (edit && !edit->text().isEmpty()) {
+                edit->clear();
+                return true;
+            }
+        }
+    }
     return QFrame::eventFilter(obj, event);
 }
 

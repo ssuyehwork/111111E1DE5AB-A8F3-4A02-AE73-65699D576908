@@ -7,6 +7,7 @@
 #include <QTimer>
 #include <QSet>
 #include <QMap>
+#include <QSettings>
 
 namespace ArcMeta {
 
@@ -24,10 +25,12 @@ void CategoryModel::refresh() {
     QMap<int, int> counts;
     for (const auto& p : countsVec) counts[p.first] = p.second;
 
+    QMap<QString, int> systemCounts = CategoryRepo::getSystemCounts();
+
     if (m_type == System || m_type == Both) {
         auto addSystemItem = [&](const QString& name, const QString& type, const QString& icon, const QString& color = "#aaaaaa") {
-            // 目前由于底层接口限制，暂不显示实时统计数字，仅对齐架构
-            QString display = name;
+            int count = systemCounts.value(type, 0);
+            QString display = QString("%1 (%2)").arg(name).arg(count);
             QStandardItem* item = new QStandardItem(display);
             item->setData(type, TypeRole);
             item->setData(name, NameRole);
@@ -40,20 +43,22 @@ void CategoryModel::refresh() {
         addSystemItem("全部数据", "all", "all_data", "#3498db");
         addSystemItem("今日数据", "today", "today", "#2ecc71");
         addSystemItem("昨日数据", "yesterday", "today", "#f39c12");
-        addSystemItem("最近访问", "recently_visited", "clock_history", "#9b59b6");
+        addSystemItem("最近访问", "recently_visited", "clock", "#9b59b6");
         addSystemItem("未分类", "uncategorized", "uncategorized", "#e67e22");
         addSystemItem("未标签", "untagged", "untagged", "#62BAC1");
-        addSystemItem("收藏", "bookmark", "star", "#F2B705");
+        addSystemItem("收藏", "bookmark", "bookmark_filled", "#F2B705");
         addSystemItem("回收站", "trash", "trash", "#e74c3c");
     }
     
     if (m_type == User || m_type == Both) {
         auto categories = CategoryRepo::getAll();
         
-        int totalUserItems = 0;
-        for (int c : counts.values()) totalUserItems += c;
+        // 物理还原：旧版统计逻辑 (总分类项 - 未分类项)
+        int userUniqueCount = CategoryRepo::getUniqueItemCount();
+        int uncatCount = CategoryRepo::getUncategorizedItemCount();
+        int totalUserDisplay = qMax(0, userUniqueCount - uncatCount);
 
-        QString userGroupName = totalUserItems > 0 ? QString("我的分类 (%1)").arg(totalUserItems) : "我的分类";
+        QString userGroupName = QString("我的分类 (%1)").arg(totalUserDisplay);
         QStandardItem* userGroup = new QStandardItem(userGroupName);
         userGroup->setData("我的分类", NameRole);
         userGroup->setSelectable(false);
@@ -69,14 +74,17 @@ void CategoryModel::refresh() {
         root->appendRow(userGroup);
 
         QMap<int, QStandardItem*> itemMap;
+        QSettings settings("ArcMeta团队", "ArcMeta");
+        int extensionTargetId = settings.value("Category/ExtensionTargetId", 0).toInt();
 
+        // 1. 先建立所有节点 (保持 SQL 返回的 pinned DESC, sort_order ASC 顺序)
         for (const auto& cat : categories) {
             int id = cat.id;
             QString name = QString::fromStdWString(cat.name);
             QString color = QString::fromStdWString(cat.color).isEmpty() ? "#aaaaaa" : QString::fromStdWString(cat.color);
             
             int count = counts.value(id, 0);
-            QString display = count > 0 ? QString("%1 (%2)").arg(name).arg(count) : name;
+            QString display = QString("%1 (%2)").arg(name).arg(count);
 
             QStandardItem* item = new QStandardItem(display);
             item->setData("category", TypeRole);
@@ -86,18 +94,24 @@ void CategoryModel::refresh() {
             item->setData(cat.pinned, PinnedRole);
             item->setFlags(item->flags() | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
             
-            if (cat.pinned) {
-                item->setIcon(UiHelper::getIcon("pin", QColor(color), 16));
+            if (id == extensionTargetId) {
+                item->setIcon(UiHelper::getIcon("toggle_right", QColor(color), 16));
+            } else if (cat.encrypted) {
+                // 物理还原：加密且锁定时显示灰色 lock
+                item->setIcon(UiHelper::getIcon("lock", QColor("#aaaaaa"), 16));
+            } else if (cat.pinned) {
+                item->setIcon(UiHelper::getIcon("pin_vertical", QColor(color), 16));
             } else {
                 item->setIcon(UiHelper::getIcon("circle_filled", QColor(color), 14));
             }
             itemMap[id] = item;
         }
 
+        // 2. 按照 SQL 排序顺序进行挂载 (由于 categories 已排序，appendRow 会维持该顺序)
+        // 物理还原：如果分类被置顶，且它有父分类，它应该在父分类内部置顶。
+        // 由于 CategoryRepo::getAll 已经是全局 Pinned DESC，这里按顺序插入即可。
         for (const auto& cat : categories) {
             int id = cat.id;
-            if (!itemMap.contains(id)) continue;
-
             int parentId = cat.parentId;
             if (parentId > 0 && itemMap.contains(parentId)) {
                 itemMap[parentId]->appendRow(itemMap[id]);

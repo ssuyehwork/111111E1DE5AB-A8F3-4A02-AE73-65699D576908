@@ -52,7 +52,8 @@ bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPat
 
 std::vector<Category> CategoryRepo::getAll() {
     std::vector<Category> results;
-    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned FROM categories ORDER BY sort_order ASC");
+    // 物理还原：置顶优先，其次按 sort_order 排序
+    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned, encrypted FROM categories ORDER BY pinned DESC, sort_order ASC");
     while (q.next()) {
         Category cat;
         cat.id = q.value(0).toInt();
@@ -67,6 +68,7 @@ std::vector<Category> CategoryRepo::getAll() {
 
         cat.sortOrder = q.value(5).toInt();
         cat.pinned = q.value(6).toBool();
+        cat.encrypted = q.value(7).toBool();
         results.push_back(cat);
     }
     return results;
@@ -78,6 +80,66 @@ std::vector<std::pair<int, int>> CategoryRepo::getCounts() {
     while (q.next()) {
         counts.push_back({q.value(0).toInt(), q.value(1).toInt()});
     }
+    return counts;
+}
+
+int CategoryRepo::getUniqueItemCount() {
+    QSqlQuery q("SELECT COUNT(DISTINCT item_path) FROM category_items");
+    if (q.next()) return q.value(0).toInt();
+    return 0;
+}
+
+int CategoryRepo::getUncategorizedItemCount() {
+    // 逻辑：总文件数 - 至少属于一个分类的文件数
+    QSqlQuery q("SELECT (SELECT COUNT(*) FROM items WHERE deleted=0) - (SELECT COUNT(DISTINCT item_path) FROM category_items)");
+    if (q.next()) return q.value(0).toInt();
+    return 0;
+}
+
+QMap<QString, int> CategoryRepo::getSystemCounts() {
+    QMap<QString, int> counts;
+    double now = (double)QDateTime::currentMSecsSinceEpoch();
+    double startOfToday = (double)QDateTime(QDate::currentDate(), QTime(0, 0)).toMSecsSinceEpoch();
+    double startOfYesterday = (double)QDateTime(QDate::currentDate().addDays(-1), QTime(0, 0)).toMSecsSinceEpoch();
+
+    // 全部数据
+    QSqlQuery qAll("SELECT COUNT(*) FROM items WHERE deleted=0");
+    if (qAll.next()) counts["all"] = qAll.value(0).toInt();
+
+    // 今日
+    QSqlQuery qToday;
+    qToday.prepare("SELECT COUNT(*) FROM items WHERE deleted=0 AND ctime >= ?");
+    qToday.addBindValue(startOfToday);
+    if (qToday.exec() && qToday.next()) counts["today"] = qToday.value(0).toInt();
+
+    // 昨日
+    QSqlQuery qYesterday;
+    qYesterday.prepare("SELECT COUNT(*) FROM items WHERE deleted=0 AND ctime >= ? AND ctime < ?");
+    qYesterday.addBindValue(startOfYesterday);
+    qYesterday.addBindValue(startOfToday);
+    if (qYesterday.exec() && qYesterday.next()) counts["yesterday"] = qYesterday.value(0).toInt();
+
+    // 最近访问 (24小时内)
+    QSqlQuery qRecent;
+    qRecent.prepare("SELECT COUNT(*) FROM items WHERE deleted=0 AND atime >= ?");
+    qRecent.addBindValue(now - 86400000.0);
+    if (qRecent.exec() && qRecent.next()) counts["recently_visited"] = qRecent.value(0).toInt();
+
+    // 未分类
+    counts["uncategorized"] = getUncategorizedItemCount();
+
+    // 未标签
+    QSqlQuery qUntagged("SELECT COUNT(*) FROM items WHERE deleted=0 AND (tags IS NULL OR tags = '' OR tags = '[]')");
+    if (qUntagged.next()) counts["untagged"] = qUntagged.value(0).toInt();
+
+    // 收藏 (假设 pinned=1 的 item 即为收藏)
+    QSqlQuery qFav("SELECT COUNT(*) FROM items WHERE pinned=1 AND deleted=0");
+    if (qFav.next()) counts["bookmark"] = qFav.value(0).toInt();
+
+    // 回收站
+    QSqlQuery qTrash("SELECT COUNT(*) FROM items WHERE deleted=1");
+    if (qTrash.next()) counts["trash"] = qTrash.value(0).toInt();
+
     return counts;
 }
 

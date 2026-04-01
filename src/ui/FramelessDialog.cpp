@@ -126,6 +126,13 @@ void FramelessDialog::mouseReleaseEvent(QMouseEvent* event) {
 
 void FramelessDialog::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
+        // 物理还原两段式 UX：若有非空输入框则先清空，否则关闭
+        QLineEdit* edit = findChild<QLineEdit*>();
+        if (edit && edit->isVisible() && !edit->text().isEmpty()) {
+            edit->clear();
+            event->accept();
+            return;
+        }
         reject();
     } else {
         QDialog::keyPressEvent(event);
