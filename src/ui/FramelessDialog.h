@@ -12,7 +12,7 @@
 namespace ArcMeta {
 
 /**
- * @brief 无边框对话框基类，自带标题栏、关闭按钮、阴影
+ * @brief 无边框对话框基类，自带标题栏、关闭按钮（扁平化设计）
  * 适配 ArcMeta 风格，参考旧版 RapidNotes 基因实现
  */
 class FramelessDialog : public QDialog {
@@ -35,7 +35,6 @@ protected:
     QVBoxLayout* m_mainLayout;
     QVBoxLayout* m_outerLayout;
     QWidget* m_container;
-    class QGraphicsDropShadowEffect* m_shadow;
     QLabel* m_titleLabel;
     QPushButton* m_closeBtn;
 

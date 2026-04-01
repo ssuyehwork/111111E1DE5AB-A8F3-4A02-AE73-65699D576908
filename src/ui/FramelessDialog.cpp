@@ -1,6 +1,5 @@
 #include "FramelessDialog.h"
 #include "UiHelper.h"
-#include <QGraphicsDropShadowEffect>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QTimer>
@@ -20,7 +19,7 @@ FramelessDialog::FramelessDialog(const QString& title, QWidget* parent)
     setWindowTitle(title);
 
     m_outerLayout = new QVBoxLayout(this);
-    m_outerLayout->setContentsMargins(20, 20, 20, 20);
+    m_outerLayout->setContentsMargins(0, 0, 0, 0);
 
     m_container = new QWidget(this);
     m_container->setObjectName("DialogContainer");
@@ -33,13 +32,6 @@ FramelessDialog::FramelessDialog(const QString& title, QWidget* parent)
         "}"
     );
     m_outerLayout->addWidget(m_container);
-
-    m_shadow = new QGraphicsDropShadowEffect(this);
-    m_shadow->setBlurRadius(20);
-    m_shadow->setXOffset(0);
-    m_shadow->setYOffset(4);
-    m_shadow->setColor(QColor(0, 0, 0, 150));
-    m_container->setGraphicsEffect(m_shadow);
 
     m_mainLayout = new QVBoxLayout(m_container);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
