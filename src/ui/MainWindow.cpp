@@ -478,9 +478,10 @@ void MainWindow::setupSplitters() {
     // --- 1. 自定义标题栏 (第一行) ---
     m_titleBarWidget = new QWidget(centralC);
     m_titleBarWidget->setFixedHeight(32);
-    m_titleBarWidget->setStyleSheet("QWidget { background-color: #1E1E1E; }");
+    // 2026-03-xx 物理回归：将分割线重新锁定在第一行下方，保持物理切割感
+    m_titleBarWidget->setStyleSheet("QWidget { background-color: #1E1E1E; border-bottom: 1px solid #333333; }");
     m_titleBarLayout = new QHBoxLayout(m_titleBarWidget);
-    m_titleBarLayout->setContentsMargins(12, 0, 12, 0);
+    m_titleBarLayout->setContentsMargins(8, 0, 5, 0); // 右侧对齐 5px 物理边距
     m_titleBarLayout->setSpacing(8);
 
     m_appNameLabel = new QLabel("ArcMeta", m_titleBarWidget);
@@ -490,11 +491,12 @@ void MainWindow::setupSplitters() {
 
     // --- 2. 统一导航栏 (第二行) ---
     m_navBarWidget = new QWidget(centralC);
-    m_navBarWidget->setFixedHeight(42); // 32px content + 5px top + 5px bottom
-    m_navBarWidget->setStyleSheet("QWidget { background-color: #252525; border-bottom: 1px solid #333; }");
+    m_navBarWidget->setFixedHeight(34); // 压缩高度，更显紧凑
+    m_navBarWidget->setStyleSheet("background: transparent; border: none;");
     
     m_navBarLayout = new QHBoxLayout(m_navBarWidget);
-    m_navBarLayout->setContentsMargins(12, 5, 12, 5);
+    // 2026-03-xx 物理对齐：侧边距调整为 5px，确保搜索框与下方 FilterPanel 物理对齐
+    m_navBarLayout->setContentsMargins(5, 0, 5, 2);
     m_navBarLayout->setSpacing(5);
     m_navBarLayout->setAlignment(Qt::AlignVCenter);
 

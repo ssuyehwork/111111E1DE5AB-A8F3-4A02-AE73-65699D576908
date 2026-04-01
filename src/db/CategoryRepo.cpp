@@ -96,7 +96,7 @@ std::vector<std::pair<int, int>> CategoryRepo::getCounts() {
 int CategoryRepo::getUniqueItemCount() {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q("SELECT COUNT(DISTINCT item_path) FROM category_items", db);
-    if (q.exec() && q.next()) return q.value(0).toInt();
+    if (q.next()) return q.value(0).toInt();
     return 0;
 }
 
@@ -104,7 +104,7 @@ int CategoryRepo::getUncategorizedItemCount() {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     // 逻辑：总文件数 - 至少属于一个分类的文件数
     QSqlQuery q("SELECT (SELECT COUNT(*) FROM items WHERE deleted=0) - (SELECT COUNT(DISTINCT item_path) FROM category_items)", db);
-    if (q.exec() && q.next()) return q.value(0).toInt();
+    if (q.next()) return q.value(0).toInt();
     return 0; 
 }
 
@@ -117,7 +117,7 @@ QMap<QString, int> CategoryRepo::getSystemCounts() {
     
     // 全部数据
     QSqlQuery qAll("SELECT COUNT(*) FROM items WHERE deleted=0", db);
-    if (qAll.exec() && qAll.next()) counts["all"] = qAll.value(0).toInt();
+    if (qAll.next()) counts["all"] = qAll.value(0).toInt();
 
     // 今日
     QSqlQuery qToday(db);
@@ -143,15 +143,15 @@ QMap<QString, int> CategoryRepo::getSystemCounts() {
 
     // 未标签
     QSqlQuery qUntagged("SELECT COUNT(*) FROM items WHERE deleted=0 AND (tags IS NULL OR tags = '' OR tags = '[]')", db);
-    if (qUntagged.exec() && qUntagged.next()) counts["untagged"] = qUntagged.value(0).toInt();
+    if (qUntagged.next()) counts["untagged"] = qUntagged.value(0).toInt();
 
     // 收藏 (假设 pinned=1 的 item 即为收藏)
     QSqlQuery qFav("SELECT COUNT(*) FROM items WHERE pinned=1 AND deleted=0", db);
-    if (qFav.exec() && qFav.next()) counts["bookmark"] = qFav.value(0).toInt();
+    if (qFav.next()) counts["bookmark"] = qFav.value(0).toInt();
 
     // 回收站
     QSqlQuery qTrash("SELECT COUNT(*) FROM items WHERE deleted=1", db);
-    if (qTrash.exec() && qTrash.next()) counts["trash"] = qTrash.value(0).toInt();
+    if (qTrash.next()) counts["trash"] = qTrash.value(0).toInt();
 
     return counts;
 }
