@@ -53,6 +53,7 @@ void SyncEngine::runIncrementalSync() {
 
 /**
  * @brief 全量扫描：递归所有盘符搜集元数据
+ * 2026-03-xx 物理修复：后台全量扫描必须使用独立线程连接，防止 UI 挂起。
  */
 void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgress) {
     std::vector<std::wstring> metaFiles;
@@ -68,8 +69,11 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
         }
     }
 
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    if (!db.isOpen()) return;
+
     // 清理并重建核心表
-    QSqlQuery q;
+    QSqlQuery q(db);
     q.exec("DELETE FROM folders");
     q.exec("DELETE FROM items");
     q.exec("DELETE FROM tags");
@@ -86,7 +90,7 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
     // 强制刷空队列
     SyncQueue::instance().flush();
     // 更新同步时间
-    QSqlQuery updateSync;
+    QSqlQuery updateSync(db);
     updateSync.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
     updateSync.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
     updateSync.exec();
@@ -96,15 +100,19 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
 
 /**
  * @brief 标签聚合统计逻辑
+ * 2026-03-xx 物理修复：聚合任务属于重度 IO 操作，强制要求在后台线程独立连接中运行事务。
  */
 void SyncEngine::rebuildTagStats() {
-    QSqlDatabase db = QSqlDatabase::database();
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    if (!db.isOpen()) return;
+
     db.transaction();
     
-    QSqlQuery("DELETE FROM tags");
+    QSqlQuery qDelete(db);
+    qDelete.exec("DELETE FROM tags");
     
     // 聚合 items 表中的标签
-    QSqlQuery query("SELECT tags FROM items WHERE tags != ''");
+    QSqlQuery query("SELECT tags FROM items WHERE tags != ''", db);
     std::map<std::string, int> tagCounts;
     while (query.next()) {
         QByteArray jsonData = query.value(0).toByteArray();
@@ -118,7 +126,7 @@ void SyncEngine::rebuildTagStats() {
     }
 
     for (const auto& [tag, count] : tagCounts) {
-        QSqlQuery ins;
+        QSqlQuery ins(db);
         ins.prepare("INSERT INTO tags (tag, item_count) VALUES (?, ?)");
         ins.addBindValue(QString::fromStdString(tag));
         ins.addBindValue(count);
