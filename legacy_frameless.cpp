@@ -1,3 +1,5 @@
+## 文件: `src/ui/FramelessDialog.cpp`
+
 ```cpp
 #include "FramelessDialog.h"
 #include "IconHelper.h"
@@ -716,3 +718,4 @@ void FramelessProgressDialog::setRange(int min, int max) {
     m_progress->setRange(min, max);
     QCoreApplication::processEvents();
 }
+```
