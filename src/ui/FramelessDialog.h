@@ -36,14 +36,7 @@ protected:
     QVBoxLayout* m_outerLayout;
     QWidget* m_container;
     QLabel* m_titleLabel;
-    QPushButton* m_btnPin;
-    QPushButton* m_minBtn;
-    QPushButton* m_maxBtn;
     QPushButton* m_closeBtn;
-
-private slots:
-    void toggleStayOnTop(bool checked);
-    void toggleMaximize();
 
 private:
     QPoint m_dragPos;
