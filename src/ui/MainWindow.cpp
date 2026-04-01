@@ -30,6 +30,7 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <windowsx.h>
 #endif
 
 namespace ArcMeta {
@@ -289,33 +290,10 @@ void MainWindow::initUi() {
     });
 }
 
-void MainWindow::mousePressEvent(QMouseEvent* event) {
-    if (event->button() == Qt::LeftButton) {
-        // 点击工具栏区域（前 36px）允许拖动窗口
-        if (event->position().y() <= 36) {
-            m_isDragging = true;
-            m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
-            event->accept();
-        }
-    }
-}
-
-void MainWindow::mouseMoveEvent(QMouseEvent* event) {
-    if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
-        move(event->globalPosition().toPoint() - m_dragPosition);
-        event->accept();
-    }
-}
-
-void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
-    Q_UNUSED(event);
-    m_isDragging = false;
-}
-
 void MainWindow::keyPressEvent(QKeyEvent* event) {
     // 1. Alt+Q: 切换窗口置顶状态
     if (event->key() == Qt::Key_Q && (event->modifiers() & Qt::AltModifier)) {
-        m_btnPinTop->setChecked(!m_btnPinTop->isChecked());
+        m_btnPin->setChecked(!m_btnPin->isChecked());
         event->accept();
         return;
     }
