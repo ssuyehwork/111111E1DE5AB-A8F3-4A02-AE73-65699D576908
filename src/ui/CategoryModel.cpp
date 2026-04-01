@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QTimer>
 #include <QSet>
+#include <QMap>
 
 namespace ArcMeta {
 
@@ -18,6 +19,10 @@ CategoryModel::CategoryModel(Type type, QObject* parent)
 void CategoryModel::refresh() {
     clear();
     QStandardItem* root = invisibleRootItem();
+
+    auto countsVec = CategoryRepo::getCounts();
+    QMap<int, int> counts;
+    for (const auto& p : countsVec) counts[p.first] = p.second;
 
     if (m_type == System || m_type == Both) {
         auto addSystemItem = [&](const QString& name, const QString& type, const QString& icon, const QString& color = "#aaaaaa") {
@@ -45,7 +50,11 @@ void CategoryModel::refresh() {
     if (m_type == User || m_type == Both) {
         auto categories = CategoryRepo::getAll();
         
-        QStandardItem* userGroup = new QStandardItem("我的分类");
+        int totalUserItems = 0;
+        for (int c : counts.values()) totalUserItems += c;
+
+        QString userGroupName = totalUserItems > 0 ? QString("我的分类 (%1)").arg(totalUserItems) : "我的分类";
+        QStandardItem* userGroup = new QStandardItem(userGroupName);
         userGroup->setData("我的分类", NameRole);
         userGroup->setSelectable(false);
         userGroup->setEditable(false);
@@ -66,7 +75,10 @@ void CategoryModel::refresh() {
             QString name = QString::fromStdWString(cat.name);
             QString color = QString::fromStdWString(cat.color).isEmpty() ? "#aaaaaa" : QString::fromStdWString(cat.color);
             
-            QStandardItem* item = new QStandardItem(name);
+            int count = counts.value(id, 0);
+            QString display = count > 0 ? QString("%1 (%2)").arg(name).arg(count) : name;
+
+            QStandardItem* item = new QStandardItem(display);
             item->setData("category", TypeRole);
             item->setData(id, IdRole);
             item->setData(color, ColorRole);

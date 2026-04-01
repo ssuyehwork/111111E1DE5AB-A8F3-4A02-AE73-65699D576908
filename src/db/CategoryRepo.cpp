@@ -72,6 +72,15 @@ std::vector<Category> CategoryRepo::getAll() {
     return results;
 }
 
+std::vector<std::pair<int, int>> CategoryRepo::getCounts() {
+    std::vector<std::pair<int, int>> counts;
+    QSqlQuery q("SELECT category_id, COUNT(*) FROM category_items GROUP BY category_id");
+    while (q.next()) {
+        counts.push_back({q.value(0).toInt(), q.value(1).toInt()});
+    }
+    return counts;
+}
+
 bool CategoryRepo::remove(int id) {
     QSqlQuery q1;
     q1.prepare("DELETE FROM category_items WHERE category_id = ?");
