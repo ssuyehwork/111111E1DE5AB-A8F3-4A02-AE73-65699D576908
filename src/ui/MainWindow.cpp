@@ -322,8 +322,8 @@ void MainWindow::initUi() {
 
 void MainWindow::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
-        // 点击工具栏区域（前 36px）允许拖动窗口
-        if (event->position().y() <= 36) {
+        // 2026-03-xx 物理还原：点击纯标题栏区域（前 32px）允许拖动窗口
+        if (event->position().y() <= 32) {
             m_isDragging = true;
             m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
             event->accept();
@@ -475,23 +475,36 @@ void MainWindow::setupSplitters() {
     mainL->setContentsMargins(0, 0, 0, 0); 
     mainL->setSpacing(0); 
 
-    // --- 1. 统一顶栏 (物理还原：上下保持 5px 间距) ---
-    QWidget* headerWidget = new QWidget(centralC);
-    headerWidget->setFixedHeight(42); // 32px content + 5px top + 5px bottom
-    headerWidget->setStyleSheet("QWidget { background-color: #252525; border-bottom: 1px solid #333; }");
+    // --- 1. 自定义标题栏 (第一行) ---
+    m_titleBarWidget = new QWidget(centralC);
+    m_titleBarWidget->setFixedHeight(32);
+    m_titleBarWidget->setStyleSheet("QWidget { background-color: #1E1E1E; }");
+    m_titleBarLayout = new QHBoxLayout(m_titleBarWidget);
+    m_titleBarLayout->setContentsMargins(12, 0, 12, 0);
+    m_titleBarLayout->setSpacing(8);
+
+    m_appNameLabel = new QLabel("ArcMeta", m_titleBarWidget);
+    m_appNameLabel->setStyleSheet("color: #AAAAAA; font-size: 12px; font-weight: bold;");
+    m_titleBarLayout->addWidget(m_appNameLabel);
+    m_titleBarLayout->addStretch();
+
+    // --- 2. 统一导航栏 (第二行) ---
+    m_navBarWidget = new QWidget(centralC);
+    m_navBarWidget->setFixedHeight(42); // 32px content + 5px top + 5px bottom
+    m_navBarWidget->setStyleSheet("QWidget { background-color: #252525; border-bottom: 1px solid #333; }");
     
-    m_topLayout = new QHBoxLayout(headerWidget);
-    m_topLayout->setContentsMargins(12, 5, 12, 5); 
-    m_topLayout->setSpacing(5);
-    m_topLayout->setAlignment(Qt::AlignVCenter);
+    m_navBarLayout = new QHBoxLayout(m_navBarWidget);
+    m_navBarLayout->setContentsMargins(12, 5, 12, 5);
+    m_navBarLayout->setSpacing(5);
+    m_navBarLayout->setAlignment(Qt::AlignVCenter);
 
-    m_topLayout->addWidget(m_btnBack);
-    m_topLayout->addWidget(m_btnForward);
-    m_topLayout->addWidget(m_btnUp);
-    m_topLayout->addWidget(m_pathStack, 1);
-    m_topLayout->addWidget(m_searchEdit);
+    m_navBarLayout->addWidget(m_btnBack);
+    m_navBarLayout->addWidget(m_btnForward);
+    m_navBarLayout->addWidget(m_btnUp);
+    m_navBarLayout->addWidget(m_pathStack, 1);
+    m_navBarLayout->addWidget(m_searchEdit);
 
-    // --- 2. 主体核心容器 (物理还原：5px 全局边距包裹) ---
+    // --- 3. 主体核心容器 (物理还原：5px 全局边距包裹) ---
     QWidget* bodyWrapper = new QWidget(centralC);
     bodyWrapper->setStyleSheet("background: transparent;"); // 确保背景透明不遮挡阴影
     QVBoxLayout* bodyLayout = new QVBoxLayout(bodyWrapper);
@@ -566,7 +579,8 @@ void MainWindow::setupSplitters() {
     statusL->addWidget(m_statusCenter, 1);
     statusL->addWidget(m_statusRight, 1);
 
-    mainL->addWidget(headerWidget);
+    mainL->addWidget(m_titleBarWidget);
+    mainL->addWidget(m_navBarWidget);
     mainL->addWidget(bodyWrapper, 1);
     mainL->addWidget(statusBar);
 
@@ -663,8 +677,8 @@ void MainWindow::setupCustomTitleBarButtons() {
     });
     connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
 
-    if (m_topLayout) {
-        m_topLayout->addWidget(titleBarBtns);
+    if (m_titleBarLayout) {
+        m_titleBarLayout->addWidget(titleBarBtns);
     }
 
     // 逻辑：置顶切换

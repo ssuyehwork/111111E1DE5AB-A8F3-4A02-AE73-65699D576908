@@ -46,7 +46,12 @@ protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
-    QHBoxLayout* m_topLayout = nullptr;
+    QWidget* m_titleBarWidget = nullptr;
+    QHBoxLayout* m_titleBarLayout = nullptr;
+    QLabel* m_appNameLabel = nullptr;
+    QWidget* m_navBarWidget = nullptr;
+    QHBoxLayout* m_navBarLayout = nullptr;
+
     void initUi();
     void updateNavButtons();
     void updateStatusBar();
