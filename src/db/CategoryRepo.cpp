@@ -31,12 +31,13 @@ bool CategoryRepo::add(Category& cat) {
 
 bool CategoryRepo::update(const Category& cat) {
     QSqlQuery q;
-    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ? WHERE id = ?");
+    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ?, encrypted = ? WHERE id = ?");
     q.addBindValue(cat.parentId);
     q.addBindValue(QString::fromStdWString(cat.name));
     q.addBindValue(QString::fromStdWString(cat.color));
     q.addBindValue(cat.sortOrder);
     q.addBindValue(cat.pinned ? 1 : 0);
+    q.addBindValue(cat.encrypted ? 1 : 0);
     q.addBindValue(cat.id);
     return q.exec();
 }
@@ -52,7 +53,7 @@ bool CategoryRepo::addItemToCategory(int categoryId, const std::wstring& itemPat
 
 std::vector<Category> CategoryRepo::getAll() {
     std::vector<Category> results;
-    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned FROM categories ORDER BY sort_order ASC");
+    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned, encrypted FROM categories ORDER BY sort_order ASC");
     while (q.next()) {
         Category cat;
         cat.id = q.value(0).toInt();
@@ -67,9 +68,34 @@ std::vector<Category> CategoryRepo::getAll() {
 
         cat.sortOrder = q.value(5).toInt();
         cat.pinned = q.value(6).toBool();
+        cat.encrypted = q.value(7).toBool();
         results.push_back(cat);
     }
     return results;
+}
+
+Category CategoryRepo::getById(int id) {
+    QSqlQuery q;
+    q.prepare("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned, encrypted FROM categories WHERE id = ?");
+    q.addBindValue(id);
+    if (q.exec() && q.next()) {
+        Category cat;
+        cat.id = q.value(0).toInt();
+        cat.parentId = q.value(1).toInt();
+        cat.name = q.value(2).toString().toStdWString();
+        cat.color = q.value(3).toString().toStdWString();
+
+        QJsonDocument doc = QJsonDocument::fromJson(q.value(4).toByteArray());
+        if (doc.isArray()) {
+            for (const auto& v : doc.array()) cat.presetTags.push_back(v.toString().toStdWString());
+        }
+
+        cat.sortOrder = q.value(5).toInt();
+        cat.pinned = q.value(6).toBool();
+        cat.encrypted = q.value(7).toBool();
+        return cat;
+    }
+    return {};
 }
 
 bool CategoryRepo::remove(int id) {

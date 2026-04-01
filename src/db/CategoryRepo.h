@@ -25,6 +25,7 @@ public:
     static bool add(Category& cat);
     static bool update(const Category& cat);
     static bool remove(int id);
+    static Category getById(int id);
     static std::vector<Category> getAll();
 
     // 条目关联逻辑
