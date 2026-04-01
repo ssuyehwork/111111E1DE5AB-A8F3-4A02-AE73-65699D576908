@@ -4,6 +4,7 @@
 #include "DropTreeView.h"
 #include "UiHelper.h"
 #include "ToolTipOverlay.h"
+#include "FramelessDialog.h"
 #include "../db/CategoryRepo.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -109,14 +110,15 @@ void CategoryPanel::setupContextMenu() {
                     QString tagsStr;
                     for(const auto& t : cat.presetTags) { if(!tagsStr.isEmpty()) tagsStr += ","; tagsStr += QString::fromStdWString(t); }
 
-                    bool ok;
-                    QString text = QInputDialog::getText(this, "设置预设标签", "标签 (逗号分隔):", QLineEdit::Normal, tagsStr, &ok);
-                    if (ok) {
+                    auto* dlg = new FramelessInputDialog("设置预设标签", "标签 (逗号分隔):", tagsStr, this);
+                    if (dlg->exec() == QDialog::Accepted) {
+                        QString text = dlg->text();
                         cat.presetTags.clear();
                         QStringList list = text.split(",", Qt::SkipEmptyParts);
                         for(const auto& t : list) cat.presetTags.push_back(t.trimmed().toStdWString());
                         CategoryRepo::update(cat);
                     }
+                    dlg->deleteLater();
                 }
             });
 
@@ -125,16 +127,16 @@ void CategoryPanel::setupContextMenu() {
             // --- 结构管理 ---
             menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
             menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类", [this, catId]() {
-                bool ok;
-                QString text = QInputDialog::getText(this, "新建子分类", "区名称:", QLineEdit::Normal, "", &ok);
-                if (ok && !text.isEmpty()) {
+                auto* dlg = new FramelessInputDialog("新建子分类", "区名称:", "", this);
+                if (dlg->exec() == QDialog::Accepted && !dlg->text().isEmpty()) {
                     Category cat;
-                    cat.name = text.toStdWString();
+                    cat.name = dlg->text().toStdWString();
                     cat.parentId = catId;
                     cat.color = L"#3498db";
                     CategoryRepo::add(cat);
                     m_partitionModel->refresh();
                 }
+                dlg->deleteLater();
             });
 
             menu.addSeparator();
@@ -158,13 +160,15 @@ void CategoryPanel::setupContextMenu() {
 
             QString deleteText = selected.size() > 1 ? QString("删除选中的 %1 个分类").arg(selected.size()) : "删除分类";
             menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), deleteText, [this, selected]() {
-                if (QMessageBox::question(this, "确认删除", "确定要删除选中的分类吗？\n(注意：物理文件不会删除，但分类关系将被抹除)") == QMessageBox::Yes) {
+                auto* msg = new FramelessMessageBox("确认删除", "确定要删除选中的分类吗？\n(注意：物理文件不会删除，但分类关系将被抹除)", this);
+                if (msg->exec() == QDialog::Accepted) {
                     for (const auto& idx : selected) {
                         int id = idx.data(CategoryModel::IdRole).toInt();
                         if (id > 0) CategoryRepo::remove(id);
                     }
                     m_partitionModel->refresh();
                 }
+                msg->deleteLater();
             });
 
             menu.addSeparator();
@@ -193,16 +197,16 @@ void CategoryPanel::setupContextMenu() {
 }
 
 void CategoryPanel::onCreateCategory() {
-    bool ok;
-    QString text = QInputDialog::getText(this, "新建分类", "名称:", QLineEdit::Normal, "", &ok);
-    if (ok && !text.isEmpty()) {
+    auto* dlg = new FramelessInputDialog("新建分类", "名称:", "", this);
+    if (dlg->exec() == QDialog::Accepted && !dlg->text().isEmpty()) {
         Category cat;
-        cat.name = text.toStdWString();
+        cat.name = dlg->text().toStdWString();
         cat.parentId = 0;
         cat.color = L"#3498db";
         CategoryRepo::add(cat);
         m_partitionModel->refresh();
     }
+    dlg->deleteLater();
 }
 
 void CategoryPanel::onRenameCategory() {

@@ -41,6 +41,8 @@ list(APPEND SOURCES
     "src/ui/CategoryModel.cpp"
     "src/ui/CategoryModel.h"
     "src/ui/CategoryDelegate.h"
+    "src/ui/FramelessDialog.h"
+    "src/ui/FramelessDialog.cpp"
     "src/ui/DropTreeView.cpp"
     "src/ui/DropTreeView.h"
     "src/core/CoreController.h"
