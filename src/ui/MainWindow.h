@@ -30,17 +30,14 @@ public:
     ~MainWindow() override = default;
 
 protected:
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
-    void changeEvent(QEvent* event) override;
-
-#ifdef Q_OS_WIN
-    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
-#endif
 
 private slots:
     void onPinToggled(bool checked);
-    void toggleMaximize();
     void onBackClicked();
     void onForwardClicked();
     void onUpClicked();
@@ -50,20 +47,12 @@ protected:
 
 private:
     void initUi();
-    void initBaseLayout();
     void updateNavButtons();
     void updateStatusBar();
     void navigateTo(const QString& path, bool record = true);
     void initToolbar();
     void setupSplitters();
     void setupCustomTitleBarButtons();
-
-    // 标准架构图层 (Memories.md)
-    QVBoxLayout* m_outerLayout = nullptr;
-    QFrame* m_container = nullptr;
-    QVBoxLayout* m_mainLayout = nullptr;
-    QWidget* m_titleBar = nullptr;
-    QWidget* m_contentArea = nullptr;
 
     // 面包屑地址栏
     BreadcrumbBar* m_breadcrumbBar = nullptr;
@@ -77,21 +66,22 @@ private:
     FilterPanel* m_filterPanel = nullptr;
 
     QSplitter* m_mainSplitter = nullptr;
-    QHBoxLayout* m_titleLayout = nullptr;
+    QHBoxLayout* m_headerLayout = nullptr;
 
     // 工具栏组件
+    QToolBar* m_toolbar = nullptr;
     QLineEdit* m_pathEdit = nullptr;
     QLineEdit* m_searchEdit = nullptr;
     QPushButton* m_btnBack = nullptr;
     QPushButton* m_btnForward = nullptr;
     QPushButton* m_btnUp = nullptr;
     
-    // 标题栏按钮组
+    // 标题栏按钮组 (用于 frameless 时的模拟，此处作为标准按钮展示)
     QPushButton* m_btnCreate = nullptr;
-    QPushButton* m_btnPin = nullptr;
-    QPushButton* m_minBtn = nullptr;
-    QPushButton* m_maxBtn = nullptr;
-    QPushButton* m_closeBtn = nullptr;
+    QPushButton* m_btnPinTop = nullptr;
+    QPushButton* m_btnMin = nullptr;
+    QPushButton* m_btnMax = nullptr;
+    QPushButton* m_btnClose = nullptr;
 
     // 状态管理
     bool m_isPinned = false;
@@ -104,12 +94,9 @@ private:
     QLabel* m_statusCenter = nullptr;
     QLabel* m_statusRight = nullptr;
 
-    // Windows 缩放辅助
-    enum ResizeEdge {
-        None = 0, Top, Bottom, Left, Right,
-        TopLeft, TopRight, BottomLeft, BottomRight
-    };
-    ResizeEdge getEdge(const QPoint& pos);
+    // 窗口拖动
+    bool m_isDragging = false;
+    QPoint m_dragPosition;
 };
 
 } // namespace ArcMeta

@@ -12,23 +12,24 @@ QuickLookWindow& QuickLookWindow::instance() {
     return inst;
 }
 
-QuickLookWindow::QuickLookWindow() : FramelessDialog("快速预览") {
-    setObjectName("QuickLookWindow");
-    resize(1000, 750);
+QuickLookWindow::QuickLookWindow() : QWidget(nullptr) {
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    setStyleSheet("QWidget { background-color: rgba(30, 30, 30, 0.95); border: 1px solid #444; border-radius: 6px; }");
+
+    resize(800, 600);
     initUi();
 }
 
 void QuickLookWindow::initUi() {
-    // 使用基类提供的 m_contentArea
-    QVBoxLayout* layout = new QVBoxLayout(m_contentArea);
-    layout->setContentsMargins(10, 10, 10, 10);
+    m_mainLayout = new QVBoxLayout(this);
+    m_mainLayout->setContentsMargins(10, 10, 10, 10);
 
-    m_titleLabel = new QLabel(m_contentArea);
+    m_titleLabel = new QLabel(this);
     m_titleLabel->setStyleSheet("color: #B0B0B0; font-size: 14px; font-weight: bold; margin-bottom: 5px;");
-    layout->addWidget(m_titleLabel);
+    m_mainLayout->addWidget(m_titleLabel);
 
     // 图片渲染层
-    m_graphicsView = new QGraphicsView(m_contentArea);
+    m_graphicsView = new QGraphicsView(this);
     m_graphicsView->setRenderHint(QPainter::Antialiasing);
     m_graphicsView->setRenderHint(QPainter::SmoothPixmapTransform);
     m_graphicsView->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
@@ -37,12 +38,12 @@ void QuickLookWindow::initUi() {
     m_graphicsView->setScene(m_scene);
     
     // 文本渲染层
-    m_textPreview = new QPlainTextEdit(m_contentArea);
+    m_textPreview = new QPlainTextEdit(this);
     m_textPreview->setReadOnly(true);
     m_textPreview->setStyleSheet("background: transparent; color: #EEEEEE; border: none; font-family: 'Consolas';");
     
-    layout->addWidget(m_graphicsView);
-    layout->addWidget(m_textPreview);
+    m_mainLayout->addWidget(m_graphicsView);
+    m_mainLayout->addWidget(m_textPreview);
 
     m_graphicsView->hide();
     m_textPreview->hide();

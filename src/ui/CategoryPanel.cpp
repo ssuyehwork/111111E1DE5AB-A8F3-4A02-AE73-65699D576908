@@ -4,7 +4,6 @@
 #include "DropTreeView.h"
 #include "UiHelper.h"
 #include "ToolTipOverlay.h"
-#include "FramelessDialog.h"
 #include "../db/CategoryRepo.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -14,7 +13,9 @@
 #include <QMenu>
 #include <QAction>
 #include <QApplication>
+#include <QInputDialog>
 #include <QColorDialog>
+#include <QMessageBox>
 #include <QRandomGenerator>
 
 namespace ArcMeta {
@@ -41,8 +42,8 @@ void CategoryPanel::setupContextMenu() {
         auto selected = m_partitionTree->selectionModel()->selectedIndexes();
         
         QMenu menu(this);
-        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; } "
-                           "QMenu::item { padding: 6px 10px 6px 10px; border-radius: 4px; } "
+        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; } "
+                           "QMenu::item { padding: 6px 10px 6px 10px; border-radius: 3px; } "
                            "QMenu::icon { margin-left: 6px; } "
                            "QMenu::item:selected { background-color: #3E3E42; color: white; }");
 
@@ -108,9 +109,9 @@ void CategoryPanel::setupContextMenu() {
                     QString tagsStr;
                     for(const auto& t : cat.presetTags) { if(!tagsStr.isEmpty()) tagsStr += ","; tagsStr += QString::fromStdWString(t); }
                     
-                    FramelessInputDialog dlg("设置预设标签", "标签 (逗号分隔):", tagsStr, this);
-                    if (dlg.exec() == QDialog::Accepted) {
-                        QString text = dlg.text();
+                    bool ok;
+                    QString text = QInputDialog::getText(this, "设置预设标签", "标签 (逗号分隔):", QLineEdit::Normal, tagsStr, &ok);
+                    if (ok) {
                         cat.presetTags.clear();
                         QStringList list = text.split(",", Qt::SkipEmptyParts);
                         for(const auto& t : list) cat.presetTags.push_back(t.trimmed().toStdWString());
@@ -124,10 +125,9 @@ void CategoryPanel::setupContextMenu() {
             // --- 结构管理 ---
             menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
             menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类", [this, catId]() {
-                FramelessInputDialog dlg("新建子分类", "区名称:", "", this);
-                if (dlg.exec() == QDialog::Accepted) {
-                    QString text = dlg.text();
-                    if (text.isEmpty()) return;
+                bool ok;
+                QString text = QInputDialog::getText(this, "新建子分类", "区名称:", QLineEdit::Normal, "", &ok);
+                if (ok && !text.isEmpty()) {
                     Category cat;
                     cat.name = text.toStdWString();
                     cat.parentId = catId;
@@ -158,9 +158,7 @@ void CategoryPanel::setupContextMenu() {
 
             QString deleteText = selected.size() > 1 ? QString("删除选中的 %1 个分类").arg(selected.size()) : "删除分类";
             menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), deleteText, [this, selected]() {
-                QString confirmMsg = "确定要删除选中的分类吗？\n(注意：物理文件不会删除，但分类关系将被抹除)";
-                FramelessMessageBox dlg("确认删除", confirmMsg, this);
-                if (dlg.exec() == QDialog::Accepted) {
+                if (QMessageBox::question(this, "确认删除", "确定要删除选中的分类吗？\n(注意：物理文件不会删除，但分类关系将被抹除)") == QMessageBox::Yes) {
                     for (const auto& idx : selected) {
                         int id = idx.data(CategoryModel::IdRole).toInt();
                         if (id > 0) CategoryRepo::remove(id);
@@ -195,10 +193,9 @@ void CategoryPanel::setupContextMenu() {
 }
 
 void CategoryPanel::onCreateCategory() {
-    FramelessInputDialog dlg("新建分类", "名称:", "", this);
-    if (dlg.exec() == QDialog::Accepted) {
-        QString text = dlg.text();
-        if (text.isEmpty()) return;
+    bool ok;
+    QString text = QInputDialog::getText(this, "新建分类", "名称:", QLineEdit::Normal, "", &ok);
+    if (ok && !text.isEmpty()) {
         Category cat;
         cat.name = text.toStdWString();
         cat.parentId = 0;
