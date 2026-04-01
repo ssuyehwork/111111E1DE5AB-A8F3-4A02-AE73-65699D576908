@@ -5,6 +5,7 @@
 #include <QStandardItemModel>
 #include <QStandardItem>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QDir>
 
 namespace ArcMeta {
@@ -53,6 +54,7 @@ private:
     QTreeView* m_treeView = nullptr;
     QStandardItemModel* m_model = nullptr;
     QVBoxLayout* m_mainLayout = nullptr;
+    QHBoxLayout* m_headerLayout = nullptr;
     QWidget* m_focusLine = nullptr;
 
 private slots:

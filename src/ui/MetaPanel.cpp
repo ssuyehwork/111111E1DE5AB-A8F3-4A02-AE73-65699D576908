@@ -219,18 +219,18 @@ void MetaPanel::initUi() {
         "  border-bottom: 1px solid #333;"
         "}"
     );
-    QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
-    headerLayout->setSpacing(8);
+    m_headerLayout = new QHBoxLayout(header);
+    m_headerLayout->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
+    m_headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);
     iconLabel->setPixmap(UiHelper::getIcon("all_data", QColor("#4a90e2"), 18).pixmap(18, 18));
-    headerLayout->addWidget(iconLabel);
+    m_headerLayout->addWidget(iconLabel);
 
     QLabel* titleLabel = new QLabel("元数据", header);
     titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #4a90e2; background: transparent; border: none;");
-    headerLayout->addWidget(titleLabel);
-    headerLayout->addStretch();
+    m_headerLayout->addWidget(titleLabel);
+    m_headerLayout->addStretch();
 
     QPushButton* closeBtn = new QPushButton(header);
     closeBtn->setIcon(UiHelper::getIcon("x", QColor("#888888"), 16));
@@ -243,7 +243,7 @@ void MetaPanel::initUi() {
     connect(closeBtn, &QPushButton::clicked, [this]() {
         this->hide();
     });
-    headerLayout->addWidget(closeBtn);
+    m_headerLayout->addWidget(closeBtn);
 
     m_mainLayout->addWidget(header);
 

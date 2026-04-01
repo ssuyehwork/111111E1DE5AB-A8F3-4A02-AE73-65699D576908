@@ -1,5 +1,6 @@
 #include "NavPanel.h"
 #include "UiHelper.h"
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QLabel>
@@ -59,18 +60,18 @@ void NavPanel::initUi() {
         "  border-bottom: 1px solid #333;"
         "}"
     );
-    QHBoxLayout* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
-    headerLayout->setSpacing(8);
+    m_headerLayout = new QHBoxLayout(header);
+    m_headerLayout->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
+    m_headerLayout->setSpacing(8);
 
     QLabel* iconLabel = new QLabel(header);
     iconLabel->setPixmap(UiHelper::getIcon("list_ul", QColor("#2ecc71"), 18).pixmap(18, 18));
-    headerLayout->addWidget(iconLabel);
+    m_headerLayout->addWidget(iconLabel);
 
     QLabel* titleLabel = new QLabel("笔记列表", header);
     titleLabel->setStyleSheet("color: #2ecc71; font-size: 13px; font-weight: bold; background: transparent; border: none;");
-    headerLayout->addWidget(titleLabel);
-    headerLayout->addStretch();
+    m_headerLayout->addWidget(titleLabel);
+    m_headerLayout->addStretch();
 
     m_mainLayout->addWidget(header);
 
