@@ -1,5 +1,6 @@
 #include "NavPanel.h"
 #include "UiHelper.h"
+#include "TreeItemDelegate.h"
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QLabel>
@@ -86,8 +87,21 @@ void NavPanel::initUi() {
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHeaderHidden(true);
     m_treeView->setAnimated(true);
-    m_treeView->setIndentation(16);
+
+    // 物理还原：20px 缩进以对齐三角形图标
+    m_treeView->setIndentation(20);
+
+    // 物理修正：禁用编辑触发，防止双击重命名
+    m_treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+
+    // 物理还原：双击锁定为伸展或折叠
     m_treeView->setExpandsOnDoubleClick(true);
+
+    // 增强：开启拖拽收藏功能
+    m_treeView->setDragEnabled(true);
+    m_treeView->setDragDropMode(QAbstractItemView::DragOnly);
+
+    m_treeView->setItemDelegate(new TreeItemDelegate(this));
 
     m_model = new QStandardItemModel(this);
     QFileIconProvider iconProvider;
@@ -120,15 +134,16 @@ void NavPanel::initUi() {
     m_treeView->setModel(m_model);
     connect(m_treeView, &QTreeView::expanded, this, &NavPanel::onItemExpanded);
 
-    // 树形控件样式美化 (禁止使用或显示三角形)
+    // 树形控件样式美化
     m_treeView->setStyleSheet(
-        "QTreeView { background-color: transparent; border: none; font-size: 12px; selection-background-color: #378ADD; outline: none; }"
-        "QTreeView::item { height: 28px; padding-left: 4px; color: #EEEEEE; }"
-        "QTreeView::item:hover { background-color: rgba(255, 255, 255, 0.05); }"
-        "QTreeView::branch:has-children:!has-siblings:closed,"
-        "QTreeView::branch:closed:has-children:has-siblings,"
-        "QTreeView::branch:has-children:!has-siblings:open,"
-        "QTreeView::branch:open:has-children:has-siblings { border-image: none; image: none; }"
+        "QTreeView { background-color: transparent; border: none; font-size: 12px; outline: none; }"
+        "QTreeView::item { height: 28px; padding-left: 0px; color: #EEEEEE; }"
+
+        "/* 物理还原：复原三角形折叠图标 */"
+        "QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); }"
+        "QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); }"
+        "QTreeView::branch:has-children:closed:has-siblings { image: url(:/icons/arrow_right.svg); }"
+        "QTreeView::branch:has-children:open:has-siblings   { image: url(:/icons/arrow_down.svg); }"
     );
 
 

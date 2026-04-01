@@ -1,5 +1,6 @@
 #include "ContentPanel.h"
 #include "../../SvgIcons.h"
+#include "TreeItemDelegate.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -464,6 +465,10 @@ void ContentPanel::initGridView() {
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
 
+    // 增强：开启拖拽收藏功能
+    m_gridView->setDragEnabled(true);
+    m_gridView->setDragDropMode(QAbstractItemView::DragOnly);
+
     // 禁用双击编辑，将双击权归还给“打开”操作
     m_gridView->setEditTriggers(QAbstractItemView::EditKeyPressed | QAbstractItemView::SelectedClicked);
 
@@ -492,17 +497,23 @@ void ContentPanel::initListView() {
     m_treeView->setSortingEnabled(true);
     m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     m_treeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+
+    // 增强：开启拖拽收藏功能
+    m_treeView->setDragEnabled(true);
+    m_treeView->setDragDropMode(QAbstractItemView::DragOnly);
+
     m_treeView->setExpandsOnDoubleClick(false);
     m_treeView->setRootIsDecorated(false);
+
+    // 物理还原：应用圆角高亮代理
+    m_treeView->setItemDelegate(new TreeItemDelegate(this));
 
     m_treeView->setModel(m_proxyModel);
     m_treeView->viewport()->installEventFilter(this);
 
     m_treeView->setStyleSheet(
         "QTreeView { background-color: transparent; border: none; outline: none; font-size: 12px; }"
-        "QTreeView::item { height: 28px; color: #EEEEEE; padding-left: 4px; }"
-        "QTreeView::item:selected { background-color: #378ADD; }"
-        "QTreeView::item:hover { background-color: rgba(255, 255, 255, 0.05); }"
+        "QTreeView::item { height: 28px; color: #EEEEEE; padding-left: 0px; }"
         "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 2px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
