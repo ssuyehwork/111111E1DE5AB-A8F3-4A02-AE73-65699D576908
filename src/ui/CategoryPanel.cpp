@@ -145,7 +145,7 @@ void CategoryPanel::initUi() {
         QTreeView { background-color: transparent; border: none; color: #CCC; outline: none; }
         QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); }
         QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); }
-        QTreeView::item { height: 22px; padding-left: 10px; }
+        QTreeView::item { height: 22px; padding-left: 0px; }
     )";
 
     // 系统树
@@ -156,7 +156,7 @@ void CategoryPanel::initUi() {
     m_systemTree->setModel(m_systemModel);
     m_systemTree->setHeaderHidden(true);
     m_systemTree->setRootIsDecorated(false);
-    m_systemTree->setIndentation(10);
+    m_systemTree->setIndentation(0);
     m_systemTree->setFixedHeight(176); // 8 items * 22px
     m_systemTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_systemTree->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -169,7 +169,7 @@ void CategoryPanel::initUi() {
     m_partitionTree->setModel(m_partitionModel);
     m_partitionTree->setHeaderHidden(true);
     m_partitionTree->setRootIsDecorated(true);
-    m_partitionTree->setIndentation(10);
+    m_partitionTree->setIndentation(0);
     m_partitionTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_partitionTree->setDragEnabled(true);
     m_partitionTree->setAcceptDrops(true);
