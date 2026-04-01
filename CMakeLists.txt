@@ -49,6 +49,9 @@ list(APPEND SOURCES
     "src/meta/MetadataManager.cpp"
     "src/ui/FramelessDialog.h"
     "src/ui/FramelessDialog.cpp"
+    "src/ui/DropListView.h"
+    "src/ui/DropListView.cpp"
+    "src/ui/TreeItemDelegate.h"
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)

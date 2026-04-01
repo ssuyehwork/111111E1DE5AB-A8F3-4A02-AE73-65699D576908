@@ -1,6 +1,8 @@
 #include "ContentPanel.h"
 #include "../../SvgIcons.h"
 #include "TreeItemDelegate.h"
+#include "DropTreeView.h"
+#include "DropListView.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -451,7 +453,8 @@ void ContentPanel::setViewMode(ViewMode mode) {
 }
 
 void ContentPanel::initGridView() {
-    m_gridView = new QListView(this);
+    // 物理还原：使用自定义视图以支持无快照拖拽
+    m_gridView = new DropListView(this);
     m_gridView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_gridView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_gridView->setViewMode(QListView::IconMode);
@@ -491,7 +494,8 @@ void ContentPanel::initGridView() {
 }
 
 void ContentPanel::initListView() {
-    m_treeView = new QTreeView(this);
+    // 物理还原：使用自定义视图以支持无快照拖拽
+    m_treeView = new DropTreeView(this);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setSortingEnabled(true);

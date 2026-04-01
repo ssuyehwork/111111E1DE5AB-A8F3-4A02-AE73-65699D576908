@@ -82,7 +82,8 @@ void NavPanel::initUi() {
     contentLayout->setContentsMargins(15, 8, 15, 8);
     contentLayout->setSpacing(0);
 
-    m_treeView = new QTreeView(this);
+    // 物理还原：使用自定义视图以支持无快照拖拽
+    m_treeView = new DropTreeView(this);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHeaderHidden(true);

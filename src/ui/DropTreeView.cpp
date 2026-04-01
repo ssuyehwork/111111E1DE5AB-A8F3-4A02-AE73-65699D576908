@@ -73,20 +73,13 @@ void DropTreeView::dropEvent(QDropEvent* event) {
 }
 
 void DropTreeView::startDrag(Qt::DropActions supportedActions) {
-    CategoryModel* catModel = qobject_cast<CategoryModel*>(model());
-    if (!catModel) {
-        if (auto* proxy = qobject_cast<QAbstractProxyModel*>(model())) {
-            catModel = qobject_cast<CategoryModel*>(proxy->sourceModel());
-        }
-    }
-
-    if (catModel && !selectedIndexes().isEmpty()) {
-        // catModel->setDraggingId(selectedIndexes().first().data(CategoryModel::IdRole).toInt());
-    }
+    QModelIndexList indexes = selectedIndexes();
+    if (indexes.isEmpty()) return;
 
     QDrag* drag = new QDrag(this);
-    drag->setMimeData(model()->mimeData(selectedIndexes()));
+    drag->setMimeData(model()->mimeData(indexes));
     
+    // 物理还原：消除卡片快照干扰，使用 1x1 透明像素
     QPixmap pix(1, 1);
     pix.fill(Qt::transparent);
     drag->setPixmap(pix);

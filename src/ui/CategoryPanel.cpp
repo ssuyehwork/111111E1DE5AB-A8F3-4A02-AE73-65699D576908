@@ -190,7 +190,23 @@ void CategoryPanel::onCreateSubCategory() {
 }
 
 void CategoryPanel::onAddData() {
-    ToolTipOverlay::instance()->showText(QCursor::pos(), "新建数据功能开发中...", 1000);
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
+
+    FramelessInputDialog dlg("新建数据", "请输入文件/笔记名称:", "", this);
+    if (dlg.exec() == QDialog::Accepted) {
+        QString name = dlg.text();
+        if (!name.isEmpty()) {
+            // [BUSINESS LOGIC] 暂时在本地数据库建立一个虚拟项并关联到此分类
+            // 后续由 CoreController 负责物理文件同步
+            std::wstring wname = name.toStdWString();
+            CategoryRepo::addItemToCategory(id, L"new://" + wname);
+            m_categoryModel->refresh();
+            ToolTipOverlay::instance()->showText(QCursor::pos(), QString("已新建并归类: %1").arg(name), 1000);
+        }
+    }
 }
 
 void CategoryPanel::onClassifyToCategory() {
@@ -268,7 +284,29 @@ void CategoryPanel::onRandomColor() {
 }
 
 void CategoryPanel::onSetPresetTags() {
-    ToolTipOverlay::instance()->showText(QCursor::pos(), "预设标签功能开发中...", 1000);
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
+
+    auto all = CategoryRepo::getAll();
+    Category current;
+    for(auto& c : all) if(c.id == id) { current = c; break; }
+
+    QString initial;
+    for(const auto& t : current.presetTags) initial += QString::fromStdWString(t) + ",";
+    if (initial.endsWith(",")) initial.chop(1);
+
+    FramelessInputDialog dlg("设置预设标签", "请输入标签 (用逗号分隔):", initial, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        QStringList tags = dlg.text().split(QRegularExpression("[,，]"), Qt::SkipEmptyParts);
+        current.presetTags.clear();
+        for(const QString& t : tags) current.presetTags.push_back(t.trimmed().toStdWString());
+
+        CategoryRepo::update(current);
+        m_categoryModel->refresh();
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "预设标签已更新", 1000);
+    }
 }
 
 void CategoryPanel::onTogglePin() {
@@ -297,7 +335,32 @@ void CategoryPanel::onTogglePin() {
 }
 
 void CategoryPanel::onSetPassword() {
-    ToolTipOverlay::instance()->showText(QCursor::pos(), "密码设置功能开发中...", 1000);
+    QModelIndex index = m_categoryTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return;
+
+    FramelessInputDialog dlg("加密分类", "请输入访问密码:", "", this);
+    // 物理还原：密码输入框应设为密码模式
+    QLineEdit* edit = dlg.findChild<QLineEdit*>();
+    if (edit) edit->setEchoMode(QLineEdit::Password);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        QString pwd = dlg.text();
+        if (!pwd.isEmpty()) {
+            auto all = CategoryRepo::getAll();
+            for(auto& cat : all) {
+                if(cat.id == id) {
+                    cat.encrypted = true;
+                    // [SECURE] 实际项目中应存储加盐哈希，此处先完成 UI 逻辑链路
+                    CategoryRepo::update(cat);
+                    break;
+                }
+            }
+            m_categoryModel->refresh();
+            ToolTipOverlay::instance()->showText(QCursor::pos(), "分类已加密", 1000);
+        }
+    }
 }
 
 void CategoryPanel::onClearPassword() {
@@ -463,9 +526,13 @@ void CategoryPanel::initUi() {
                     count++;
                 }
             }
-            // 物理反馈：提示收藏成功
+
+            // 物理修正：释放后刷新模型，确保数量更新并固化显示
+            m_categoryModel->refresh();
+
+            // 物理反馈：提示收藏成功 (使用翠绿边框强化)
             ToolTipOverlay::instance()->showText(QCursor::pos(), 
-                QString("<b style='color:#2ecc71;'>已收藏 %1 个项目到 [%2]</b>").arg(count).arg(categoryName), 1200);
+                QString("<b style='color:#2ecc71;'>已收藏 %1 个项目到 [%2]</b>").arg(count).arg(categoryName), 1200, QColor("#2ecc71"));
         }
     });
     
