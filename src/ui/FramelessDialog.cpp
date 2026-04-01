@@ -52,15 +52,42 @@ FramelessDialog::FramelessDialog(const QString& title, QWidget* parent)
     titleLayout->addWidget(m_titleLabel);
     titleLayout->addStretch();
 
-    m_closeBtn = new QPushButton();
-    m_closeBtn->setObjectName("closeBtn");
-    m_closeBtn->setFixedSize(28, 28);
-    m_closeBtn->setIcon(UiHelper::getIcon("close", QColor("#888888"), 18));
-    m_closeBtn->setAutoDefault(false);
-    m_closeBtn->setCursor(Qt::PointingHandCursor);
+    // 严格遵循 Memories.md：按钮尺寸 24x24 px，外边距 2px，圆角 4px
+    auto createTitleBtn = [&](const QString& iconKey, const QString& tip) {
+        QPushButton* btn = new QPushButton();
+        btn->setFixedSize(24, 24);
+        btn->setIcon(UiHelper::getIcon(iconKey, QColor("#888888"), 16));
+        btn->setIconSize(QSize(16, 16));
+        btn->setAutoDefault(false);
+        btn->setProperty("tooltipText", tip);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet(
+            "QPushButton { background: transparent; border: none; border-radius: 4px; margin: 2px; } "
+            "QPushButton:hover { background-color: #3E3E42; } "
+            "QPushButton:pressed { background-color: rgba(255, 255, 255, 0.15); }"
+        );
+        btn->installEventFilter(this);
+        return btn;
+    };
+
+    m_btnPin = createTitleBtn("pin_tilted", "置顶");
+    m_btnPin->setCheckable(true);
+    connect(m_btnPin, &QPushButton::toggled, this, &FramelessDialog::toggleStayOnTop);
+    titleLayout->addWidget(m_btnPin);
+
+    m_minBtn = createTitleBtn("minimize", "最小化");
+    connect(m_minBtn, &QPushButton::clicked, this, &QDialog::showMinimized);
+    titleLayout->addWidget(m_minBtn);
+
+    m_maxBtn = createTitleBtn("maximize", "最大化");
+    connect(m_maxBtn, &QPushButton::clicked, this, &FramelessDialog::toggleMaximize);
+    titleLayout->addWidget(m_maxBtn);
+
+    m_closeBtn = createTitleBtn("close", "关闭");
     m_closeBtn->setStyleSheet(
-        "QPushButton { background: transparent; border: none; border-radius: 4px; } "
-        "QPushButton:hover { background-color: #E81123; }"
+        "QPushButton { background: transparent; border: none; border-radius: 4px; margin: 2px; } "
+        "QPushButton:hover { background-color: #E81123; } "
+        "QPushButton:pressed { background-color: rgba(255, 255, 255, 0.15); }"
     );
     connect(m_closeBtn, &QPushButton::clicked, this, &QDialog::reject);
     titleLayout->addWidget(m_closeBtn);
@@ -116,6 +143,38 @@ void FramelessDialog::mouseMoveEvent(QMouseEvent* event) {
 void FramelessDialog::mouseReleaseEvent(QMouseEvent* event) {
     m_isDragging = false;
     QDialog::mouseReleaseEvent(event);
+}
+
+void FramelessDialog::toggleStayOnTop(bool checked) {
+    if (checked) {
+        setWindowFlag(Qt::WindowStaysOnTopHint, true);
+        m_btnPin->setIcon(UiHelper::getIcon("pin_vertical", QColor("#FF551C"), 16));
+        // 保持 Checked 状态下的背景显示
+        m_btnPin->setStyleSheet(
+            "QPushButton { background-color: #3E3E42; border: none; border-radius: 4px; margin: 2px; } "
+            "QPushButton:hover { background-color: #4E4E52; } "
+            "QPushButton:pressed { background-color: rgba(255, 255, 255, 0.15); }"
+        );
+    } else {
+        setWindowFlag(Qt::WindowStaysOnTopHint, false);
+        m_btnPin->setIcon(UiHelper::getIcon("pin_tilted", QColor("#888888"), 16));
+        m_btnPin->setStyleSheet(
+            "QPushButton { background: transparent; border: none; border-radius: 4px; margin: 2px; } "
+            "QPushButton:hover { background-color: #3E3E42; } "
+            "QPushButton:pressed { background-color: rgba(255, 255, 255, 0.15); }"
+        );
+    }
+    show(); // 修改 WindowFlags 后必须调用 show()
+}
+
+void FramelessDialog::toggleMaximize() {
+    if (isMaximized()) {
+        showNormal();
+        m_maxBtn->setIcon(UiHelper::getIcon("maximize", QColor("#888888"), 16));
+    } else {
+        showMaximized();
+        m_maxBtn->setIcon(UiHelper::getIcon("restore", QColor("#888888"), 16));
+    }
 }
 
 void FramelessDialog::keyPressEvent(QKeyEvent* event) {
