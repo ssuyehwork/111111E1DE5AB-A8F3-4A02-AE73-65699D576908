@@ -46,6 +46,7 @@ protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
+    QHBoxLayout* m_topLayout = nullptr;
     void initUi();
     void updateNavButtons();
     void updateStatusBar();
@@ -66,7 +67,6 @@ private:
     FilterPanel* m_filterPanel = nullptr;
 
     QSplitter* m_mainSplitter = nullptr;
-    QHBoxLayout* m_headerLayout = nullptr;
 
     // 工具栏组件
     QToolBar* m_toolbar = nullptr;

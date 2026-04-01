@@ -477,16 +477,16 @@ void MainWindow::setupSplitters() {
     headerWidget->setFixedHeight(42); // 32px content + 5px top + 5px bottom
     headerWidget->setStyleSheet("QWidget { background-color: #252525; border-bottom: 1px solid #333; }");
     
-    m_headerLayout = new QHBoxLayout(headerWidget);
-    m_headerLayout->setContentsMargins(12, 5, 12, 5); 
-    m_headerLayout->setSpacing(5);
-    m_headerLayout->setAlignment(Qt::AlignVCenter);
+    m_topLayout = new QHBoxLayout(headerWidget);
+    m_topLayout->setContentsMargins(12, 5, 12, 5);
+    m_topLayout->setSpacing(5);
+    m_topLayout->setAlignment(Qt::AlignVCenter);
 
-    m_headerLayout->addWidget(m_btnBack);
-    m_headerLayout->addWidget(m_btnForward);
-    m_headerLayout->addWidget(m_btnUp);
-    m_headerLayout->addWidget(m_pathStack, 1);
-    m_headerLayout->addWidget(m_searchEdit);
+    m_topLayout->addWidget(m_btnBack);
+    m_topLayout->addWidget(m_btnForward);
+    m_topLayout->addWidget(m_btnUp);
+    m_topLayout->addWidget(m_pathStack, 1);
+    m_topLayout->addWidget(m_searchEdit);
 
     // --- 2. 主体核心容器 (物理还原：5px 全局边距包裹) ---
     QWidget* bodyWrapper = new QWidget(centralC);
@@ -660,8 +660,8 @@ void MainWindow::setupCustomTitleBarButtons() {
     });
     connect(m_btnClose, &QPushButton::clicked, this, &MainWindow::close);
 
-    if (m_headerLayout) {
-        m_headerLayout->addWidget(titleBarBtns);
+    if (m_topLayout) {
+        m_topLayout->addWidget(titleBarBtns);
     }
 
     // 逻辑：置顶切换
