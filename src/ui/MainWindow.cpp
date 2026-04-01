@@ -491,12 +491,12 @@ void MainWindow::setupSplitters() {
 
     // --- 2. 统一导航栏 (第二行) ---
     m_navBarWidget = new QWidget(centralC);
-    m_navBarWidget->setFixedHeight(34); // 压缩高度，更显紧凑
+    m_navBarWidget->setFixedHeight(37); // 32px 内容 + 5px 上边距
     m_navBarWidget->setStyleSheet("background: transparent; border: none;");
     
     m_navBarLayout = new QHBoxLayout(m_navBarWidget);
-    // 2026-03-xx 物理对齐：侧边距调整为 5px，确保搜索框与下方 FilterPanel 物理对齐
-    m_navBarLayout->setContentsMargins(5, 0, 5, 2);
+    // 2026-03-xx 物理对齐：实现上下 5px 呼吸感，上边距由本布局提供，下边距由 bodyLayout 提供
+    m_navBarLayout->setContentsMargins(5, 5, 5, 0);
     m_navBarLayout->setSpacing(5);
     m_navBarLayout->setAlignment(Qt::AlignVCenter);
 
