@@ -262,6 +262,106 @@ FramelessDialog::ResizeEdge FramelessDialog::getEdge(const QPoint& pos) {
     return None;
 }
 
+// --- FramelessInputDialog ---
+
+FramelessInputDialog::FramelessInputDialog(const QString& title, const QString& label, const QString& initialText, QWidget* parent)
+    : FramelessDialog(title, parent) {
+    resize(400, 200);
+
+    QVBoxLayout* layout = new QVBoxLayout(m_contentArea);
+    layout->setContentsMargins(30, 20, 30, 20);
+    layout->setSpacing(15);
+
+    QLabel* textLabel = new QLabel(label, m_contentArea);
+    textLabel->setStyleSheet("color: #B0B0B0; font-size: 13px;");
+    layout->addWidget(textLabel);
+
+    m_lineEdit = new QLineEdit(m_contentArea);
+    m_lineEdit->setFixedHeight(36);
+    m_lineEdit->setText(initialText);
+    m_lineEdit->setFocus();
+    layout->addWidget(m_lineEdit);
+
+    layout->addStretch();
+
+    QHBoxLayout* btnLayout = new QHBoxLayout();
+    btnLayout->setSpacing(10);
+    btnLayout->addStretch();
+
+    auto createActionBtn = [this](const QString& text, bool primary) {
+        QPushButton* btn = new QPushButton(text, m_contentArea);
+        btn->setFixedSize(90, 32);
+        if (primary) {
+            btn->setStyleSheet("QPushButton { background-color: #378ADD; color: white; border: none; border-radius: 4px; font-weight: bold; } "
+                               "QPushButton:hover { background-color: #4A9BEF; }");
+            btn->setDefault(true);
+        } else {
+            btn->setStyleSheet("QPushButton { background-color: #333333; color: #EEEEEE; border: 1px solid #444; border-radius: 4px; } "
+                               "QPushButton:hover { background-color: #444444; }");
+        }
+        return btn;
+    };
+
+    QPushButton* okBtn = createActionBtn("确定", true);
+    QPushButton* cancelBtn = createActionBtn("取消", false);
+
+    btnLayout->addWidget(okBtn);
+    btnLayout->addWidget(cancelBtn);
+    layout->addLayout(btnLayout);
+
+    connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
+    connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+}
+
+QString FramelessInputDialog::textValue() const {
+    return m_lineEdit->text();
+}
+
+// --- FramelessMessageBox ---
+
+FramelessMessageBox::FramelessMessageBox(const QString& title, const QString& text, IconType type, QWidget* parent)
+    : FramelessDialog(title, parent) {
+    Q_UNUSED(type);
+    resize(420, 180);
+
+    QVBoxLayout* layout = new QVBoxLayout(m_contentArea);
+    layout->setContentsMargins(30, 25, 30, 20);
+    layout->setSpacing(20);
+
+    QLabel* msgLabel = new QLabel(text, m_contentArea);
+    msgLabel->setWordWrap(true);
+    msgLabel->setStyleSheet("color: #EEEEEE; font-size: 13px; line-height: 1.5;");
+    layout->addWidget(msgLabel);
+
+    layout->addStretch();
+
+    QHBoxLayout* btnLayout = new QHBoxLayout();
+    btnLayout->setSpacing(10);
+    btnLayout->addStretch();
+
+    QPushButton* okBtn = new QPushButton("确定", m_contentArea);
+    okBtn->setFixedSize(90, 32);
+    okBtn->setStyleSheet("QPushButton { background-color: #E24B4A; color: white; border: none; border-radius: 4px; font-weight: bold; } "
+                         "QPushButton:hover { background-color: #EF5B5A; }");
+
+    QPushButton* cancelBtn = new QPushButton("取消", m_contentArea);
+    cancelBtn->setFixedSize(90, 32);
+    cancelBtn->setStyleSheet("QPushButton { background-color: #333333; color: #EEEEEE; border: 1px solid #444; border-radius: 4px; } "
+                             "QPushButton:hover { background-color: #444444; }");
+
+    btnLayout->addWidget(okBtn);
+    btnLayout->addWidget(cancelBtn);
+    layout->addLayout(btnLayout);
+
+    connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
+    connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+}
+
+bool FramelessMessageBox::question(QWidget* parent, const QString& title, const QString& text) {
+    FramelessMessageBox dlg(title, text, Question, parent);
+    return dlg.exec() == QDialog::Accepted;
+}
+
 void FramelessDialog::loadSettings() {
     if (objectName().isEmpty()) return;
     QSettings settings("ArcMeta团队", "WindowStates");

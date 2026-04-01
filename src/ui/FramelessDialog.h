@@ -69,4 +69,30 @@ private:
     ResizeEdge getEdge(const QPoint& pos);
 };
 
+/**
+ * @brief 符合 Frameless 架构的标准输入对话框
+ */
+class FramelessInputDialog : public FramelessDialog {
+    Q_OBJECT
+public:
+    explicit FramelessInputDialog(const QString& title, const QString& label, const QString& initialText = "", QWidget* parent = nullptr);
+    QString textValue() const;
+
+private:
+    QLineEdit* m_lineEdit = nullptr;
+};
+
+/**
+ * @brief 符合 Frameless 架构的标准消息对话框
+ */
+class FramelessMessageBox : public FramelessDialog {
+    Q_OBJECT
+public:
+    enum IconType { Info, Question, Warning, Error };
+    static bool question(QWidget* parent, const QString& title, const QString& text);
+
+private:
+    explicit FramelessMessageBox(const QString& title, const QString& text, IconType type, QWidget* parent = nullptr);
+};
+
 } // namespace ArcMeta
