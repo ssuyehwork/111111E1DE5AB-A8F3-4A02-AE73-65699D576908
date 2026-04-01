@@ -37,8 +37,6 @@
 #include <QInputDialog>
 #include <windows.h>
 #include <shellapi.h>
-#include "../mft/MftReader.h"
-#include "../mft/PathBuilder.h"
 #include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 #include "UiHelper.h"
@@ -140,18 +138,12 @@ protected:
         bool rightPinned = source_right.data(IsLockedRole).toBool();
 
         if (leftPinned != rightPinned) {
-            // 在 lessThan(left, right) 中，返回 true 表示 left < right (升序时 left 排在 right 之前)
-            // 如果我们想要 Pinned 的永远在最前面，无论升序降序，我们需要特殊处理。
-            // 但 Qt 的排序是：lessThan 结果决定相对顺序，升序直接用 lessThan，降序取反。
-            // 因此，为了实现“置顶永远在前”，必须根据 sortOrder 动态返回。
-            
             if (sortOrder() == Qt::AscendingOrder)
-                return leftPinned; // 升序时，Pinned 为 "小"，排在前
+                return leftPinned;
             else
-                return !leftPinned; // 降序时，Pinned 为 "大"，排在前
+                return !leftPinned;
         }
 
-        // 如果置顶状态相同，则走默认逻辑
         return QSortFilterProxyModel::lessThan(source_left, source_right);
     }
 };
@@ -162,8 +154,6 @@ ContentPanel::ContentPanel(QWidget* parent)
     setObjectName("EditorContainer");
     setAttribute(Qt::WA_StyledBackground, true);
     setMinimumWidth(230);
-    
-    // 核心修正：移除宽泛的 QWidget QSS，防止其屏蔽 MainWindow 赋予的 ID 边框样式
     setStyleSheet("color: #EEEEEE;");
 
     m_mainLayout = new QVBoxLayout(this);
@@ -185,17 +175,15 @@ void ContentPanel::setFocusHighlight(bool visible) {
 }
 
 void ContentPanel::initUi() {
-    // 物理还原：1px 翠绿高亮焦点线 (#2ecc71)
     m_focusLine = new QWidget(this);
     m_focusLine->setFixedHeight(1);
     m_focusLine->setStyleSheet("background-color: #2ecc71;");
-    m_focusLine->hide(); // 初始隐藏
+    m_focusLine->hide();
     m_mainLayout->addWidget(m_focusLine);
 
     QWidget* titleBar = new QWidget(this);
     titleBar->setObjectName("ContainerHeader");
     titleBar->setFixedHeight(32);
-    // 重新注入标题栏样式，确保背景色和边框还原
     titleBar->setStyleSheet(
         "QWidget#ContainerHeader {"
         "  background-color: #252526;"
@@ -203,7 +191,7 @@ void ContentPanel::initUi() {
         "}"
     );
     QHBoxLayout* titleL = new QHBoxLayout(titleBar);
-    titleL->setContentsMargins(15, 2, 15, 0); // 严格还原 15px 左右边距，顶部 2px 偏移以垂直居中
+    titleL->setContentsMargins(15, 2, 15, 0);
 
     QLabel* iconLabel = new QLabel(titleBar);
     iconLabel->setPixmap(UiHelper::getIcon("eye", QColor("#41F2F2"), 18).pixmap(18, 18));
@@ -243,14 +231,11 @@ void ContentPanel::initUi() {
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
-    // 2026-03-xx 纠偏：预览面板回归微量对齐边距 (2, 2, 2, 2)
     contentWrapper->setContentsMargins(2, 2, 2, 2);
     contentWrapper->setSpacing(0);
     contentWrapper->addWidget(m_viewStack);
     
     m_mainLayout->addLayout(contentWrapper);
-    
-    // 快捷键拦截提升至控件本身，而非 viewport()，确保焦点行为一致
     m_gridView->installEventFilter(this);
 }
 
@@ -258,8 +243,8 @@ void ContentPanel::updateGridSize() {
     m_zoomLevel = qBound(32, m_zoomLevel, 128);
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
-    int cardW = m_zoomLevel + 30; // 用户指定: zoomLevel+30
-    int cardH = m_zoomLevel + 60; // 遵循规范: zoomLevel+60
+    int cardW = m_zoomLevel + 30;
+    int cardH = m_zoomLevel + 60;
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
 
@@ -280,13 +265,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
         QAbstractItemView* view = qobject_cast<QAbstractItemView*>(obj);
         if (!view) view = qobject_cast<QAbstractItemView*>(obj->parent());
 
-        // 核心红线：如果焦点在 QLineEdit 上，说明正在重命名，直接放行
         if (qobject_cast<QLineEdit*>(QApplication::focusWidget())) {
             return false;
         }
 
         if (view) {
-            // 1. Ctrl + 0..5 (星级)
             if ((keyEvent->modifiers() & Qt::ControlModifier) && 
                 (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_5)) {
                 
@@ -296,16 +279,14 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     if (idx.column() == 0) {
                         QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
-                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
-                        MetadataManager::instance().setRating(path.toStdWString(), rating);
-                        m_proxyModel->setData(idx, rating, RatingRole);
+                            MetadataManager::instance().setRating(path.toStdWString(), rating);
+                            m_proxyModel->setData(idx, rating, RatingRole);
                         }
                     }
                 }
                 return true;
             }
 
-            // 2. Alt + D (置顶/取消置顶)
             if (((keyEvent->modifiers() & Qt::AltModifier) || (keyEvent->modifiers() & (Qt::AltModifier | Qt::WindowShortcut))) && 
                 (keyEvent->key() == Qt::Key_D)) {
                 auto indexes = view->selectionModel()->selectedIndexes();
@@ -313,9 +294,8 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     if (idx.column() == 0) {
                         QString itemPath = idx.data(PathRole).toString();
                         if (!itemPath.isEmpty()) {
-                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
-                        bool current = idx.data(IsLockedRole).toBool();
-                        MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
+                            bool current = idx.data(IsLockedRole).toBool();
+                            MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
                             m_proxyModel->setData(idx, !current, IsLockedRole);
                         }
                     }
@@ -323,7 +303,6 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 return true;
             }
 
-            // 3. Alt + 1..9 (颜色打标)
             if ((keyEvent->modifiers() & Qt::AltModifier) && 
                 (keyEvent->key() >= Qt::Key_1 && keyEvent->key() <= Qt::Key_9)) {
                 
@@ -345,9 +324,8 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     if (idx.column() == 0) {
                         QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
-                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
-                        MetadataManager::instance().setColor(path.toStdWString(), color.toStdWString());
-                        m_proxyModel->setData(idx, color, ColorRole);
+                            MetadataManager::instance().setColor(path.toStdWString(), color.toStdWString());
+                            m_proxyModel->setData(idx, color, ColorRole);
                         }
                     }
                 }
@@ -360,10 +338,6 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     auto indexes = view->selectionModel()->selectedIndexes();
                     for (const auto& idx : indexes) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(PathRole).toString());
                     if (!paths.isEmpty()) QApplication::clipboard()->setText(paths.join("\r\n"));
-                    return true;
-                }
-                if (keyEvent->key() == Qt::Key_R) {
-                    // 批量重命名 (Ctrl+Shift+R) 被触发
                     return true;
                 }
             }
@@ -453,7 +427,6 @@ void ContentPanel::setViewMode(ViewMode mode) {
 }
 
 void ContentPanel::initGridView() {
-    // 物理还原：使用自定义视图以支持无快照拖拽
     m_gridView = new DropListView(this);
     m_gridView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_gridView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -463,23 +436,20 @@ void ContentPanel::initGridView() {
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
-    m_gridView->setGridSize(QSize(126, 156)); // 遵循规范: W=96+30, H=96+60
+    m_gridView->setGridSize(QSize(126, 156));
     m_gridView->setSpacing(0);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-    // 增强：开启拖拽收藏功能
     m_gridView->setDragEnabled(true);
     m_gridView->setDragDropMode(QAbstractItemView::DragOnly);
 
-    // 禁用双击编辑，将双击权归还给“打开”操作
     m_gridView->setEditTriggers(QAbstractItemView::EditKeyPressed | QAbstractItemView::SelectedClicked);
 
     m_gridView->setModel(m_proxyModel);
     m_gridView->setItemDelegate(new GridItemDelegate(this));
     m_gridView->viewport()->installEventFilter(this);
 
-    // 显式连接双击打开信号
     connect(m_gridView, &QListView::doubleClicked, this, &ContentPanel::onDoubleClicked);
 
     m_gridView->setStyleSheet(
@@ -494,7 +464,6 @@ void ContentPanel::initGridView() {
 }
 
 void ContentPanel::initListView() {
-    // 物理还原：使用自定义视图以支持无快照拖拽
     m_treeView = new DropTreeView(this);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -502,14 +471,12 @@ void ContentPanel::initListView() {
     m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     m_treeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     
-    // 增强：开启拖拽收藏功能
     m_treeView->setDragEnabled(true);
     m_treeView->setDragDropMode(QAbstractItemView::DragOnly);
 
     m_treeView->setExpandsOnDoubleClick(false);
     m_treeView->setRootIsDecorated(false);
     
-    // 物理还原：应用圆角高亮代理
     m_treeView->setItemDelegate(new TreeItemDelegate(this));
 
     m_treeView->setModel(m_proxyModel);
@@ -518,7 +485,7 @@ void ContentPanel::initListView() {
     m_treeView->setStyleSheet(
         "QTreeView { background-color: transparent; border: none; outline: none; font-size: 12px; }"
         "QTreeView::item { height: 28px; color: #EEEEEE; padding-left: 0px; }"
-        "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 4px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
+        "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 6px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
     m_treeView->header()->setStyleSheet(
@@ -553,7 +520,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     menu.addSeparator();
     
     QMenu* categorizeMenu = menu.addMenu("归类到...");
-    categorizeMenu->addAction("（暂无分类）"); // 占位，待后续对接数据库加载
+    categorizeMenu->addAction("（暂无分类）");
     
     menu.addSeparator();
     
@@ -614,12 +581,9 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
             if (idx.column() == 0) {
                 QString itemPath = idx.data(PathRole).toString();
                 if (!itemPath.isEmpty()) {
-                    QFileInfo info(itemPath);
-                    ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-                    meta.load();
-                    bool current = meta.items()[info.fileName().toStdWString()].pinned;
-                    meta.items()[info.fileName().toStdWString()].pinned = !current;
-                    meta.save();
+                    bool current = idx.data(IsLockedRole).toBool();
+                    MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
+                    m_proxyModel->setData(idx, !current, IsLockedRole);
                 }
             }
         }
@@ -668,7 +632,6 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
-    // 空路径 → 展示此电脑（所有驱动器）
     if (path.isEmpty() || path == "computer://") {
         m_currentPath = "computer://";
         QFileIconProvider iconProvider;
@@ -699,7 +662,6 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
 
             typeCounts["folder"]++;
         }
-        // 发送统计数据，使筛选面板更新（例如显示“文件夹(8)”）
         emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
                                   createDateCounts, modifyDateCounts);
         return;
@@ -739,7 +701,6 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
     QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
     QFileIconProvider iconProvider;
 
-    // 2026-03-xx 重构：彻底抛弃单目录 AmMetaJson 加载，改为从 MetadataManager 内存镜像读取
     QDate today    = QDate::currentDate();
     QDate yesterday = today.addDays(-1);
 
@@ -759,7 +720,6 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         nameItem->setData(fullPath, PathRole);
         nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
 
-        // 元数据反填 + 统计 (接入 L1 缓存)
         RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
         
         int     itemRating = runtimeMeta.rating;
@@ -773,21 +733,13 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
         nameItem->setData(itemTags, TagsRole);
 
-        for (const auto& t : itemTags) {
-            tagCounts[t]++;
-        }
+        for (const auto& t : itemTags) tagCounts[t]++;
 
-        // 评级统计
         ratingCounts[itemRating]++;
-        // 颜色统计
         colorCounts[itemColor]++;
-        // 无标签计数
         if (!hasTags) noTagCount++;
-        // 文件类型统计
         typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
-        // 创建日期统计
         createDateCounts[dateKey(info.birthTime().date())]++;
-        // 修改日期统计
         modifyDateCounts[dateKey(info.lastModified().date())]++;
 
         row << nameItem;
@@ -805,85 +757,11 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
 
 
 void ContentPanel::search(const QString& query) {
-    if (query.isEmpty()) return;
+    // 2026-03-xx 按照用户最新要求：物理移除 MFT 引擎及其相关搜索逻辑。
+    // 此处暂不实现替代方案，仅保留函数接口以防编译报错，后续可按需实现基于 QDirIterator 的简单过滤。
+    Q_UNUSED(query);
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "路径", "类型", "修改时间"});
-
-    auto results = MftReader::instance().search(query.toStdWString());
-    QFileIconProvider iconProvider;
-
-    QMap<int, int>     ratingCounts;
-    QMap<QString, int> colorCounts;
-    QMap<QString, int> tagCounts;
-    QMap<QString, int> typeCounts;
-    QMap<QString, int> createDateCounts;
-    QMap<QString, int> modifyDateCounts;
-    int noTagCount = 0;
-
-    QDate today = QDate::currentDate();
-    QDate yesterday = today.addDays(-1);
-    auto dateKey = [&](const QDate& d) -> QString {
-        if (d == today)     return "today";
-        if (d == yesterday) return "yesterday";
-        return d.toString("yyyy-MM-dd");
-    };
-
-    int count = 0;
-    for (const auto& entry : results) {
-        if (++count > 1000) break;
-
-        QString fileName = QString::fromStdWString(entry.name);
-        if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
-
-        std::wstring fullWPath = PathBuilder::getPath(entry.volume, entry.frn);
-        QString fullPath = QString::fromStdWString(fullWPath);
-        if (fullPath.isEmpty()) {
-            fullPath = QString::fromStdWString(entry.volume) + "[FRN:" + QString::number(entry.frn, 16) + "]";
-        }
-
-        QFileInfo info(fullPath);
-        QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, PathRole); 
-        nameItem->setData(entry.isDir() ? "folder" : "file", TypeRole);
-        
-        // 2026-03-xx 重构：彻底消除搜索时的 IO 轰炸，接入 MetadataManager 内存镜像
-        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
-
-        int     itemRating = runtimeMeta.rating;
-        QString itemColor  = QString::fromStdWString(runtimeMeta.color);
-        QStringList itemTags = runtimeMeta.tags;
-        bool    hasTags = !itemTags.isEmpty();
-
-        nameItem->setData(itemRating, RatingRole);
-        nameItem->setData(itemColor, ColorRole);
-        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
-        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
-        nameItem->setData(itemTags, TagsRole);
-
-        for (const auto& t : itemTags) {
-            tagCounts[t]++;
-        }
-
-        // 统计累加
-        ratingCounts[itemRating]++;
-        colorCounts[itemColor]++;
-        if (!hasTags) noTagCount++;
-        typeCounts[entry.isDir() ? "folder" : info.suffix().toUpper()]++;
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
-
-        row << nameItem;
-        row << new QStandardItem(fullPath);
-        row << new QStandardItem(entry.isDir() ? "文件夹" : (info.suffix().isEmpty() ? "文件" : info.suffix().toUpper() + " 文件"));
-        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
-
-        m_model->appendRow(row);
-    }
-
-    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
-    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                              createDateCounts, modifyDateCounts);
 }
 
 void ContentPanel::applyFilters(const FilterState& state) {
@@ -905,7 +783,6 @@ void ContentPanel::createNewItem(const QString& type) {
     QString finalName = baseName + ext;
     QString fullPath = m_currentPath + "/" + finalName;
 
-    // 自动避重
     int counter = 1;
     while (QFileInfo::exists(fullPath)) {
         finalName = baseName + QString(" (%1)").arg(counter++) + ext;
@@ -925,7 +802,6 @@ void ContentPanel::createNewItem(const QString& type) {
 
     if (success) {
         loadDirectory(m_currentPath);
-        // 自动进入重命名模式（查找对应项并激活编辑）
         auto results = m_model->findItems(finalName, Qt::MatchExactly, 0);
         if (!results.isEmpty()) {
             QModelIndex srcIdx = results.first()->index();
@@ -951,7 +827,6 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QColor cardBg = isSelected ? QColor("#282828") : (isHovered ? QColor("#2A2A2A") : QColor("#2D2D2D"));
     painter->setPen(isSelected ? QPen(QColor("#3498db"), 2) : QPen(QColor("#333333"), 1));
     painter->setBrush(cardBg);
-    // 物理还原：文件卡片固定应用 8px 圆角
     painter->drawRoundedRect(cardRect, 8, 8);
 
     QString path = index.data(PathRole).toString();
@@ -963,7 +838,6 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QRect extRect(cardRect.left() + 8, cardRect.top() + 8, 36, 18);
     painter->setPen(Qt::NoPen);
     painter->setBrush(badgeColor);
-    // 2026-03-xx 恢复为 2px，仅外围圆角为 8px
     painter->drawRoundedRect(extRect, 2, 2);
     painter->setPen(QColor("#FFFFFF"));
     QFont extFont = painter->font();
@@ -977,13 +851,12 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    // 2026-03-xx 按照用户要求：文件名背景块高度由 16px 调整为 18px
     int nameH = 18;
     int gap1 = 6;
     int gap2 = 4;
     
     int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
-    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13; // +5 -> +13 (下移 8px)
+    int startY = cardRect.top() + (cardRect.height() - totalH) / 2 + 13;
 
     QRect iconRect(cardRect.left() + (cardRect.width() - iconDrawSize) / 2, startY, iconDrawSize, iconDrawSize);
     QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
@@ -993,18 +866,16 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int rating = index.data(RatingRole).toInt();
     
     int starSize = 12; 
-    int starSpacing = 1; // 还原间距，不再脑补加宽
+    int starSpacing = 1;
     int banW = 12;
     int banGap = 4;
     int infoTotalW = banW + banGap + (5 * starSize) + (4 * starSpacing);
     int infoStartX = cardRect.left() + (cardRect.width() - infoTotalW) / 2;
 
-    // A. 绘制“清除星级”图标 (SVG)
     QRect banRect(infoStartX, ratingY + (ratingH - banW) / 2, banW, banW);
     QIcon banIcon = UiHelper::getIcon("no_color", QColor("#555555"), banW);
     banIcon.paint(painter, banRect);
 
-    // B. 绘制星级 (SVG)
     int starsStartX = infoStartX + banW + banGap;
     QPixmap filledStar = UiHelper::getPixmap("star_filled", QSize(starSize, starSize), QColor("#EF9F27"));
     QPixmap emptyStar = UiHelper::getPixmap("star", QSize(starSize, starSize), QColor("#444444"));
@@ -1029,7 +900,6 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         if (dotC.isValid()) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(dotC);
-            // 2026-03-xx 恢复为 2px，仅外围圆角为 8px
             painter->drawRoundedRect(nameRect, 2, 2);
             painter->setPen(dotC.lightness() > 180 ? Qt::black : Qt::white);
         } else {
@@ -1060,7 +930,6 @@ bool GridItemDelegate::eventFilter(QObject* obj, QEvent* event) {
         QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
         QLineEdit* editor = qobject_cast<QLineEdit*>(obj);
         if (editor) {
-            // 修复重命名：允许方向键、Home/End 在编辑框内正常导航，不触发视图切换
             switch (keyEvent->key()) {
                 case Qt::Key_Left:
                 case Qt::Key_Right:
@@ -1068,8 +937,6 @@ bool GridItemDelegate::eventFilter(QObject* obj, QEvent* event) {
                 case Qt::Key_Down:
                 case Qt::Key_Home:
                 case Qt::Key_End:
-                    // 返回 false 表示不拦截，让 QLineEdit 自身处理
-                    // 同时停止事件传播，防止 QAbstractItemView 捕获并结束编辑
                     keyEvent->accept();
                     return false;
                 default:
@@ -1088,7 +955,6 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             if (baseIconSize <= 0) baseIconSize = 64; 
             int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
             int ratingH = 12;
-            // 2026-03-xx 按照用户要求：点击判定基准高度同步调整为 18px
             int nameH = 18;
             int gap1 = 6;
             int gap2 = 4;
@@ -1102,19 +968,16 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             int infoTotalW = banW + banGap + (5 * starSize + 4 * starSpacing);
             int infoStartX = option.rect.left() + (option.rect.width() - infoTotalW) / 2;
 
-            // 1. 判定“清除”图标
             QRect banRect(infoStartX, ratingY + (ratingH - 14) / 2, 14, 14);
             if (banRect.contains(mEvent->pos())) {
                 QString path = index.data(PathRole).toString();
                 if (!path.isEmpty()) {
-                    // 2026-03-xx 重构：接入 MetadataManager 统一更新
                     MetadataManager::instance().setRating(path.toStdWString(), 0);
                     model->setData(index, 0, RatingRole);
                 }
                 return true;
             }
 
-            // 2. 判定 5 颗星星 (1..5)
             int starsStartX = infoStartX + banW + banGap;
             for (int i = 0; i < 5; ++i) {
                 QRect starRect(starsStartX + i * (starSize + starSpacing), ratingY + (ratingH - starSize) / 2, starSize, starSize);
@@ -1122,7 +985,6 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
                     int r = i + 1;
                     QString path = index.data(PathRole).toString();
                     if (!path.isEmpty()) {
-                        // 2026-03-xx 重构：接入 MetadataManager 统一更新
                         MetadataManager::instance().setRating(path.toStdWString(), r);
                         model->setData(index, r, RatingRole);
                     }
@@ -1137,16 +999,10 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
 QWidget* GridItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const {
     Q_UNUSED(option);
     QLineEdit* editor = new QLineEdit(parent);
-    
-    // 关键点：重命名时光标行为修复
-    // 默认情况下 QAbstractItemView 会在编辑状态下拦截方向键
-    // 我们通过设置属性让编辑器能处理方向键
     editor->installEventFilter(const_cast<GridItemDelegate*>(this));
-
     editor->setAlignment(Qt::AlignCenter);
     editor->setFrame(false);
     
-    // 背景色动态匹配标签色，若无标签则用默认深色
     QString tagColorStr = index.data(ColorRole).toString();
     QString bgColor = tagColorStr.isEmpty() ? "#3E3E42" : tagColorStr;
     QString textColor = tagColorStr.isEmpty() ? "#FFFFFF" : "#000000";
@@ -1164,7 +1020,6 @@ void GridItemDelegate::setEditorData(QWidget* editor, const QModelIndex& index) 
     QLineEdit* lineEdit = static_cast<QLineEdit*>(editor);
     lineEdit->setText(value);
     
-    // 智能选中：选中不含扩展名的部分
     int lastDot = value.lastIndexOf('.');
     if (lastDot > 0) {
         lineEdit->setSelection(0, lastDot);
@@ -1185,23 +1040,18 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
     if (QFile::rename(oldPath, newPath)) {
         model->setData(index, value, Qt::EditRole);
         model->setData(index, newPath, PathRole);
-        // 2026-03-xx 按照用户要求：修复重命名后元数据丢失问题，同步更新 JSON
         AmMetaJson::renameItem(info.absolutePath(), info.fileName(), value);
-    } else {
-        // 失败则不改模型
     }
 }
 
 void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const {
     Q_UNUSED(index);
-    // 强制编辑器位置与 paint 中计算的文件名绘制区域 NameBox 重合
     QRect cardRect = option.rect.adjusted(4, 4, -4, -4);
     int baseIconSize = option.decorationSize.width();
     if (baseIconSize <= 0) baseIconSize = 64; 
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    // 2026-03-xx 按照用户要求：编辑器高度同步调整为 18px
     int nameH = 18;
     int gap1 = 6;
     int gap2 = 4;
@@ -1211,7 +1061,6 @@ void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionV
     int ratingY = startY + iconDrawSize + gap1;
     int nameY = ratingY + ratingH + gap2;
     
-    // 编辑框精准覆盖文件名区域，不遮挡星级
     QRect nameBoxRect(cardRect.left() + 6, nameY, cardRect.width() - 12, nameH);
     editor->setGeometry(nameBoxRect);
 }

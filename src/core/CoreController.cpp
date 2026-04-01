@@ -3,7 +3,6 @@
 #include "../db/SyncEngine.h"
 #include "../meta/SyncQueue.h"
 #include "../meta/MetadataManager.h"
-#include "../mft/MftReader.h"
 #include <QtConcurrent>
 #include <QThreadPool>
 #include <QDebug>
@@ -19,27 +18,25 @@ CoreController::CoreController(QObject* parent) : QObject(parent) {}
 
 CoreController::~CoreController() {}
 
+/**
+ * @brief 启动系统初始化链条
+ * 2026-03-xx 按照用户最新要求：彻底移除 MFT 引擎构建，仅加载数据库、配置及增量 JSON。
+ */
 void CoreController::startSystem() {
     // 异步链式初始化
-    // 2026-03-xx 按照编译器建议：对于无需返回值的异步任务，使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告
     QThreadPool::globalInstance()->start([this]() {
-        qDebug() << "[Core] 开始后台异步初始化链条...";
+        qDebug() << "[Core] 开始后台异步初始化链条 (MFT 已移除)...";
         
         // 1. 初始化数据库元数据内存镜像 (关键：消除 UI 启动后的 IO 抖动)
         setStatus("正在载入元数据缓存...", true);
         MetadataManager::instance().initFromDatabase();
         qDebug() << "[Core] 数据库元数据缓存加载完成";
 
-        // 2. 底层 MFT 索引构建 (耗时操作)
-        setStatus("正在构建全盘索引...", true);
-        MftReader::instance().buildIndex();
-        qDebug() << "[Core] MFT 极速索引构建完成";
-
-        // 3. 启动同步队列
+        // 2. 启动同步队列
         setStatus("启动同步引擎...", true);
         SyncQueue::instance().start();
 
-        // 4. 执行增量同步 (耗时操作)
+        // 3. 执行增量同步 (基于分布式 JSON 对齐元数据)
         setStatus("正在校验增量数据...", true);
         SyncEngine::instance().runIncrementalSync();
         qDebug() << "[Core] 增量同步完成";

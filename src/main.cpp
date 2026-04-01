@@ -10,7 +10,6 @@
 #include "db/Database.h"
 #include "db/SyncEngine.h"
 #include "meta/SyncQueue.h"
-#include "mft/MftReader.h"
 #include "core/CoreController.h"
 
 /**
@@ -40,40 +39,16 @@ void customMessageHandler(QtMsgType type, const QMessageLogContext &context, con
     }
 }
 
-/**
- * @brief 检查当前进程是否具有管理员权限
- */
-bool isRunningAsAdmin() {
-    BOOL fRet = FALSE;
-    HANDLE hToken = NULL;
-    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
-        TOKEN_ELEVATION elevation;
-        DWORD cbSize = sizeof(TOKEN_ELEVATION);
-        if (GetTokenInformation(hToken, TokenElevation, &elevation, sizeof(elevation), &cbSize)) {
-            fRet = elevation.TokenIsElevated;
-        }
-    }
-    if (hToken) CloseHandle(hToken);
-    return fRet;
-}
-
 int main(int argc, char *argv[]) {
     // 1. 安装自定义日志处理器：确保从程序启动的第一秒开始就能捕获所有调试信息
     qInstallMessageHandler(customMessageHandler);
-    qDebug() << "================ ArcMeta 启动加载 ==================";
+    qDebug() << "================ ArcMeta 启动加载 (MFT 已移除) ==================";
 
     // 设置高 DPI 支持 (Qt 6 默认开启，此处显式设置)
     QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QApplication a(argc, argv);
     a.setApplicationName("ArcMeta");
     a.setOrganizationName("ArcMetaTeam");
-
-    // 1. 权限检查逻辑
-    if (!isRunningAsAdmin()) {
-        QMessageBox::critical(nullptr, "权限不足", 
-            "ArcMeta 需要管理员权限以读取 MFT 数据及加速索引。\n请尝试“以管理员身份运行”。");
-        // 文档规定：无权限时执行降级方案，但启动基础 UI 仍需进行
-    }
 
     // 2. 初始化数据库 (仅核心表结构，必须同步完成)
     std::wstring dbPath = L"arcmeta.db";
@@ -87,7 +62,7 @@ int main(int argc, char *argv[]) {
     ArcMeta::MainWindow w;
 
     // 4. 建立“万事俱备”联动逻辑：
-    // 2026-03-xx 按照用户要求：必须等到数据库元数据载入、MFT 扫描、同步引擎启动等核心逻辑全部完成后，才打开主窗口。
+    // 2026-03-xx 按照用户要求：必须等到数据库元数据载入、同步引擎启动等核心逻辑全部完成后，才打开主窗口。
     // 2026-03-xx 最终修复：明确指定 Qt::QueuedConnection 确保跨线程信号能正确排队投递到 UI 线程。
     QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished, &w, [&w]() {
         qDebug() << "[Main] 收到初始化完成信号，准备打开窗口...";
