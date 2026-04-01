@@ -47,6 +47,8 @@ list(APPEND SOURCES
     "src/core/CoreController.cpp"
     "src/core/DatabaseManager.h"
     "src/core/DatabaseManager.cpp"
+    "src/core/FileCryptoHelper.h"
+    "src/core/FileCryptoHelper.cpp"
     "src/meta/MetadataManager.h"
     "src/meta/MetadataManager.cpp"
     "src/ui/FramelessDialog.h"
@@ -54,6 +56,7 @@ list(APPEND SOURCES
     "src/ui/IconHelper.h"
     "src/ui/AdvancedTagSelector.h"
     "src/ui/AdvancedTagSelector.cpp"
+    "src/ui/StringUtils.h"
     "src/ui/FlowLayout.h"
     "src/ui/FlowLayout.cpp"
 )
