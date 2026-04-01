@@ -50,6 +50,10 @@ list(APPEND SOURCES
     "src/ui/FramelessDialog.h"
     "src/ui/FramelessDialog.cpp"
     "src/ui/IconHelper.h"
+    "src/ui/AdvancedTagSelector.h"
+    "src/ui/AdvancedTagSelector.cpp"
+    "src/ui/FlowLayout.h"
+    "src/ui/FlowLayout.cpp"
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
