@@ -1,4 +1,4 @@
-```cpp
+
 #include "FramelessDialog.h"
 #include "IconHelper.h"
 #include <QGraphicsDropShadowEffect>

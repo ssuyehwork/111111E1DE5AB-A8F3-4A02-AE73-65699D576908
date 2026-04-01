@@ -1,4 +1,4 @@
-```cpp
+
 #ifndef FRAMELESSDIALOG_H
 #define FRAMELESSDIALOG_H
 
