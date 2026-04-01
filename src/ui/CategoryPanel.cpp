@@ -110,7 +110,7 @@ void CategoryPanel::setupContextMenu() {
                     
                     FramelessInputDialog dlg("设置预设标签", "标签 (逗号分隔):", tagsStr, this);
                     if (dlg.exec() == QDialog::Accepted) {
-                        QString text = dlg.textValue();
+                        QString text = dlg.text();
                         cat.presetTags.clear();
                         QStringList list = text.split(",", Qt::SkipEmptyParts);
                         for(const auto& t : list) cat.presetTags.push_back(t.trimmed().toStdWString());
@@ -126,7 +126,7 @@ void CategoryPanel::setupContextMenu() {
             menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类", [this, catId]() {
                 FramelessInputDialog dlg("新建子分类", "区名称:", "", this);
                 if (dlg.exec() == QDialog::Accepted) {
-                    QString text = dlg.textValue();
+                    QString text = dlg.text();
                     if (text.isEmpty()) return;
                     Category cat;
                     cat.name = text.toStdWString();
@@ -158,7 +158,9 @@ void CategoryPanel::setupContextMenu() {
 
             QString deleteText = selected.size() > 1 ? QString("删除选中的 %1 个分类").arg(selected.size()) : "删除分类";
             menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), deleteText, [this, selected]() {
-                if (FramelessMessageBox::question(this, "确认删除", "确定要删除选中的分类吗？\n(注意：物理文件不会删除，但分类关系将被抹除)")) {
+                QString confirmMsg = "确定要删除选中的分类吗？\n(注意：物理文件不会删除，但分类关系将被抹除)";
+                FramelessMessageBox dlg("确认删除", confirmMsg, this);
+                if (dlg.exec() == QDialog::Accepted) {
                     for (const auto& idx : selected) {
                         int id = idx.data(CategoryModel::IdRole).toInt();
                         if (id > 0) CategoryRepo::remove(id);
@@ -195,7 +197,7 @@ void CategoryPanel::setupContextMenu() {
 void CategoryPanel::onCreateCategory() {
     FramelessInputDialog dlg("新建分类", "名称:", "", this);
     if (dlg.exec() == QDialog::Accepted) {
-        QString text = dlg.textValue();
+        QString text = dlg.text();
         if (text.isEmpty()) return;
         Category cat;
         cat.name = text.toStdWString();
