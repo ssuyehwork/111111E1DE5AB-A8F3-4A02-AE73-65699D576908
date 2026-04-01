@@ -518,10 +518,10 @@ void ContentPanel::initListView() {
 void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QMenu menu(this);
     menu.setStyleSheet(
-        "QMenu { background-color: #2B2B2B; border: 1px solid #444444; color: #EEEEEE; padding: 4px; border-radius: 6px; }"
-        "QMenu::item { height: 24px; padding: 0 10px 0 10px; border-radius: 3px; font-size: 12px; }"
-        "QMenu::item:selected { background-color: #505050; }"
-        "QMenu::separator { height: 1px; background: #444444; margin: 4px 8px 4px 8px; }"
+        "QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; }"
+        "QMenu::item { padding: 6px 25px 6px 10px; border-radius: 4px; font-size: 12px; }"
+        "QMenu::item:selected { background-color: #3E3E42; color: white; }"
+        "QMenu::separator { height: 1px; background: #444; margin: 4px 8px; }"
         "QMenu::right-arrow { image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRUVFRUVFIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iOSAxOCAxNSAxMiA5IDYiPjwvcG9seWxpbmU+PC9zdmc+); width: 12px; height: 12px; right: 8px; }"
     );
 

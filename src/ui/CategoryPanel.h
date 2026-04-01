@@ -33,8 +33,17 @@ protected:
 
 private slots:
     void onCreateCategory();
+    void onCreateSubCategory();
     void onRenameCategory();
     void onDeleteCategory();
+    void onAddData();
+    void onClassifyToCategory();
+    void onSetColor();
+    void onRandomColor();
+    void onSetPresetTags();
+    void onTogglePin();
+    void onSetPassword();
+    void onClearPassword();
 
 private:
     void initUi();

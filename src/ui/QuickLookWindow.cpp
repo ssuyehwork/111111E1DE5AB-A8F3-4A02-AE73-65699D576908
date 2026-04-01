@@ -14,7 +14,7 @@ QuickLookWindow& QuickLookWindow::instance() {
 
 QuickLookWindow::QuickLookWindow() : QWidget(nullptr) {
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
-    setStyleSheet("QWidget { background-color: rgba(30, 30, 30, 0.95); border: 1px solid #444; border-radius: 6px; }");
+    setStyleSheet("QWidget { background-color: rgba(30, 30, 30, 0.95); border: 1px solid #444; border-radius: 12px; }");
     
     resize(800, 600);
     initUi();

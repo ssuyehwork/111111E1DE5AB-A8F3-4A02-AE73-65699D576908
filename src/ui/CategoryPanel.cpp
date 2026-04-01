@@ -14,6 +14,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QApplication>
+#include <QRandomGenerator>
 
 namespace ArcMeta {
 
@@ -38,32 +39,59 @@ void CategoryPanel::setupContextMenu() {
         QModelIndex index = m_partitionTree->indexAt(pos);
         
         QMenu menu(this);
-        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; } "
-                           "QMenu::item { padding: 6px 10px 6px 10px; border-radius: 3px; } "
+        // [PHYSICAL RESTORATION] 8px radius for context menu
+        menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; } "
+                           "QMenu::item { padding: 6px 25px 6px 10px; border-radius: 4px; } "
                            "QMenu::icon { margin-left: 6px; } "
-                           "QMenu::item:selected { background-color: #3E3E42; color: white; }");
+                           "QMenu::item:selected { background-color: #3E3E42; color: white; } "
+                           "QMenu::separator { height: 1px; background: #444; margin: 4px 8px; }");
 
         // 基于规范逻辑：如果没有选中项，或者选中了“我的分类”根节点
         if (!index.isValid() || index.data(CategoryModel::NameRole).toString() == "我的分类") {
-            menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
+            menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
             
-            auto* importMenu = menu.addMenu(UiHelper::getIcon("file_import", QColor("#1abc9c"), 18), "导入数据");
-            importMenu->setStyleSheet(menu.styleSheet());
-            importMenu->addAction(UiHelper::getIcon("file", QColor("#1abc9c"), 18), "导入文件(s)...");
-            importMenu->addAction(UiHelper::getIcon("folder", QColor("#1abc9c"), 18), "导入文件夹...");
+            auto* sortMenu = menu.addMenu(UiHelper::getIcon("list_ul", QColor("#aaaaaa"), 18), "排列");
+            sortMenu->setStyleSheet(menu.styleSheet());
+            sortMenu->addAction("按名称");
+            sortMenu->addAction("按时间");
         } else {
             // 具体分类项的右键菜单
             QString type = index.data(CategoryModel::TypeRole).toString();
             if (type == "category") {
-                menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类");
-                menu.addAction(UiHelper::getIcon("edit", QColor("#3498db"), 18), "重命名", this, &CategoryPanel::onRenameCategory);
+                menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建数据", this, &CategoryPanel::onAddData);
+                menu.addAction(UiHelper::getIcon("branch", QColor("#3498db"), 18), "归类到此分类", this, &CategoryPanel::onClassifyToCategory);
+
                 menu.addSeparator();
                 
+                menu.addAction(UiHelper::getIcon("palette", QColor("#f39c12"), 18), "设置颜色", this, &CategoryPanel::onSetColor);
+                menu.addAction(UiHelper::getIcon("random_color", QColor("#e91e63"), 18), "随机颜色", this, &CategoryPanel::onRandomColor);
+                menu.addAction(UiHelper::getIcon("tag", QColor("#e91e63"), 18), "设置预设标签", this, &CategoryPanel::onSetPresetTags);
+
+                menu.addSeparator();
+
+                menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
+                menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建子分类", this, &CategoryPanel::onCreateSubCategory);
+
+                menu.addSeparator();
+
                 bool isPinned = index.data(CategoryModel::PinnedRole).toBool();
                 menu.addAction(UiHelper::getIcon("pin", isPinned ? QColor("#FF551C") : QColor("#aaaaaa"), 18), 
-                               isPinned ? "取消置顶" : "置顶分类");
+                               isPinned ? "取消置顶" : "置顶分类", this, &CategoryPanel::onTogglePin);
                                
+                menu.addAction(UiHelper::getIcon("edit", QColor("#aaaaaa"), 18), "重命名分类", this, &CategoryPanel::onRenameCategory);
                 menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), "删除分类", this, &CategoryPanel::onDeleteCategory);
+
+                menu.addSeparator();
+
+                auto* sortMenu = menu.addMenu(UiHelper::getIcon("list_ul", QColor("#aaaaaa"), 18), "排列");
+                sortMenu->setStyleSheet(menu.styleSheet());
+                sortMenu->addAction("按名称");
+                sortMenu->addAction("按时间");
+
+                auto* pwdMenu = menu.addMenu(UiHelper::getIcon("lock", QColor("#aaaaaa"), 18), "密码保护");
+                pwdMenu->setStyleSheet(menu.styleSheet());
+                pwdMenu->addAction("设置密码", this, &CategoryPanel::onSetPassword);
+                pwdMenu->addAction("清除密码", this, &CategoryPanel::onClearPassword);
             }
         }
         
@@ -86,6 +114,97 @@ void CategoryPanel::onCreateCategory() {
             m_partitionModel->refresh();
         }
     }
+}
+
+void CategoryPanel::onCreateSubCategory() {
+    QModelIndex index = m_partitionTree->currentIndex();
+    if (!index.isValid()) return;
+    int parentId = index.data(CategoryModel::IdRole).toInt();
+
+    FramelessInputDialog dlg("新建子分类", "请输入子分类名称:", "", this);
+    if (dlg.exec() == QDialog::Accepted) {
+        QString text = dlg.text();
+        if (!text.isEmpty()) {
+            Category cat;
+            cat.name = text.toStdWString();
+            cat.parentId = parentId;
+            cat.color = L"#3498db";
+            CategoryRepo::add(cat);
+            m_partitionModel->refresh();
+        }
+    }
+}
+
+void CategoryPanel::onAddData() {
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "新建数据功能开发中...", 1000);
+}
+
+void CategoryPanel::onClassifyToCategory() {
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "归类功能开发中...", 1000);
+}
+
+void CategoryPanel::onSetColor() {
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "设置颜色功能开发中...", 1000);
+}
+
+void CategoryPanel::onRandomColor() {
+    QModelIndex index = m_partitionTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+
+    QStringList colors = {"#3498db", "#2ecc71", "#e74c3c", "#f1c40f", "#9b59b6", "#1abc9c", "#e67e22"};
+    QString color = colors[QRandomGenerator::global()->bounded(static_cast<int>(colors.size()))];
+
+    auto all = CategoryRepo::getAll();
+    for(auto& cat : all) {
+        if(cat.id == id) {
+            cat.color = color.toStdWString();
+            CategoryRepo::update(cat);
+            break;
+        }
+    }
+    m_partitionModel->refresh();
+}
+
+void CategoryPanel::onSetPresetTags() {
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "预设标签功能开发中...", 1000);
+}
+
+void CategoryPanel::onTogglePin() {
+    QModelIndex index = m_partitionTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+    bool isPinned = index.data(CategoryModel::PinnedRole).toBool();
+
+    auto all = CategoryRepo::getAll();
+    for(auto& cat : all) {
+        if(cat.id == id) {
+            cat.pinned = !isPinned;
+            CategoryRepo::update(cat);
+            break;
+        }
+    }
+    m_partitionModel->refresh();
+}
+
+void CategoryPanel::onSetPassword() {
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "密码设置功能开发中...", 1000);
+}
+
+void CategoryPanel::onClearPassword() {
+    QModelIndex index = m_partitionTree->currentIndex();
+    if (!index.isValid()) return;
+    int id = index.data(CategoryModel::IdRole).toInt();
+
+    auto all = CategoryRepo::getAll();
+    for(auto& cat : all) {
+        if(cat.id == id) {
+            cat.encrypted = false;
+            CategoryRepo::update(cat);
+            break;
+        }
+    }
+    m_partitionModel->refresh();
 }
 
 void CategoryPanel::onRenameCategory() {
