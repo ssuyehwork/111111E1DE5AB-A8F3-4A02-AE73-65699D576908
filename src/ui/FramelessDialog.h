@@ -8,6 +8,9 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QFrame>
+#include <QPoint>
+#include <QMouseEvent>
+#include <QKeyEvent>
 
 namespace ArcMeta {
 
