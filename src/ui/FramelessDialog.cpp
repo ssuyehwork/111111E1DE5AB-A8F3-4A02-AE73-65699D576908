@@ -164,10 +164,10 @@ FramelessInputDialog::FramelessInputDialog(const QString& title, const QString& 
 
     m_edit = new QLineEdit(initial);
     m_edit->setMinimumHeight(38);
-    // 严格对齐 RapidNotes 输入框风格：深色背景 + 蓝色聚焦边框
+    // 严格对齐 RapidNotes 输入框风格：深色背景 + 蓝色聚焦边框，应用 6px 圆角
     m_edit->setStyleSheet(
         "QLineEdit {"
-        "  background-color: #2D2D2D; border: 1px solid #444; border-radius: 4px;"
+        "  background-color: #2D2D2D; border: 1px solid #444; border-radius: 6px;"
         "  padding: 0px 10px; color: white; selection-background-color: #4A90E2;"
         "  font-size: 14px;"
         "}"

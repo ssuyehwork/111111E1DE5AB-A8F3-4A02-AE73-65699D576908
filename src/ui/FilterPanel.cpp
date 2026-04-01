@@ -47,6 +47,7 @@ public:
     explicit ClickableRow(QCheckBox* cb, QWidget* parent = nullptr)
         : QWidget(parent), m_cb(cb) {
         setCursor(Qt::PointingHandCursor);
+        setAttribute(Qt::WA_StyledBackground);
     }
 protected:
     void mousePressEvent(QMouseEvent* e) override {
@@ -60,7 +61,7 @@ protected:
         QWidget::mousePressEvent(e);
     }
     void enterEvent(QEnterEvent* e) override {
-        setStyleSheet("QWidget { background: #2A2A2A; }");
+        setStyleSheet("QWidget { background: #2A2A2A; border-radius: 4px; }");
         QWidget::enterEvent(e);
     }
     void leaveEvent(QEvent* e) override {

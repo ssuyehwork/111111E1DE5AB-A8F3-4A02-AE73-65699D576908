@@ -485,8 +485,8 @@ void ContentPanel::initGridView() {
     m_gridView->setStyleSheet(
         "QListView { background-color: transparent; border: none; outline: none; }"
         "QListView::item { background: transparent; }"
-        "QListView::item:selected { background-color: rgba(55, 138, 221, 0.2); border-radius: 6px; }"
-        "QListView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 2px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
+        "QListView::item:selected { background-color: rgba(55, 138, 221, 0.2); border-radius: 8px; }"
+        "QListView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 6px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
     connect(m_gridView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
@@ -518,7 +518,7 @@ void ContentPanel::initListView() {
     m_treeView->setStyleSheet(
         "QTreeView { background-color: transparent; border: none; outline: none; font-size: 12px; }"
         "QTreeView::item { height: 28px; color: #EEEEEE; padding-left: 0px; }"
-        "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 2px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
+        "QTreeView QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #378ADD; border-radius: 4px; padding: 2px; selection-background-color: #378ADD; selection-color: #FFFFFF; }"
     );
 
     m_treeView->header()->setStyleSheet(
@@ -951,6 +951,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QColor cardBg = isSelected ? QColor("#282828") : (isHovered ? QColor("#2A2A2A") : QColor("#2D2D2D"));
     painter->setPen(isSelected ? QPen(QColor("#3498db"), 2) : QPen(QColor("#333333"), 1));
     painter->setBrush(cardBg);
+    // 物理还原：文件卡片固定应用 8px 圆角
     painter->drawRoundedRect(cardRect, 8, 8);
 
     QString path = index.data(PathRole).toString();

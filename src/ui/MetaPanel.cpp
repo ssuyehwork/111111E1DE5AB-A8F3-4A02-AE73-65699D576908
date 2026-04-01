@@ -267,6 +267,7 @@ void MetaPanel::initUi() {
     addInfoRow("物理路径", lblPath); 
     addInfoRow("加密状态", lblEncrypted);
 
+    m_containerLayout->addSpacing(10);
     m_containerLayout->addWidget(createSeparator());
 
     chkPinned = new QCheckBox("置顶条目", m_container); 
@@ -327,7 +328,8 @@ void MetaPanel::initUi() {
     btnChangePwd = new QPushButton("修改密码", m_container);
     for (auto b : {btnEncrypt, btnDecrypt, btnChangePwd}) { 
         b->setFixedHeight(32); 
-        b->setStyleSheet("QPushButton { background: #378ADD; border: none; border-radius: 4px; color: white; font-weight: 500; } QPushButton:hover { background: #4A9BEF; }"); 
+        // 物理还原：功能按钮对齐 6px 圆角规范
+        b->setStyleSheet("QPushButton { background: #378ADD; border: none; border-radius: 6px; color: white; font-weight: 500; } QPushButton:hover { background: #4A9BEF; }");
         m_containerLayout->addWidget(b); 
     }
     

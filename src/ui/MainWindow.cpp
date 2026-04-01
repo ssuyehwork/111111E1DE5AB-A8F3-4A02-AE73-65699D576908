@@ -58,18 +58,20 @@ MainWindow::MainWindow(QWidget* parent)
     QString qss = R"(
         QMainWindow { background-color: #1E1E1E; }
 
-        /* 核心容器样式还原 - 强化 1 像素物理切割感 */
+        /* 核心容器样式还原 - 强化 1 像素物理切割感，应用 8px 标准圆角 */
         #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
             background-color: #1E1E1E;
             border: 1px solid #333333;
-            border-radius: 0px;
+            border-radius: 8px;
         }
 
         /* 容器标题栏样式 (还原旧版 #252526 实色背景与下边框) */
-        /* 2026-03-xx 回归修正：各面板已注入局部样式，此处保留全局 ID 匹配以作兜底 */
+        /* 2026-03-xx 物理回归：标题栏必须保持绝对直角，以体现“物理切割感” */
         #ContainerHeader {
             background-color: #252526;
             border-bottom: 1px solid #333333;
+            border-top-left-radius: 0px;
+            border-top-right-radius: 0px;
         }
 
         /* 全局滚动条美化 */
@@ -125,11 +127,11 @@ MainWindow::MainWindow(QWidget* parent)
             image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);
         }
 
-        /* 统一输入框样式 */
-        QLineEdit {
+        /* 统一输入框与多行文本框样式，应用 6px 圆角规范 */
+        QLineEdit, QPlainTextEdit, QTextEdit {
             background: #1E1E1E;
             border: 1px solid #333333;
-            border-radius: 4px;
+            border-radius: 6px;
             color: #EEEEEE;
             padding-left: 8px;
         }
@@ -416,7 +418,7 @@ void MainWindow::initToolbar() {
     // 2026-03-xx 按照用户最新要求：地址栏高度还原为 32px
     m_pathStack->setFixedHeight(32); 
     m_pathStack->setMinimumWidth(300);
-    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; }");
+    m_pathStack->setStyleSheet("QStackedWidget { background: #1E1E1E; border: 1px solid #444444; border-radius: 6px; }");
 
     // A. 面包屑视图
     m_breadcrumbBar = new BreadcrumbBar(m_pathStack);
@@ -425,7 +427,8 @@ void MainWindow::initToolbar() {
     // B. 编辑视图
     m_pathEdit = new QLineEdit(m_pathStack);
     m_pathEdit->setPlaceholderText("输入路径...");
-    m_pathEdit->setFixedHeight(34);
+    // 物理对齐：修正高度为 32px 以匹配 Stack 容器，确保圆角边框完美重合
+    m_pathEdit->setFixedHeight(32);
     m_pathEdit->setStyleSheet("QLineEdit { background: transparent; border: none; color: #EEEEEE; padding-left: 8px; }");
     m_pathStack->addWidget(m_pathEdit);
 
@@ -456,7 +459,7 @@ void MainWindow::initToolbar() {
     // [脑补优化] 为搜索框添加图标，并统一圆角为 4px
     m_searchEdit->addAction(UiHelper::getIcon("search", QColor("#888888")), QLineEdit::LeadingPosition);
     m_searchEdit->setStyleSheet(
-        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 4px; color: #EEEEEE; padding-left: 5px; }"
+        "QLineEdit { background: #1E1E1E; border: 1px solid #444444; border-radius: 6px; color: #EEEEEE; padding-left: 5px; }"
         "QLineEdit:focus { border: 1px solid #378ADD; }"
     );
 

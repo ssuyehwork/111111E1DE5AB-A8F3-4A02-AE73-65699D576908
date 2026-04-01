@@ -1,6 +1,7 @@
 #include "NavPanel.h"
 #include "UiHelper.h"
 #include "TreeItemDelegate.h"
+#include "DropTreeView.h"
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QLabel>

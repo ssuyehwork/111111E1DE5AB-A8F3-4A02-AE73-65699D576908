@@ -40,12 +40,12 @@ public:
             QRect contentRect = decoRect.united(textRect);
             contentRect = contentRect.intersected(option.rect);
             
-            // 物理还原：选中高亮应用 4px 圆角
+            // 物理还原：选中高亮应用 5px 圆角，与列表模式保持一致
             contentRect.adjust(0, 1, 0, -1);
             
             painter->setBrush(bg);
             painter->setPen(Qt::NoPen);
-            painter->drawRoundedRect(contentRect, 4, 4);
+            painter->drawRoundedRect(contentRect, 5, 5);
             painter->restore();
         }
 
@@ -70,7 +70,7 @@ public:
             "  background-color: #2D2D2D;"
             "  color: white;"
             "  border: 1px solid #4a90e2;"
-            "  border-radius: 4px;"
+            "  border-radius: 6px;"
             "  padding: 0px 4px;"
             "  margin: 0px;"
             "}"
