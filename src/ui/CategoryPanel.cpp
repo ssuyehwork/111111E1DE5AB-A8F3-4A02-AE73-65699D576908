@@ -46,11 +46,6 @@ void CategoryPanel::setupContextMenu() {
         // 基于规范逻辑：如果没有选中项，或者选中了“我的分类”根节点
         if (!index.isValid() || index.data(CategoryModel::NameRole).toString() == "我的分类") {
             menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
-            
-            auto* importMenu = menu.addMenu(UiHelper::getIcon("file_import", QColor("#1abc9c"), 18), "导入数据");
-            importMenu->setStyleSheet(menu.styleSheet());
-            importMenu->addAction(UiHelper::getIcon("file", QColor("#1abc9c"), 18), "导入文件(s)...");
-            importMenu->addAction(UiHelper::getIcon("folder", QColor("#1abc9c"), 18), "导入文件夹...");
         } else {
             // 具体分类项的右键菜单
             QString type = index.data(CategoryModel::TypeRole).toString();
@@ -139,11 +134,11 @@ void CategoryPanel::initUi() {
 
     m_mainLayout->addWidget(header);
 
-    // 2. 内容区包裹容器 (物理还原 8, 8, 8, 8 呼吸边距)
+    // 2. 内容区包裹容器 (物理还原 10, 10, 10, 10 呼吸边距)
     QWidget* sbContent = new QWidget(this);
     sbContent->setStyleSheet("background: transparent; border: none;");
     auto* sbContentLayout = new QVBoxLayout(sbContent);
-    sbContentLayout->setContentsMargins(8, 8, 8, 8);
+    sbContentLayout->setContentsMargins(10, 10, 10, 10);
     sbContentLayout->setSpacing(0);
 
     QString treeStyle = R"(
