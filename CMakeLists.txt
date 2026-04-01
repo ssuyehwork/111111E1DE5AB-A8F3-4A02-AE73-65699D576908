@@ -45,6 +45,8 @@ list(APPEND SOURCES
     "src/ui/DropTreeView.h"
     "src/core/CoreController.h"
     "src/core/CoreController.cpp"
+    "src/core/DatabaseManager.h"
+    "src/core/DatabaseManager.cpp"
     "src/meta/MetadataManager.h"
     "src/meta/MetadataManager.cpp"
     "src/ui/FramelessDialog.h"
