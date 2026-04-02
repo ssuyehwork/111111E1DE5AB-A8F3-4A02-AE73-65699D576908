@@ -2,9 +2,6 @@
 #include <QDrag>
 #include <QPixmap>
 #include <QMimeData>
-#include <QUrl>
-#include <QFileInfo>
-#include "Logger.h"
 
 namespace ArcMeta {
 
@@ -14,33 +11,33 @@ void DropListView::startDrag(Qt::DropActions supportedActions) {
     QModelIndexList indexes = selectedIndexes();
     if (indexes.isEmpty()) return;
 
-    Logger::log(QString("[列表视图] 开始拖拽 | 选中项数量: %1").arg(indexes.count()));
-
-    // 核心增强：拦截并注入物理路径 QUrl，确保 CategoryPanel 接收校验通过
+    // 1. 获取基础 MimeData
     QMimeData* mimeData = model()->mimeData(indexes);
+    if (!mimeData) mimeData = new QMimeData();
+
+    // 2. 核心补全：注入物理路径 (QUrl)
     QList<QUrl> urls;
     for (const QModelIndex& idx : indexes) {
-        // ContentPanel 网格视图主要使用 PathRole (UserRole+5)
+        // 依次尝试 PathRole (UserRole+5) 和 UserRole+1 (兼容性提取)
         QString path = idx.data(Qt::UserRole + 5).toString();
-        Logger::log(QString("[列表视图] 提取路径 (Role+5) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
+        if (path.isEmpty()) {
+            path = idx.data(Qt::UserRole + 1).toString();
+        }
 
-        if (!path.isEmpty() && QFileInfo::exists(path)) {
+        if (!path.isEmpty()) {
             urls << QUrl::fromLocalFile(path);
         }
     }
-
-    QStringList urlStrs;
-    for(const QUrl& u : urls) urlStrs << u.toString();
-    Logger::log(QString("[列表视图] 最终注入的物理路径列表: %1").arg(urlStrs.join(",")));
 
     if (!urls.isEmpty()) {
         mimeData->setUrls(urls);
     }
 
+    // 3. 执行拖拽
     QDrag* drag = new QDrag(this);
     drag->setMimeData(mimeData);
     
-    // 物理还原：消除卡片快照干扰，使用 1x1 透明像素
+    // 物理还原：消除卡片快照干扰，使用 1x1 透明像素作为拖拽图标
     QPixmap pix(1, 1);
     pix.fill(Qt::transparent);
     drag->setPixmap(pix);

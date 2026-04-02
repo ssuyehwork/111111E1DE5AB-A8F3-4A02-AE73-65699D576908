@@ -7,8 +7,6 @@
 #include <QUrl>
 #include <QDir>
 #include <QStringList>
-#include <QFileInfo>
-#include "Logger.h"
 
 namespace ArcMeta {
 
@@ -18,12 +16,10 @@ DropTreeView::DropTreeView(QWidget* parent) : QTreeView(parent) {
 }
 
 void DropTreeView::dragEnterEvent(QDragEnterEvent* event) {
-    Logger::log(QString("[树形视图] 拖拽进入 | 格式: %1").arg(event->mimeData()->formats().join(",")));
     if (event->mimeData()->hasFormat("application/x-note-ids") || 
         event->mimeData()->hasFormat("application/x-qabstractitemmodeldatalist") ||
         event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
-        Logger::log("[树形视图] 已接受拖拽进入信号");
     } else {
         event->ignore();
     }
@@ -43,8 +39,6 @@ void DropTreeView::dragMoveEvent(QDragMoveEvent* event) {
 
 void DropTreeView::dropEvent(QDropEvent* event) {
     QModelIndex index = indexAt(event->position().toPoint());
-    Logger::log(QString("[树形视图] 释放事件 | 目标索引是否有效: %1 | 名称: %2")
-                .arg(index.isValid() ? "是" : "否").arg(index.data().toString()));
 
     // 优先处理路径拖入 (收藏逻辑)
     if (event->mimeData()->hasUrls()) {
@@ -54,7 +48,6 @@ void DropTreeView::dropEvent(QDropEvent* event) {
                 paths << QDir::toNativeSeparators(url.toLocalFile());
             }
         }
-        Logger::log(QString("[树形视图] 释放的文件路径: %1").arg(paths.join(",")));
         if (!paths.isEmpty()) {
             emit pathsDropped(paths, index);
             event->setDropAction(Qt::LinkAction); // 视觉上显示为“链接/快捷方式”
@@ -83,46 +76,45 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
     QModelIndexList indexes = selectedIndexes();
     if (indexes.isEmpty()) return;
 
-    Logger::log(QString("[树形视图] 开始拖拽 | 选中项数量: %1").arg(indexes.count()));
-
-    // 核心增强：拦截并注入物理路径 QUrl，确保 CategoryPanel 接收校验通过
+    // 1. 获取基础 MimeData
     QMimeData* mimeData = model()->mimeData(indexes);
+    if (!mimeData) mimeData = new QMimeData();
+
+    // 2. 核心补全：注入物理路径 (QUrl)，解决容器 2、3 拖拽至侧边栏失效问题
     QList<QUrl> urls;
     for (const QModelIndex& idx : indexes) {
         if (idx.column() != 0) continue;
 
-        // 兼容性提取：NavPanel 使用 UserRole+1，ContentPanel 使用 PathRole (UserRole+5)
-        QString path = idx.data(Qt::UserRole + 1).toString(); // 尝试 NavPanel 角色
-        Logger::log(QString("[树形视图] 正在尝试提取 Role+1 (导航面板) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
+        QString path;
+        // 按照规范：NavPanel 路径存储在 UserRole+1，ContentPanel/CategoryPanel 路径存储在 UserRole+5 (PathRole)
+        QVariant p1 = idx.data(Qt::UserRole + 1);
+        QVariant p5 = idx.data(Qt::UserRole + 5);
 
-        if (path.isEmpty() || !QFileInfo::exists(path)) {
-            path = idx.data(Qt::UserRole + 5).toString(); // 尝试 ContentPanel/PathRole 角色
-            Logger::log(QString("[树形视图] 正在尝试提取 Role+5 (内容面板) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
+        if (p1.isValid() && !p1.toString().isEmpty()) {
+            path = p1.toString();
+        } else if (p5.isValid() && !p5.toString().isEmpty()) {
+            path = p5.toString();
         }
 
-        if (!path.isEmpty() && QFileInfo::exists(path)) {
+        if (!path.isEmpty()) {
             urls << QUrl::fromLocalFile(path);
         }
     }
-
-    QStringList urlStrs;
-    for(const QUrl& u : urls) urlStrs << u.toString();
-    Logger::log(QString("[树形视图] 最终注入的物理路径列表: %1").arg(urlStrs.join(",")));
 
     if (!urls.isEmpty()) {
         mimeData->setUrls(urls);
     }
 
+    // 3. 执行拖拽
     QDrag* drag = new QDrag(this);
     drag->setMimeData(mimeData);
     
-    // 物理还原：消除卡片快照干扰，使用 1x1 透明像素
+    // 物理还原：消除卡片快照干扰，统一使用 1x1 透明像素作为拖拽图标
     QPixmap pix(1, 1);
     pix.fill(Qt::transparent);
     drag->setPixmap(pix);
     drag->setHotSpot(QPoint(0, 0));
     
-    Logger::log("[树形视图] 执行拖拽操作...");
     drag->exec(supportedActions, Qt::MoveAction);
 }
 
