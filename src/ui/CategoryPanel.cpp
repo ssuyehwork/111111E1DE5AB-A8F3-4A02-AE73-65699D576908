@@ -45,6 +45,11 @@ void CategoryPanel::setupContextMenu() {
     connect(m_categoryTree, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
         QModelIndex index = m_categoryTree->indexAt(pos);
         
+        // 2026-03-xx 按照用户要求：实现右键点击即选中，解决“分类与其子分类”交互一致性问题
+        if (index.isValid()) {
+            m_categoryTree->setCurrentIndex(index);
+        }
+
         QMenu menu(this);
         // [PHYSICAL RESTORATION] 8px radius for context menu
         menu.setStyleSheet("QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; } "
@@ -62,9 +67,9 @@ void CategoryPanel::setupContextMenu() {
             sortMenu->addAction("按名称");
             sortMenu->addAction("按时间");
         } else {
-            // 具体分类项的右键菜单
+            // 2026-03-xx 按照用户要求：打破类型封锁，无论是 category 还是物理项都弹出完整菜单（“它们都是分类”）
             QString type = index.data(CategoryModel::TypeRole).toString();
-            if (type == "category") {
+            if (type == "category" || type == "file" || type == "folder") {
                 menu.addAction(UiHelper::getIcon("add", QColor("#3498db"), 18), "新建数据", this, &CategoryPanel::onAddData);
                 menu.addAction(UiHelper::getIcon("branch", QColor("#3498db"), 18), "归类到此分类", this, &CategoryPanel::onClassifyToCategory);
                 
@@ -170,8 +175,7 @@ void CategoryPanel::onCreateCategory() {
 
 void CategoryPanel::onCreateSubCategory() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     FramelessInputDialog dlg("新建子分类", "请输入子分类名称:", "", this);
@@ -198,8 +202,7 @@ void CategoryPanel::onCreateSubCategory() {
 
 void CategoryPanel::onAddData() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     FramelessInputDialog dlg("新建数据", "请输入文件/笔记名称:", "", this);
@@ -218,8 +221,7 @@ void CategoryPanel::onAddData() {
 
 void CategoryPanel::onClassifyToCategory() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     QSettings settings("ArcMeta团队", "ArcMeta");
@@ -239,8 +241,7 @@ void CategoryPanel::onClassifyToCategory() {
 
 void CategoryPanel::onSetColor() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     auto all = CategoryRepo::getAll();
@@ -265,8 +266,7 @@ void CategoryPanel::onSetColor() {
 
 void CategoryPanel::onRandomColor() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
     
     QStringList colors = {"#3498db", "#2ecc71", "#e74c3c", "#f1c40f", "#9b59b6", "#1abc9c", "#e67e22", "#E24B4A", "#EF9F27", "#FAC775", "#639922", "#1D9E75", "#378ADD", "#7F77DD", "#62BAC1", "#F2B705", "#E91E63", "#FF551C"};
@@ -292,8 +292,7 @@ void CategoryPanel::onRandomColor() {
 
 void CategoryPanel::onSetPresetTags() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     auto all = CategoryRepo::getAll();
@@ -318,9 +317,9 @@ void CategoryPanel::onSetPresetTags() {
 
 void CategoryPanel::onTogglePin() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
+
     bool isPinned = index.data(CategoryModel::PinnedRole).toBool();
 
     auto all = CategoryRepo::getAll();
@@ -343,8 +342,7 @@ void CategoryPanel::onTogglePin() {
 
 void CategoryPanel::onSetPassword() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     FramelessInputDialog dlg("加密分类", "请输入访问密码:", "", this);
@@ -372,8 +370,7 @@ void CategoryPanel::onSetPassword() {
 
 void CategoryPanel::onClearPassword() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (!index.isValid()) return;
-    int id = index.data(CategoryModel::IdRole).toInt();
+    int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
     auto all = CategoryRepo::getAll();
@@ -396,15 +393,34 @@ void CategoryPanel::onClearPassword() {
 
 void CategoryPanel::onRenameCategory() {
     QModelIndex index = m_categoryTree->currentIndex();
-    if (index.isValid() && index.data(CategoryModel::IdRole).toInt() > 0) {
-        m_categoryTree->edit(index);
+    if (index.isValid()) {
+        QString type = index.data(CategoryModel::TypeRole).toString();
+        // 2026-03-xx 物理兼容：允许重命名分类或文件项 (逻辑处理见 Model)
+        if (type == "category" || type == "file" || type == "folder") {
+            m_categoryTree->edit(index);
+        }
     }
 }
 
 void CategoryPanel::onDeleteCategory() {
     QModelIndex index = m_categoryTree->currentIndex();
     if (index.isValid()) {
+        QString type = index.data(CategoryModel::TypeRole).toString();
         int id = index.data(CategoryModel::IdRole).toInt();
+
+        // 2026-03-xx 适配物理子项：如果是物理项目，则执行“解除关联”
+        if (type == "file" || type == "folder") {
+            QString path = index.data(CategoryModel::PathRole).toString();
+            int parentCatId = getTargetCategoryId(index);
+
+            if (parentCatId > 0 && !path.isEmpty()) {
+                CategoryRepo::removeItemFromCategory(parentCatId, path.toStdWString());
+                m_categoryModel->refresh();
+                ToolTipOverlay::instance()->showText(QCursor::pos(), "已从该分类中解除关联", 1000);
+            }
+            return;
+        }
+
         if (id > 0) {
             QSet<int> expandedIds;
             QStringList expandedNames;
@@ -416,6 +432,16 @@ void CategoryPanel::onDeleteCategory() {
             restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
         }
     }
+}
+
+int CategoryPanel::getTargetCategoryId(const QModelIndex& index) {
+    if (!index.isValid()) return 0;
+
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id > 0) return id;
+
+    // 递归查找父节点，直到找到 category 类型
+    return getTargetCategoryId(index.parent());
 }
 
 void CategoryPanel::setFocusHighlight(bool visible) {

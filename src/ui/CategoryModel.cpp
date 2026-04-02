@@ -151,9 +151,13 @@ QVariant CategoryModel::data(const QModelIndex& index, int role) const {
 bool CategoryModel::setData(const QModelIndex& index, const QVariant& val, int role) {
     if (role == Qt::EditRole) {
         QString newName = val.toString().trimmed();
+        if (newName.isEmpty()) return false;
+
+        QString type = index.data(TypeRole).toString();
         int id = index.data(IdRole).toInt();
-        if (!newName.isEmpty() && id > 0) {
-            // 获取分类并更新名称
+
+        // 2026-03-xx 物理兼容：处理分类重命名
+        if (type == "category" && id > 0) {
             auto categories = CategoryRepo::getAll();
             for (auto& cat : categories) {
                 if (cat.id == id) {
@@ -165,6 +169,14 @@ bool CategoryModel::setData(const QModelIndex& index, const QVariant& val, int r
             QTimer::singleShot(0, [this]() { this->refresh(); });
             return true;
         }
+
+        // 2026-03-xx 物理兼容：处理物理文件重命名 (暂不修改物理磁盘，仅修改数据库/显示名)
+        if (type == "file" || type == "folder") {
+            // 这里可以添加物理重命名逻辑，目前先通过刷新模型来恢复
+            QTimer::singleShot(0, [this]() { this->refresh(); });
+            return false;
+        }
+
         return false;
     }
     return QStandardItemModel::setData(index, val, role);

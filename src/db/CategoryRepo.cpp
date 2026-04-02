@@ -83,6 +83,15 @@ std::vector<Category> CategoryRepo::getAll() {
     return results;
 }
 
+bool CategoryRepo::removeItemFromCategory(int categoryId, const std::wstring& itemPath) {
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
+    q.prepare("DELETE FROM category_items WHERE category_id = ? AND item_path = ?");
+    q.addBindValue(categoryId);
+    q.addBindValue(QString::fromStdWString(itemPath));
+    return q.exec();
+}
+
 std::vector<std::pair<int, int>> CategoryRepo::getCounts() {
     std::vector<std::pair<int, int>> counts;
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();

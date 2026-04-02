@@ -55,6 +55,11 @@ private:
     void initUi();
     void setupContextMenu();
 
+    /**
+     * @brief 2026-03-xx 物理寻址辅助：递归向上查找有效的分类 ID
+     */
+    int getTargetCategoryId(const QModelIndex& index);
+
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     
