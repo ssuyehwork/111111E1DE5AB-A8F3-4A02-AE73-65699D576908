@@ -212,8 +212,16 @@ void CategoryPanel::onAddData() {
             // [BUSINESS LOGIC] 暂时在本地数据库建立一个虚拟项并关联到此分类
             // 后续由 CoreController 负责物理文件同步
             std::wstring wname = name.toStdWString();
+
+            QSet<int> expandedIds;
+            QStringList expandedNames;
+            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
             CategoryRepo::addItemToCategory(id, L"new://" + wname);
             m_categoryModel->refresh();
+
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
             ToolTipOverlay::instance()->showText(QCursor::pos(), QString("已新建并归类: %1").arg(name), 1000);
         }
     }
@@ -309,8 +317,14 @@ void CategoryPanel::onSetPresetTags() {
         current.presetTags.clear();
         for(const QString& t : tags) current.presetTags.push_back(t.trimmed().toStdWString());
         
+        QSet<int> expandedIds;
+        QStringList expandedNames;
+        saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
         CategoryRepo::update(current);
         m_categoryModel->refresh();
+
+        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
         ToolTipOverlay::instance()->showText(QCursor::pos(), "预设标签已更新", 1000);
     }
 }
@@ -353,6 +367,10 @@ void CategoryPanel::onSetPassword() {
     if (dlg.exec() == QDialog::Accepted) {
         QString pwd = dlg.text();
         if (!pwd.isEmpty()) {
+            QSet<int> expandedIds;
+            QStringList expandedNames;
+            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
             auto all = CategoryRepo::getAll();
             for(auto& cat : all) {
                 if(cat.id == id) {
@@ -363,6 +381,8 @@ void CategoryPanel::onSetPassword() {
                 }
             }
             m_categoryModel->refresh();
+
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
             ToolTipOverlay::instance()->showText(QCursor::pos(), "分类已加密", 1000);
         }
     }
@@ -373,6 +393,10 @@ void CategoryPanel::onClearPassword() {
     int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
+    QSet<int> expandedIds;
+    QStringList expandedNames;
+    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
     auto all = CategoryRepo::getAll();
     for(auto& cat : all) {
         if(cat.id == id) {
@@ -382,13 +406,10 @@ void CategoryPanel::onClearPassword() {
         }
     }
 
-    QSet<int> expandedIds;
-    QStringList expandedNames;
-    saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
-
     m_categoryModel->refresh();
 
     restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+    ToolTipOverlay::instance()->showText(QCursor::pos(), "密码已清除", 1000);
 }
 
 void CategoryPanel::onRenameCategory() {
@@ -414,8 +435,14 @@ void CategoryPanel::onDeleteCategory() {
             int parentCatId = getTargetCategoryId(index);
 
             if (parentCatId > 0 && !path.isEmpty()) {
+                QSet<int> expandedIds;
+                QStringList expandedNames;
+                saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
                 CategoryRepo::removeItemFromCategory(parentCatId, path.toStdWString());
                 m_categoryModel->refresh();
+
+                restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
                 ToolTipOverlay::instance()->showText(QCursor::pos(), "已从该分类中解除关联", 1000);
             }
             return;
@@ -492,17 +519,22 @@ void CategoryPanel::initUi() {
         QTreeView { background-color: transparent; border: none; color: #CCC; outline: none; }
         
         /* 物理还原：复原三角形折叠图标 (资源系统路径) */
+        /* 2026-03-xx 视觉微调：为图标增加 padding 以实现清秀感，防止线条过粗感 */
         QTreeView::branch:has-children:closed { 
             image: url(:/icons/arrow_right.svg); 
+            padding: 4px;
         }
         QTreeView::branch:has-children:open { 
             image: url(:/icons/arrow_down.svg); 
+            padding: 4px;
         }
         QTreeView::branch:has-children:closed:has-siblings { 
             image: url(:/icons/arrow_right.svg); 
+            padding: 4px;
         }
         QTreeView::branch:has-children:open:has-siblings { 
             image: url(:/icons/arrow_down.svg); 
+            padding: 4px;
         }
 
         QTreeView::item { height: 26px; padding-left: 0px; }
