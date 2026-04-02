@@ -25,6 +25,11 @@ public:
      */
     void setFocusHighlight(bool visible);
 
+    /**
+     * @brief 暴露模型以便外部（如 MainWindow）触发刷新
+     */
+    CategoryModel* model() const { return m_categoryModel; }
+
 signals:
     void categorySelected(const QString& name);
 

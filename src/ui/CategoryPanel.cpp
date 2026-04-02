@@ -6,6 +6,7 @@
 #include "ToolTipOverlay.h"
 #include "FramelessDialog.h"
 #include "../db/CategoryRepo.h"
+#include "../meta/MetadataManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -516,23 +517,44 @@ void CategoryPanel::initUi() {
         if (!index.isValid()) return;
         
         int categoryId = index.data(CategoryModel::IdRole).toInt();
-        QString categoryName = index.data(CategoryModel::NameRole).toString();
+        QString itemType = index.data(CategoryModel::TypeRole).toString();
+        QString itemName = index.data(CategoryModel::NameRole).toString();
         
-        // 核心红线：仅对具体分类执行“建立引用收藏”逻辑
+        int count = 0;
+        bool changed = false;
+
+        // 2026-03-xx 按照用户要求：实现全局数据库持久化收藏与归类逻辑
         if (categoryId > 0) {
-            int count = 0;
+            // 分支 A：拖拽至具体自定义分类项
             for (const QString& path : paths) {
                 if (CategoryRepo::addItemToCategory(categoryId, path.toStdWString())) {
                     count++;
                 }
             }
-            
-            // 物理修正：释放后刷新模型，确保数量更新并固化显示
-            m_categoryModel->refresh();
+            changed = (count > 0);
+            if (changed) {
+                ToolTipOverlay::instance()->showText(QCursor::pos(),
+                    QString("<b style='color:#2ecc71;'>已归类 %1 个项目到 [%2]</b>").arg(count).arg(itemName), 1200, QColor("#2ecc71"));
+            }
+        }
+        else if (itemType == "bookmark") {
+            // 分支 B：拖拽至系统预设的“收藏”项
+            for (const QString& path : paths) {
+                // 物理写入：更新 items 表的 pinned 状态
+                MetadataManager::instance().setPinned(path.toStdWString(), true);
+                count++;
+            }
+            changed = (count > 0);
+            if (changed) {
+                ToolTipOverlay::instance()->showText(QCursor::pos(),
+                    QString("<b style='color:#2ecc71;'>已成功收藏 %1 个项目</b>").arg(count), 1200, QColor("#2ecc71"));
+            }
+        }
 
-            // 物理反馈：提示收藏成功 (使用翠绿边框强化)
-            ToolTipOverlay::instance()->showText(QCursor::pos(), 
-                QString("<b style='color:#2ecc71;'>已收藏 %1 个项目到 [%2]</b>").arg(count).arg(categoryName), 1200, QColor("#2ecc71"));
+        if (changed) {
+            // 物理联动：强制刷新模型以触发 CategoryRepo::getCounts/getSystemCounts 重新统计
+            // 确保侧边栏名称后的 (数量) 实时更新并固化
+            m_categoryModel->refresh();
         }
     });
     

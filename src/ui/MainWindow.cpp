@@ -27,6 +27,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include "../meta/AmMetaJson.h"
+#include "../meta/MetadataManager.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -316,6 +317,14 @@ void MainWindow::initUi() {
                 meta.items()[info.fileName().toStdWString()].color = color;
             }
             meta.save();
+        }
+    });
+
+    // 9. 2026-03-xx 按照用户要求：响应元数据全局变更，同步刷新侧边栏计数
+    // 确保在内容面板收藏项目后，侧边栏的“收藏 (X)”数字能实时跳变
+    connect(&MetadataManager::instance(), &MetadataManager::metaChanged, [this]() {
+        if (m_categoryPanel && m_categoryPanel->model()) {
+            m_categoryPanel->model()->refresh();
         }
     });
 }
