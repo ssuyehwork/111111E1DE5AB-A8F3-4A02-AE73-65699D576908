@@ -169,4 +169,18 @@ bool CategoryRepo::remove(int id) {
     return q2.exec();
 }
 
+std::vector<std::wstring> CategoryRepo::getItemPathsInCategory(int categoryId) {
+    std::vector<std::wstring> results;
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
+    q.prepare("SELECT item_path FROM category_items WHERE category_id = ? ORDER BY added_at DESC");
+    q.addBindValue(categoryId);
+    if (q.exec()) {
+        while (q.next()) {
+            results.push_back(q.value(0).toString().toStdWString());
+        }
+    }
+    return results;
+}
+
 } // namespace ArcMeta

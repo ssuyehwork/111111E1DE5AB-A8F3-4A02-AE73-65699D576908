@@ -13,7 +13,8 @@ public:
         IdRole,
         ColorRole,
         NameRole,
-        PinnedRole
+        PinnedRole,
+        PathRole
     };
     explicit CategoryModel(Type type, QObject* parent = nullptr);
 public slots:

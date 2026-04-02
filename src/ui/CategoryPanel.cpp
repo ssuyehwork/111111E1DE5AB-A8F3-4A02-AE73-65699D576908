@@ -510,9 +510,17 @@ void CategoryPanel::initUi() {
     connect(m_categoryTree, &QTreeView::clicked, [this](const QModelIndex& index) {
         QString type = index.data(CategoryModel::TypeRole).toString();
         QString name = index.data(CategoryModel::NameRole).toString();
-        // 只有具体分类或系统项触发选中事件
+        int id = index.data(CategoryModel::IdRole).toInt();
+
+        // 核心联动：如果点击的是分类
         if (type == "category" || type != "") {
-             emit categorySelected(name);
+             emit categorySelected(id, name);
+        }
+
+        // 核心联动：如果是点击了具体物理文件路径 (处理收藏项的点击)
+        if (type == "file") {
+            QString path = index.data(CategoryModel::PathRole).toString();
+            emit fileSelected(path);
         }
     });
 
@@ -584,9 +592,15 @@ void CategoryPanel::initUi() {
         }
         
         if (changed) {
+            // [UX] 状态保持：刷新模型前后保存并恢复展开状态，防止“我的分类”自动折叠
+            QSet<int> expandedIds;
+            QStringList expandedNames;
+            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
             // 物理联动：强制刷新模型以触发 CategoryRepo::getCounts/getSystemCounts 重新统计
-            // 确保侧边栏名称后的 (数量) 实时更新并固化
             m_categoryModel->refresh();
+
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
         }
     });
     

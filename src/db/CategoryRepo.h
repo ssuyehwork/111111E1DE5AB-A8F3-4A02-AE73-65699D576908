@@ -34,6 +34,7 @@ public:
     // 条目关联逻辑
     static bool addItemToCategory(int categoryId, const std::wstring& itemPath);
     static bool removeItemFromCategory(int categoryId, const std::wstring& itemPath);
+    static std::vector<std::wstring> getItemPathsInCategory(int categoryId);
 };
 
 } // namespace ArcMeta

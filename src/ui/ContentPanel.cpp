@@ -225,9 +225,11 @@ void ContentPanel::initUi() {
     
     initGridView();
     initListView();
+    initMarkdownView();
 
     m_viewStack->addWidget(m_gridView);
     m_viewStack->addWidget(m_treeView);
+    m_viewStack->addWidget(m_markdownView);
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
@@ -423,7 +425,8 @@ void ContentPanel::wheelEvent(QWheelEvent* event) {
 
 void ContentPanel::setViewMode(ViewMode mode) {
     if (mode == GridView) m_viewStack->setCurrentWidget(m_gridView);
-    else m_viewStack->setCurrentWidget(m_treeView);
+    else if (mode == ListView) m_viewStack->setCurrentWidget(m_treeView);
+    else if (mode == MarkdownView) m_viewStack->setCurrentWidget(m_markdownView);
 }
 
 void ContentPanel::initGridView() {
@@ -461,6 +464,21 @@ void ContentPanel::initGridView() {
 
     connect(m_gridView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
     connect(m_gridView, &QListView::customContextMenuRequested, this, &ContentPanel::onCustomContextMenuRequested);
+}
+
+void ContentPanel::initMarkdownView() {
+    m_markdownView = new QTextBrowser(this);
+    m_markdownView->setOpenExternalLinks(true);
+    m_markdownView->setStyleSheet(
+        "QTextBrowser { "
+        "  background-color: #1E1E1E; "
+        "  color: #D4D4D4; "
+        "  border: none; "
+        "  padding: 20px; "
+        "  font-family: 'Segoe UI', 'Microsoft YaHei'; "
+        "  font-size: 14px; "
+        "}"
+    );
 }
 
 void ContentPanel::initListView() {
@@ -625,6 +643,79 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
         emit directorySelected(path); 
     } else {
         QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    }
+}
+
+void ContentPanel::loadPaths(const QStringList& paths) {
+    m_model->clear();
+    m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
+
+    QMap<int, int>     ratingCounts;
+    QMap<QString, int> colorCounts;
+    QMap<QString, int> tagCounts;
+    QMap<QString, int> typeCounts;
+    QMap<QString, int> createDateCounts;
+    QMap<QString, int> modifyDateCounts;
+    int noTagCount = 0;
+
+    QFileIconProvider iconProvider;
+    QDate today = QDate::currentDate();
+    QDate yesterday = today.addDays(-1);
+    auto dateKey = [&](const QDate& d) -> QString {
+        if (d == today)     return "today";
+        if (d == yesterday) return "yesterday";
+        return d.toString("yyyy-MM-dd");
+    };
+
+    for (const QString& fullPath : paths) {
+        QFileInfo info(fullPath);
+        if (!info.exists()) continue;
+
+        QString fileName = info.fileName();
+        QList<QStandardItem*> row;
+        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
+        nameItem->setData(fullPath, PathRole);
+        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
+
+        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
+        nameItem->setData(runtimeMeta.rating, RatingRole);
+        nameItem->setData(QString::fromStdWString(runtimeMeta.color), ColorRole);
+        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
+        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
+        nameItem->setData(runtimeMeta.tags, TagsRole);
+
+        for (const auto& t : runtimeMeta.tags) tagCounts[t]++;
+        ratingCounts[runtimeMeta.rating]++;
+        colorCounts[QString::fromStdWString(runtimeMeta.color)]++;
+        if (runtimeMeta.tags.isEmpty()) noTagCount++;
+        typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
+        createDateCounts[dateKey(info.birthTime().date())]++;
+        modifyDateCounts[dateKey(info.lastModified().date())]++;
+
+        row << nameItem;
+        row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
+        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
+        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
+        m_model->appendRow(row);
+    }
+
+    applyFilters();
+    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
+    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts);
+
+    // 如果是从预览模式切回，重置为网格视图
+    if (m_viewStack->currentWidget() == m_markdownView) {
+        setViewMode(GridView);
+    }
+}
+
+void ContentPanel::previewMarkdown(const QString& path) {
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QString content = QString::fromUtf8(file.readAll());
+        m_markdownView->setMarkdown(content);
+        file.close();
+        setViewMode(MarkdownView);
     }
 }
 

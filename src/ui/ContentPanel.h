@@ -9,6 +9,7 @@
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
 #include <QMap>
+#include <QTextBrowser>
 #include "FilterPanel.h"
 
 namespace ArcMeta {
@@ -37,7 +38,8 @@ class ContentPanel : public QFrame {
 public:
     enum ViewMode {
         GridView,
-        ListView
+        ListView,
+        MarkdownView
     };
 
     explicit ContentPanel(QWidget* parent = nullptr);
@@ -132,6 +134,16 @@ public slots:
      * @brief 加载并显示目录内容
      */
     void loadDirectory(const QString& path, bool recursive = false);
+
+    /**
+     * @brief 加载指定的物理路径列表（用于分类联动）
+     */
+    void loadPaths(const QStringList& paths);
+
+    /**
+     * @brief 预览 Markdown 文件内容
+     */
+    void previewMarkdown(const QString& path);
 
     /**
      * @brief 全局/本地搜索

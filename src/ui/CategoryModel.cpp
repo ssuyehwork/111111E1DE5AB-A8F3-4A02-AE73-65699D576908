@@ -105,6 +105,19 @@ void CategoryModel::refresh() {
                 item->setIcon(UiHelper::getIcon("circle_filled", QColor(color), 14));
             }
             itemMap[id] = item;
+
+            // [NEW] 按照用户需求 3：动态加载分类关联的文件子项以便直接点击预览
+            std::vector<std::wstring> filePaths = CategoryRepo::getItemPathsInCategory(id);
+            for (const auto& wp : filePaths) {
+                QString fp = QString::fromStdWString(wp);
+                QFileInfo fi(fp);
+                QStandardItem* fileItem = new QStandardItem(fi.fileName());
+                fileItem->setData("file", TypeRole);
+                fileItem->setData(fp, PathRole);
+                fileItem->setData(fi.fileName(), NameRole);
+                fileItem->setIcon(UiHelper::getIcon(fi.isDir() ? "folder" : "text", QColor("#888888"), 14));
+                item->appendRow(fileItem);
+            }
         }
 
         // 2. 按照 SQL 排序顺序进行挂载 (由于 categories 已排序，appendRow 会维持该顺序)
@@ -116,7 +129,10 @@ void CategoryModel::refresh() {
             if (parentId > 0 && itemMap.contains(parentId)) {
                 itemMap[parentId]->appendRow(itemMap[id]);
             } else {
-                userGroup->appendRow(itemMap[id]);
+                // 如果该项已经被作为子项挂载过，则跳过
+                if (itemMap[id]->parent() == nullptr) {
+                    userGroup->appendRow(itemMap[id]);
+                }
             }
         }
     }

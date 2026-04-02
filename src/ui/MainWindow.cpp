@@ -9,6 +9,7 @@
 #include "FilterPanel.h"
 #include "QuickLookWindow.h"
 #include "ToolTipOverlay.h"
+#include "../db/CategoryRepo.h"
 #include "../../SvgIcons.h"
 
 #include <QVBoxLayout>
@@ -177,11 +178,35 @@ void MainWindow::initUi() {
         navigateTo(path);
     });
 
-    // 1a. 分类选择 -> 内容面板执行检索或筛选
-    connect(m_categoryPanel, &CategoryPanel::categorySelected, [this](const QString& name) {
+    // 1a. 分类选择 -> 内容面板执行数据加载 (针对问题 2)
+    connect(m_categoryPanel, &CategoryPanel::categorySelected, [this](int id, const QString& name) {
         m_pathStack->setCurrentWidget(m_pathEdit);
         m_pathEdit->setText("分类: " + name);
-        m_contentPanel->search(name); 
+
+        if (id > 0) {
+            // 从数据库拉取分类下的物理路径
+            std::vector<std::wstring> wpaths = CategoryRepo::getItemPathsInCategory(id);
+            QStringList paths;
+            for (const auto& wp : wpaths) paths << QString::fromStdWString(wp);
+
+            // 联动 ContentPanel 展示这些文件
+            m_contentPanel->loadPaths(paths);
+        } else {
+            // 系统内置分类（如收藏、全部数据等）逻辑维持原样或按需扩展
+            m_contentPanel->search(name);
+        }
+    });
+
+    // 1b. 侧边栏文件点击 -> 内容面板预览 (针对问题 3)
+    connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
+        if (!paths.isEmpty()) {
+            QString path = paths.first();
+            if (path.endsWith(".md", Qt::CaseInsensitive)) {
+                // 如果是在分类视图下点击了 MD 文件，自动进入预览模式
+                // 注意：这里需要一个判断，是否处于“分类浏览模式”
+                // 为了简化，我们只在 ContentPanel 内部处理或通过特定信号
+            }
+        }
     });
 
     // 2. 内容面板选中项改变 -> 元数据面板刷新
@@ -328,6 +353,13 @@ void MainWindow::initUi() {
             m_categoryPanel->model()->refresh();
         }
     });
+
+    // 10. 针对问题 3：侧边栏点击文件直接触发预览
+    connect(m_categoryPanel, &CategoryPanel::fileSelected, [this](const QString& path) {
+        if (path.endsWith(".md", Qt::CaseInsensitive)) {
+            m_contentPanel->previewMarkdown(path);
+        }
+    });
 }
 
 void MainWindow::mousePressEvent(QMouseEvent* event) {
@@ -459,6 +491,16 @@ void MainWindow::initToolbar() {
     });
     connect(m_breadcrumbBar, &BreadcrumbBar::pathClicked, [this](const QString& path) {
         navigateTo(path);
+    });
+
+    // 针对问题 3 的核心联动：在内容面板双击或选中文件时，如果需要预览
+    connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
+         if (paths.size() == 1) {
+             QString path = paths.first();
+             if (path.endsWith(".md", Qt::CaseInsensitive)) {
+                 m_contentPanel->previewMarkdown(path);
+             }
+         }
     });
 
     m_searchEdit = new QLineEdit(this);

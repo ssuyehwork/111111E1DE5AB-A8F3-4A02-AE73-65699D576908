@@ -31,7 +31,8 @@ public:
     CategoryModel* model() const { return m_categoryModel; }
 
 signals:
-    void categorySelected(const QString& name);
+    void categorySelected(int id, const QString& name);
+    void fileSelected(const QString& path);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
