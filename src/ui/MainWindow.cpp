@@ -58,11 +58,11 @@ MainWindow::MainWindow(QWidget* parent)
     QString qss = R"(
         QMainWindow { background-color: #1E1E1E; }
 
-        /* 核心容器样式还原 - 强化 1 像素物理切割感，应用 8px 标准圆角 */
+        /* 核心容器样式还原 - 强化 1 像素物理切割感，回归绝对直角设计 */
         #SidebarContainer, #ListContainer, #EditorContainer, #MetadataContainer, #FilterContainer {
             background-color: #1E1E1E;
             border: 1px solid #333333;
-            border-radius: 8px;
+            border-radius: 0px;
         }
 
         /* 容器标题栏样式 (还原旧版 #252526 实色背景与下边框) */
