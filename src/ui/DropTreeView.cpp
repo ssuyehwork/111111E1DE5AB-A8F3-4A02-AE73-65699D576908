@@ -7,6 +7,7 @@
 #include <QUrl>
 #include <QDir>
 #include <QStringList>
+#include <QFileInfo>
 
 namespace ArcMeta {
 
@@ -76,8 +77,29 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
     QModelIndexList indexes = selectedIndexes();
     if (indexes.isEmpty()) return;
 
+    // 核心增强：拦截并注入物理路径 QUrl，确保 CategoryPanel 接收校验通过
+    QMimeData* mimeData = model()->mimeData(indexes);
+    QList<QUrl> urls;
+    for (const QModelIndex& idx : indexes) {
+        if (idx.column() != 0) continue;
+
+        // 兼容性提取：NavPanel 使用 UserRole+1，ContentPanel 使用 PathRole (UserRole+5)
+        QString path = idx.data(Qt::UserRole + 1).toString(); // 尝试 NavPanel 角色
+        if (path.isEmpty() || !QFileInfo::exists(path)) {
+            path = idx.data(Qt::UserRole + 5).toString(); // 尝试 ContentPanel/PathRole 角色
+        }
+
+        if (!path.isEmpty() && QFileInfo::exists(path)) {
+            urls << QUrl::fromLocalFile(path);
+        }
+    }
+
+    if (!urls.isEmpty()) {
+        mimeData->setUrls(urls);
+    }
+
     QDrag* drag = new QDrag(this);
-    drag->setMimeData(model()->mimeData(indexes));
+    drag->setMimeData(mimeData);
     
     // 物理还原：消除卡片快照干扰，使用 1x1 透明像素
     QPixmap pix(1, 1);
