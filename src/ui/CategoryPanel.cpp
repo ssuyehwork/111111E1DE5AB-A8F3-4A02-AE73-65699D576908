@@ -19,6 +19,7 @@
 #include <QRandomGenerator>
 #include <QSet>
 #include <QSettings>
+#include <QDebug>
 
 namespace ArcMeta {
 
@@ -515,11 +516,18 @@ void CategoryPanel::initUi() {
     });
 
     connect(m_categoryTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
-        if (!index.isValid()) return;
+        if (!index.isValid()) {
+            qDebug() << "[CategoryPanel] pathsDropped | Invalid target index!";
+            return;
+        }
         
         int categoryId = index.data(CategoryModel::IdRole).toInt();
         QString itemType = index.data(CategoryModel::TypeRole).toString();
         QString itemName = index.data(CategoryModel::NameRole).toString();
+
+        qDebug() << "[CategoryPanel] pathsDropped | Target:" << itemName
+                 << "(ID:" << categoryId << ", Type:" << itemType << ")"
+                 << "| Paths:" << paths;
         
         int count = 0;
         bool changed = false;
