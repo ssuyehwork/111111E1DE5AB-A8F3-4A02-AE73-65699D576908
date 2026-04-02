@@ -19,7 +19,7 @@
 #include <QRandomGenerator>
 #include <QSet>
 #include <QSettings>
-#include <QDebug>
+#include "Logger.h"
 
 namespace ArcMeta {
 
@@ -517,25 +517,45 @@ void CategoryPanel::initUi() {
     });
 
     connect(m_categoryTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
-        if (!index.isValid()) {
-            qDebug() << "[CategoryPanel] pathsDropped | Invalid target index!";
-            return;
-        }
-        
-        int categoryId = index.data(CategoryModel::IdRole).toInt();
-        QString itemType = index.data(CategoryModel::TypeRole).toString();
-        QString itemName = index.data(CategoryModel::NameRole).toString();
+        int categoryId = -1;
+        QString itemType = "";
+        QString itemName = "";
 
-        qDebug() << "[CategoryPanel] pathsDropped | Target:" << itemName
-                 << "(ID:" << categoryId << ", Type:" << itemType << ")"
-                 << "| Paths:" << paths;
+        if (index.isValid()) {
+            categoryId = index.data(CategoryModel::IdRole).toInt();
+            itemType = index.data(CategoryModel::TypeRole).toString();
+            itemName = index.data(CategoryModel::NameRole).toString();
+        } else {
+            Logger::log("[分类面板] 接收到路径但落点无效，正在尝试自动创建分类...");
+            // 物理还原：如果拖拽到空白处且有路径，则自动创建分类
+            if (!paths.isEmpty()) {
+                QString firstPath = paths.first();
+                QFileInfo fi(firstPath);
+                QString autoCatName = fi.fileName(); // 提取文件夹/文件名作为分类名
+                if (autoCatName.isEmpty()) autoCatName = "新分类";
+
+                Category cat;
+                cat.name = autoCatName.toStdWString();
+                cat.parentId = 0; // 默认为根分类
+                cat.color = L"#3498db";
+
+                if (CategoryRepo::add(cat)) {
+                    categoryId = cat.id;
+                    itemName = autoCatName;
+                    Logger::log(QString("[分类面板] 已自动创建分类: %1 ID: %2").arg(itemName).arg(categoryId));
+                }
+            }
+        }
+
+        Logger::log(QString("[分类面板] 最终归类目标: %1 (ID: %2, 类型: %3) | 路径列表: %4")
+                    .arg(itemName).arg(categoryId).arg(itemType).arg(paths.join(",")));
         
         int count = 0;
         bool changed = false;
 
         // 2026-03-xx 按照用户要求：实现全局数据库持久化收藏与归类逻辑
         if (categoryId > 0) {
-            // 分支 A：拖拽至具体自定义分类项
+            // 分支 A：拖拽至具体自定义分类项 (包括刚刚自动创建的)
             for (const QString& path : paths) {
                 if (CategoryRepo::addItemToCategory(categoryId, path.toStdWString())) {
                     count++;
@@ -544,7 +564,7 @@ void CategoryPanel::initUi() {
             changed = (count > 0);
             if (changed) {
                 ToolTipOverlay::instance()->showText(QCursor::pos(), 
-                    QString("<b style='color:#2ecc71;'>已归类 %1 个项目到 [%2]</b>").arg(count).arg(itemName), 1200, QColor("#2ecc71"));
+                    QString("<b style='color:#2ecc71;'>已自动创建并归类 %1 个项目到 [%2]</b>").arg(count).arg(itemName), 1500, QColor("#2ecc71"));
             }
         } 
         else if (itemType == "bookmark") {
