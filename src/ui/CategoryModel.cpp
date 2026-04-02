@@ -113,7 +113,7 @@ void CategoryModel::refresh() {
                 QString fp = QString::fromStdWString(wp);
                 QFileInfo fi(fp);
                 QStandardItem* fileItem = new QStandardItem(fi.fileName());
-                fileItem->setData("file", TypeRole);
+                fileItem->setData(fi.isDir() ? "folder" : "file", TypeRole);
                 fileItem->setData(fp, PathRole);
                 fileItem->setData(fi.fileName(), NameRole);
                 fileItem->setIcon(UiHelper::getIcon(fi.isDir() ? "folder" : "text", QColor("#888888"), 14));

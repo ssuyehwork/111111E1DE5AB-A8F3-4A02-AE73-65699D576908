@@ -347,9 +347,14 @@ void MainWindow::initUi() {
         }
     });
 
-    // 10. 针对问题 3：侧边栏点击文件直接触发预览
+    // 10. 针对问题 3：侧边栏点击物理项（文件预览或文件夹跳转）
     connect(m_categoryPanel, &CategoryPanel::fileSelected, [this](const QString& path) {
-        if (path.endsWith(".md", Qt::CaseInsensitive)) {
+        QFileInfo fi(path);
+        if (fi.isDir()) {
+            // 如果是文件夹，执行界面跳转联动
+            navigateTo(path);
+        } else if (path.endsWith(".md", Qt::CaseInsensitive)) {
+            // 如果是 Markdown，执行即时预览
             m_contentPanel->previewMarkdown(path);
         }
     });

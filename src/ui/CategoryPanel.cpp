@@ -516,15 +516,17 @@ void CategoryPanel::initUi() {
         QString name = index.data(CategoryModel::NameRole).toString();
         int id = index.data(CategoryModel::IdRole).toInt();
 
-        // 核心联动：如果点击的是分类
-        if (type == "category" || type != "") {
+        // 核心联动：如果点击的是分类节点
+        if (type == "category") {
              emit categorySelected(id, name);
         }
 
-        // 核心联动：如果是点击了具体物理文件路径 (处理收藏项的点击)
-        if (type == "file") {
+        // 核心联动：如果是点击了具体物理路径 (文件或文件夹)
+        if (type == "file" || type == "folder") {
             QString path = index.data(CategoryModel::PathRole).toString();
-            emit fileSelected(path);
+            if (!path.isEmpty()) {
+                emit fileSelected(path);
+            }
         }
     });
 
