@@ -2,6 +2,7 @@
 #include "../core/CoreController.h"
 #include "BreadcrumbBar.h"
 #include "CategoryPanel.h"
+#include "CategoryModel.h"
 #include "NavPanel.h"
 #include "ContentPanel.h"
 #include "MetaPanel.h"
