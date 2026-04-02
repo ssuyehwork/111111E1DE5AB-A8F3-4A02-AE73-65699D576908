@@ -234,9 +234,9 @@ void MainWindow::initUi() {
             m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
             m_metaPanel->setTags(idx.data(TagsRole).toStringList());
 
-            // 针对问题 3：自动预览 Markdown
-            if (paths.size() == 1 && path.endsWith(".md", Qt::CaseInsensitive)) {
-                m_contentPanel->previewMarkdown(path);
+            // 2026-03-xx 按照用户要求：实现全能自动预览，不再局限于 Markdown
+            if (paths.size() == 1) {
+                m_contentPanel->previewFile(path);
             }
         }
         // 状态栏右侧显示已选数量
@@ -347,15 +347,15 @@ void MainWindow::initUi() {
         }
     });
 
-    // 10. 针对问题 3：侧边栏点击物理项（文件预览或文件夹跳转）
+    // 10. 侧边栏点击物理项（文件预览或文件夹跳转）
     connect(m_categoryPanel, &CategoryPanel::fileSelected, [this](const QString& path) {
         QFileInfo fi(path);
         if (fi.isDir()) {
             // 如果是文件夹，执行界面跳转联动
             navigateTo(path);
-        } else if (path.endsWith(".md", Qt::CaseInsensitive)) {
-            // 如果是 Markdown，执行即时预览
-            m_contentPanel->previewMarkdown(path);
+        } else {
+            // 2026-03-xx 按照用户要求：侧边栏选中任何物理文件，立即执行即时全能预览
+            m_contentPanel->previewFile(path);
         }
     });
 }

@@ -257,10 +257,16 @@ void ContentPanel::initUi() {
     
     m_mainLayout->addLayout(contentWrapper);
 
-    m_previewWidget = new QTextBrowser(this);
-    m_previewWidget->setStyleSheet("background-color: #1E1E1E; color: #EEEEEE; border: none; padding: 20px; font-family: 'Segoe UI'; font-size: 14px;");
-    m_previewWidget->hide();
-    m_mainLayout->addWidget(m_previewWidget, 1);
+    m_textPreview = new QTextBrowser(this);
+    m_textPreview->setStyleSheet("background-color: #1E1E1E; color: #EEEEEE; border: none; padding: 20px; font-family: 'Segoe UI'; font-size: 14px;");
+    m_textPreview->hide();
+    m_mainLayout->addWidget(m_textPreview, 1);
+
+    m_imagePreview = new QLabel(this);
+    m_imagePreview->setStyleSheet("background-color: #1E1E1E; border: none;");
+    m_imagePreview->setAlignment(Qt::AlignCenter);
+    m_imagePreview->hide();
+    m_mainLayout->addWidget(m_imagePreview, 1);
 
     m_gridView->installEventFilter(this);
 }
@@ -656,7 +662,8 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
 
 void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     if (m_viewStack) m_viewStack->show();
-    if (m_previewWidget) m_previewWidget->hide();
+    if (m_textPreview) m_textPreview->hide();
+    if (m_imagePreview) m_imagePreview->hide();
 
     m_isRecursive = recursive;
     if (m_btnLayers) m_btnLayers->setChecked(recursive);
@@ -793,6 +800,10 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
 void ContentPanel::search(const QString& query) {
     // 2026-03-xx 按照用户最新要求：物理移除 MFT 引擎及其相关搜索逻辑。
     // 此处暂不实现替代方案，仅保留函数接口以防编译报错，后续可按需实现基于 QDirIterator 的简单过滤。
+    if (m_viewStack) m_viewStack->show();
+    if (m_textPreview) m_textPreview->hide();
+    if (m_imagePreview) m_imagePreview->hide();
+
     Q_UNUSED(query);
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "路径", "类型", "修改时间"});
@@ -809,19 +820,50 @@ void ContentPanel::applyFilters() {
     proxy->updateFilter();
 }
 
-void ContentPanel::previewMarkdown(const QString& path) {
+void ContentPanel::previewFile(const QString& path) {
+    // 2026-03-xx 按照用户要求：全能预览实现，支持图片与多种文本格式，破除 .md 局限
+    QFileInfo info(path);
+    QString ext = info.suffix().toLower();
+
+    // 1. 图片格式识别
+    static const QStringList imageExts = {"jpg", "jpeg", "png", "bmp", "webp", "gif", "ico"};
+    if (imageExts.contains(ext)) {
+        QPixmap pix(path);
+        if (!pix.isNull()) {
+            m_viewStack->hide();
+            m_textPreview->hide();
+
+            // 保持比例缩放显示
+            m_imagePreview->setPixmap(pix.scaled(m_imagePreview->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            m_imagePreview->show();
+            return;
+        }
+    }
+
+    // 2. 文本格式识别 (参考版本A 扩展识别)
+    // 此处可根据需要进一步细化，目前先处理常规文本
     QFile file(path);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (file.open(QIODevice::ReadOnly)) {
         m_viewStack->hide();
-        m_previewWidget->setMarkdown(file.readAll());
-        m_previewWidget->show();
+        m_imagePreview->hide();
+
+        // 针对 Markdown 特殊渲染
+        if (ext == "md" || ext == "markdown") {
+             m_textPreview->setMarkdown(file.readAll());
+        } else {
+             // 针对其他代码或文本，直接显示原文
+             // 限制读取前 1MB 以防大文件卡死
+             m_textPreview->setPlainText(QString::fromUtf8(file.read(1024 * 1024)));
+        }
+        m_textPreview->show();
         file.close();
     }
 }
 
 void ContentPanel::loadPaths(const QStringList& paths) {
     m_viewStack->show();
-    m_previewWidget->hide();
+    if (m_textPreview) m_textPreview->hide();
+    if (m_imagePreview) m_imagePreview->hide();
     
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});

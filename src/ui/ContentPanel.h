@@ -105,7 +105,8 @@ private:
     QWidget* m_focusLine = nullptr;
     QStackedWidget* m_viewStack = nullptr;
     QPushButton* m_btnLayers = nullptr;
-    QTextBrowser* m_previewWidget = nullptr;
+    QTextBrowser* m_textPreview = nullptr;
+    QLabel* m_imagePreview = nullptr;
 
     // 视图组件
     QListView* m_gridView = nullptr;
@@ -156,9 +157,9 @@ public slots:
     void createNewItem(const QString& type);
 
     /**
-     * @brief 预览 Markdown
+     * @brief 预览文件内容 (支持文本、Markdown、图片等)
      */
-    void previewMarkdown(const QString& path);
+    void previewFile(const QString& path);
 
     /**
      * @brief 加载指定路径列表 (分类联动使用)
