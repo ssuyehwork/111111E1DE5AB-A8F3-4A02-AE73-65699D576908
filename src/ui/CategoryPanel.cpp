@@ -21,6 +21,8 @@
 #include <QRandomGenerator>
 #include <QSet>
 #include <QSettings>
+#include <QClipboard>
+#include <QProcess>
 #include "Logger.h"
 
 namespace ArcMeta {
@@ -88,6 +90,29 @@ void CategoryPanel::setupContextMenu() {
                 menu.addAction(UiHelper::getIcon("edit", QColor("#aaaaaa"), 18), "重命名分类", this, &CategoryPanel::onRenameCategory);
                 menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), "删除分类", this, &CategoryPanel::onDeleteCategory);
 
+                // 2026-03-xx 按照用户要求：如果分类有父分类，增加“从此分类中移除”选项
+                QModelIndex parentIdx = index.parent();
+                if (parentIdx.isValid() && parentIdx.data(CategoryModel::NameRole).toString() != "我的分类") {
+                    menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), "从此分类中移除", [this, index]() {
+                        int id = index.data(CategoryModel::IdRole).toInt();
+                        auto all = CategoryRepo::getAll();
+                        for(auto& cat : all) {
+                            if(cat.id == id) {
+                                cat.parentId = 0; // 移回根级“我的分类”
+                                CategoryRepo::update(cat);
+                                break;
+                            }
+                        }
+
+                        QSet<int> expandedIds;
+                        QStringList expandedNames;
+                        saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+                        m_categoryModel->refresh();
+                        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+                        ToolTipOverlay::instance()->showText(QCursor::pos(), "已移至根分类", 1000);
+                    });
+                }
+
                 menu.addSeparator();
 
                 auto* sortMenu = menu.addMenu(UiHelper::getIcon("list_ul", QColor("#aaaaaa"), 18), "排列");
@@ -99,6 +124,39 @@ void CategoryPanel::setupContextMenu() {
                 pwdMenu->setStyleSheet(menu.styleSheet());
                 pwdMenu->addAction("设置密码", this, &CategoryPanel::onSetPassword);
                 pwdMenu->addAction("清除密码", this, &CategoryPanel::onClearPassword);
+            } else if (type == "file" || type == "folder") {
+                // 具体的分类子项右键菜单
+                QString path = index.data(CategoryModel::PathRole).toString();
+
+                menu.addAction("打开", [this, path]() { emit fileSelected(path); });
+                menu.addAction("在“资源管理器”中显示", [path]() {
+                    QStringList args;
+                    args << "/select," << QDir::toNativeSeparators(path);
+                    QProcess::startDetached("explorer", args);
+                });
+                menu.addAction("复制路径", [path]() {
+                    QApplication::clipboard()->setText(QDir::toNativeSeparators(path));
+                });
+
+                menu.addSeparator();
+                // 核心改动：使用 Lambda 捕获 index 确保移除逻辑准确
+                menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), "从此分类中移除", [this, index]() {
+                    QString path = index.data(CategoryModel::PathRole).toString();
+                    int categoryId = index.parent().data(CategoryModel::IdRole).toInt();
+
+                    if (categoryId > 0 && !path.isEmpty()) {
+                        QSet<int> expandedIds;
+                        QStringList expandedNames;
+                        saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
+                        if (CategoryRepo::removeItemFromCategory(categoryId, path.toStdWString())) {
+                            m_categoryModel->refresh();
+                            ToolTipOverlay::instance()->showText(QCursor::pos(), "已从此分类中移除", 1000);
+                        }
+
+                        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+                    }
+                });
             }
         }
         
@@ -123,6 +181,7 @@ static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<i
         }
     }
 }
+
 
 /**
  * @brief 递归恢复 QTreeView 的展开状态
