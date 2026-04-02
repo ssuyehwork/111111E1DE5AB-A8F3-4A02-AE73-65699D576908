@@ -6,6 +6,8 @@
 #include "ToolTipOverlay.h"
 #include "FramelessDialog.h"
 #include <QDir>
+#include <QFileInfo>
+#include <QRegularExpression>
 #include "../db/CategoryRepo.h"
 #include "../meta/MetadataManager.h"
 #include <QVBoxLayout>
@@ -110,6 +112,7 @@ void CategoryPanel::setupContextMenu() {
  * @brief 递归保存 QTreeView 的展开状态
  */
 static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<int>& expandedIds, QStringList& expandedNames) {
+    if (!tree || !tree->model()) return;
     for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
         QModelIndex idx = tree->model()->index(i, 0, parent);
         if (tree->isExpanded(idx)) {
@@ -125,6 +128,7 @@ static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<i
  * @brief 递归恢复 QTreeView 的展开状态
  */
 static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds, const QStringList& expandedNames) {
+    if (!tree || !tree->model()) return;
     for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
         QModelIndex idx = tree->model()->index(i, 0, parent);
         int id = idx.data(CategoryModel::IdRole).toInt();
@@ -538,8 +542,8 @@ void CategoryPanel::initUi() {
             // 物理还原：如果拖拽到空白处且有路径，则自动创建分类
             if (!paths.isEmpty()) {
                 QString firstPath = paths.first();
-                QFileInfo fi(firstPath);
-                QString autoCatName = fi.fileName(); // 提取文件夹/文件名作为分类名
+                QFileInfo fileInfo(firstPath);
+                QString autoCatName = fileInfo.fileName(); // 提取文件夹/文件名作为分类名
                 if (autoCatName.isEmpty()) autoCatName = "新分类";
 
                 Category cat;

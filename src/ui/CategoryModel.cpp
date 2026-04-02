@@ -3,6 +3,7 @@
 #include "../db/ItemRepo.h"
 #include "UiHelper.h"
 #include <QMimeData>
+#include <QFileInfo>
 #include <QFont>
 #include <QTimer>
 #include <QSet>

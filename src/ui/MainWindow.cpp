@@ -197,19 +197,7 @@ void MainWindow::initUi() {
         }
     });
 
-    // 1b. 侧边栏文件点击 -> 内容面板预览 (针对问题 3)
-    connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
-        if (!paths.isEmpty()) {
-            QString path = paths.first();
-            if (path.endsWith(".md", Qt::CaseInsensitive)) {
-                // 如果是在分类视图下点击了 MD 文件，自动进入预览模式
-                // 注意：这里需要一个判断，是否处于“分类浏览模式”
-                // 为了简化，我们只在 ContentPanel 内部处理或通过特定信号
-            }
-        }
-    });
-
-    // 2. 内容面板选中项改变 -> 元数据面板刷新
+    // 2. 内容面板选中项改变 -> 元数据面板刷新 & 自动预览
     // 2026-03-xx 按照高性能要求，优先从模型 Role 读取元数据缓存，避免频繁磁盘 IO
     connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
         if (paths.isEmpty()) {
@@ -237,14 +225,19 @@ void MainWindow::initUi() {
                 info.lastModified().toString("yyyy-MM-dd"),
                 info.lastRead().toString("yyyy-MM-dd"),
                 info.absoluteFilePath(),
-                idx.data(EncryptedRole).toBool()
+                idx.data(ItemRole::EncryptedRole).toBool()
             );
 
             // 应用缓存中的元数据状态
-            m_metaPanel->setRating(idx.data(RatingRole).toInt());
-            m_metaPanel->setColor(idx.data(ColorRole).toString().toStdWString());
-            m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
-            m_metaPanel->setTags(idx.data(TagsRole).toStringList());
+            m_metaPanel->setRating(idx.data(ItemRole::RatingRole).toInt());
+            m_metaPanel->setColor(idx.data(ItemRole::ColorRole).toString().toStdWString());
+            m_metaPanel->setPinned(idx.data(ItemRole::IsLockedRole).toBool());
+            m_metaPanel->setTags(idx.data(ItemRole::TagsRole).toStringList());
+
+            // 针对问题 3：自动预览 Markdown
+            if (paths.size() == 1 && path.endsWith(".md", Qt::CaseInsensitive)) {
+                m_contentPanel->previewMarkdown(path);
+            }
         }
         // 状态栏右侧显示已选数量
         if (m_statusRight) {
@@ -325,7 +318,7 @@ void MainWindow::initUi() {
     connect(m_metaPanel, &MetaPanel::metadataChanged, [this](int rating, const std::wstring& color) {
         auto indexes = m_contentPanel->getSelectedIndexes();
         for (const auto& idx : indexes) {
-            QString path = idx.data(PathRole).toString(); 
+            QString path = idx.data(ItemRole::PathRole).toString();
             if(path.isEmpty()) continue;
             
             QFileInfo info(path);
@@ -335,11 +328,11 @@ void MainWindow::initUi() {
             if (rating != -1) {
                 // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
                 // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
-                m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
+                m_contentPanel->getProxyModel()->setData(idx, rating, ItemRole::RatingRole);
                 meta.items()[info.fileName().toStdWString()].rating = rating;
             }
             if (color != L"__NO_CHANGE__") {
-                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
+                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ItemRole::ColorRole);
                 meta.items()[info.fileName().toStdWString()].color = color;
             }
             meta.save();
@@ -493,15 +486,6 @@ void MainWindow::initToolbar() {
         navigateTo(path);
     });
 
-    // 针对问题 3 的核心联动：在内容面板双击或选中文件时，如果需要预览
-    connect(m_contentPanel, &ContentPanel::selectionChanged, [this](const QStringList& paths) {
-         if (paths.size() == 1) {
-             QString path = paths.first();
-             if (path.endsWith(".md", Qt::CaseInsensitive)) {
-                 m_contentPanel->previewMarkdown(path);
-             }
-         }
-    });
 
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("过滤内容...");

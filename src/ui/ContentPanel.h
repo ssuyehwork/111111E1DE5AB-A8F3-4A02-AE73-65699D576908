@@ -98,6 +98,7 @@ private:
     void initUi();
     void initGridView();
     void initListView();
+    void initMarkdownView();
     void setupContextMenu();
 
     QVBoxLayout* m_mainLayout = nullptr;
@@ -107,6 +108,7 @@ private:
     // 视图组件
     QListView* m_gridView = nullptr;
     QTreeView* m_treeView = nullptr;
+    QTextBrowser* m_markdownView = nullptr;
     QStandardItemModel* m_model = nullptr;
     QSortFilterProxyModel* m_proxyModel = nullptr;
 
