@@ -7,6 +7,8 @@
 #include <QUrl>
 #include <QDir>
 #include <QStringList>
+#include <QFileInfo>
+#include <QList>
 
 namespace ArcMeta {
 

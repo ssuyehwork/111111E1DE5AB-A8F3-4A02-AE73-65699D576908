@@ -16,20 +16,6 @@
 namespace ArcMeta {
 
 /**
- * @brief 自定义 Role 枚举，用于 QStandardItemModel 数据存取
- */
-enum ItemRole {
-    RatingRole = Qt::UserRole + 1,
-    ColorRole,
-    PinnedRole,
-    EncryptedRole,
-    PathRole,
-    IsLockedRole,
-    TagsRole,
-    TypeRole
-};
-
-/**
  * @brief 内容面板（面板四）：核心业务展示区
  * 支持网格视图（QListView）与列表视图（QTreeView）切换
  */
@@ -37,6 +23,20 @@ class ContentPanel : public QFrame {
     Q_OBJECT
 
 public:
+    /**
+     * @brief 自定义 Role 枚举，用于 QStandardItemModel 数据存取
+     */
+    enum Roles {
+        RatingRole = Qt::UserRole + 1,
+        ColorRole,
+        PinnedRole,
+        EncryptedRole,
+        PathRole,
+        IsLockedRole,
+        TagsRole,
+        TypeRole
+    };
+
     enum ViewMode {
         GridView,
         ListView

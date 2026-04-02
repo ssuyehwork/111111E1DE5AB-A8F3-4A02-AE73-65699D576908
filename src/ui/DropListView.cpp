@@ -2,6 +2,9 @@
 #include <QDrag>
 #include <QPixmap>
 #include <QMimeData>
+#include <QUrl>
+#include <QFileInfo>
+#include <QList>
 
 namespace ArcMeta {
 

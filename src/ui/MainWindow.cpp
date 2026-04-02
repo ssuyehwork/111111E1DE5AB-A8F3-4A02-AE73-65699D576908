@@ -231,10 +231,10 @@ void MainWindow::initUi() {
             );
 
             // 应用缓存中的元数据状态
-            m_metaPanel->setRating(idx.data(RatingRole).toInt());
-            m_metaPanel->setColor(idx.data(ColorRole).toString().toStdWString());
-            m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
-            m_metaPanel->setTags(idx.data(TagsRole).toStringList());
+            m_metaPanel->setRating(idx.data(ContentPanel::RatingRole).toInt());
+            m_metaPanel->setColor(idx.data(ContentPanel::ColorRole).toString().toStdWString());
+            m_metaPanel->setPinned(idx.data(ContentPanel::IsLockedRole).toBool());
+            m_metaPanel->setTags(idx.data(ContentPanel::TagsRole).toStringList());
 
             // 针对问题 3：自动预览 Markdown
             if (paths.size() == 1 && path.endsWith(".md", Qt::CaseInsensitive)) {
@@ -325,7 +325,8 @@ void MainWindow::initUi() {
     connect(m_metaPanel, &MetaPanel::metadataChanged, [this](int rating, const std::wstring& color) {
         auto indexes = m_contentPanel->getSelectedIndexes();
         for (const auto& idx : indexes) {
-            QString path = idx.data(ItemRole::PathRole).toString();
+            // 物理修正：ItemRole 为普通枚举，应直接引用 PathRole，避免使用 ItemRole:: 作用域限定导致编译错误
+            QString path = idx.data(PathRole).toString();
             if(path.isEmpty()) continue;
             
             QFileInfo info(path);
@@ -335,11 +336,11 @@ void MainWindow::initUi() {
             if (rating != -1) {
                 // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
                 // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
-                m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
+                m_contentPanel->getProxyModel()->setData(idx, rating, ContentPanel::RatingRole);
                 meta.items()[info.fileName().toStdWString()].rating = rating;
             }
             if (color != L"__NO_CHANGE__") {
-                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
+                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ContentPanel::ColorRole);
                 meta.items()[info.fileName().toStdWString()].color = color;
             }
             meta.save();
