@@ -8,7 +8,7 @@
 #include <QDir>
 #include <QStringList>
 #include <QFileInfo>
-#include "Logger.h"
+#include <QDebug>
 
 namespace ArcMeta {
 
@@ -18,12 +18,12 @@ DropTreeView::DropTreeView(QWidget* parent) : QTreeView(parent) {
 }
 
 void DropTreeView::dragEnterEvent(QDragEnterEvent* event) {
-    Logger::log(QString("[DropTreeView] dragEnterEvent | Formats: %1").arg(event->mimeData()->formats().join(",")));
+    qDebug() << "[DropTreeView] dragEnterEvent | Formats:" << event->mimeData()->formats();
     if (event->mimeData()->hasFormat("application/x-note-ids") || 
         event->mimeData()->hasFormat("application/x-qabstractitemmodeldatalist") ||
         event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
-        Logger::log("[DropTreeView] Accepted DragEnter");
+        qDebug() << "[DropTreeView] Accepted DragEnter";
     } else {
         event->ignore();
     }
@@ -43,8 +43,8 @@ void DropTreeView::dragMoveEvent(QDragMoveEvent* event) {
 
 void DropTreeView::dropEvent(QDropEvent* event) {
     QModelIndex index = indexAt(event->position().toPoint());
-    Logger::log(QString("[DropTreeView] dropEvent | Target Index Valid: %1 | Name: %2")
-                .arg(index.isValid() ? "true" : "false").arg(index.data().toString()));
+    qDebug() << "[DropTreeView] dropEvent | Target Index Valid:" << index.isValid()
+             << "| Name:" << index.data().toString();
 
     // 优先处理路径拖入 (收藏逻辑)
     if (event->mimeData()->hasUrls()) {
@@ -54,7 +54,7 @@ void DropTreeView::dropEvent(QDropEvent* event) {
                 paths << QDir::toNativeSeparators(url.toLocalFile());
             }
         }
-        Logger::log(QString("[DropTreeView] Dropped Paths: %1").arg(paths.join(",")));
+        qDebug() << "[DropTreeView] Dropped Paths:" << paths;
         if (!paths.isEmpty()) {
             emit pathsDropped(paths, index);
             event->setDropAction(Qt::LinkAction); // 视觉上显示为“链接/快捷方式”
@@ -83,7 +83,7 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
     QModelIndexList indexes = selectedIndexes();
     if (indexes.isEmpty()) return;
 
-    Logger::log(QString("[DropTreeView] startDrag | Selected Count: %1").arg(indexes.count()));
+    qDebug() << "[DropTreeView] startDrag | Selected Count:" << indexes.count();
 
     // 核心增强：拦截并注入物理路径 QUrl，确保 CategoryPanel 接收校验通过
     QMimeData* mimeData = model()->mimeData(indexes);
@@ -93,11 +93,11 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
 
         // 兼容性提取：NavPanel 使用 UserRole+1，ContentPanel 使用 PathRole (UserRole+5)
         QString path = idx.data(Qt::UserRole + 1).toString(); // 尝试 NavPanel 角色
-        Logger::log(QString("[DropTreeView] Trying Role+1 for %1 : %2").arg(idx.data().toString()).arg(path));
+        qDebug() << "[DropTreeView] Trying Role+1 for" << idx.data().toString() << ":" << path;
 
         if (path.isEmpty() || !QFileInfo::exists(path)) {
             path = idx.data(Qt::UserRole + 5).toString(); // 尝试 ContentPanel/PathRole 角色
-            Logger::log(QString("[DropTreeView] Trying Role+5 for %1 : %2").arg(idx.data().toString()).arg(path));
+            qDebug() << "[DropTreeView] Trying Role+5 for" << idx.data().toString() << ":" << path;
         }
 
         if (!path.isEmpty() && QFileInfo::exists(path)) {
@@ -105,10 +105,7 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
         }
     }
 
-    QStringList urlStrs;
-    for(const QUrl& u : urls) urlStrs << u.toString();
-    Logger::log(QString("[DropTreeView] Final URLs injected: %1").arg(urlStrs.join(",")));
-
+    qDebug() << "[DropTreeView] Final URLs injected:" << urls;
     if (!urls.isEmpty()) {
         mimeData->setUrls(urls);
     }
@@ -122,7 +119,7 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
     drag->setPixmap(pix);
     drag->setHotSpot(QPoint(0, 0));
     
-    Logger::log("[DropTreeView] Executing drag...");
+    qDebug() << "[DropTreeView] Executing drag...";
     drag->exec(supportedActions, Qt::MoveAction);
 }
 

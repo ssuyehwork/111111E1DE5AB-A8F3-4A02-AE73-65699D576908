@@ -55,7 +55,7 @@ list(APPEND SOURCES
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest")
+add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest" "resources/resources.qrc")
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE

@@ -19,7 +19,7 @@
 #include <QRandomGenerator>
 #include <QSet>
 #include <QSettings>
-#include "Logger.h"
+#include <QDebug>
 
 namespace ArcMeta {
 
@@ -494,7 +494,8 @@ void CategoryPanel::initUi() {
     m_categoryTree->setDragEnabled(true);
     m_categoryTree->setAcceptDrops(true);
     m_categoryTree->setDropIndicatorShown(true);
-    m_categoryTree->setDragDropMode(QAbstractItemView::InternalMove);
+    // 核心修正：解除 InternalMove 模式封锁，允许接收外部容器（NavPanel/ContentPanel）的拖拽
+    m_categoryTree->setDragDropMode(QAbstractItemView::DragDrop);
     m_categoryTree->setDefaultDropAction(Qt::MoveAction);
     m_categoryTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -517,7 +518,7 @@ void CategoryPanel::initUi() {
 
     connect(m_categoryTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
         if (!index.isValid()) {
-            Logger::log("[CategoryPanel] pathsDropped | Invalid target index!");
+            qDebug() << "[CategoryPanel] pathsDropped | Invalid target index!";
             return;
         }
         
@@ -525,8 +526,9 @@ void CategoryPanel::initUi() {
         QString itemType = index.data(CategoryModel::TypeRole).toString();
         QString itemName = index.data(CategoryModel::NameRole).toString();
 
-        Logger::log(QString("[CategoryPanel] pathsDropped | Target: %1 (ID: %2, Type: %3) | Paths: %4")
-                    .arg(itemName).arg(categoryId).arg(itemType).arg(paths.join(",")));
+        qDebug() << "[CategoryPanel] pathsDropped | Target:" << itemName
+                 << "(ID:" << categoryId << ", Type:" << itemType << ")"
+                 << "| Paths:" << paths;
         
         int count = 0;
         bool changed = false;
