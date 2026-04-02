@@ -5,6 +5,7 @@
 #include "UiHelper.h"
 #include "ToolTipOverlay.h"
 #include "FramelessDialog.h"
+#include <QDir>
 #include "../db/CategoryRepo.h"
 #include "../meta/MetadataManager.h"
 #include <QVBoxLayout>
