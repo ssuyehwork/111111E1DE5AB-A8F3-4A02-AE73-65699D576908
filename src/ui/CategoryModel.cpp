@@ -112,6 +112,8 @@ void CategoryModel::refresh() {
             for (const auto& wp : filePaths) {
                 QString fp = QString::fromStdWString(wp);
                 QFileInfo fi(fp);
+                if (!fi.exists()) continue;
+
                 QStandardItem* fileItem = new QStandardItem(fi.fileName());
                 fileItem->setData(fi.isDir() ? "folder" : "file", TypeRole);
                 fileItem->setData(fp, PathRole);

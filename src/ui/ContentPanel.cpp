@@ -3,7 +3,7 @@
 #include "TreeItemDelegate.h"
 #include "DropTreeView.h"
 #include "DropListView.h"
-#include "CategoryModel.h"
+#include "ToolTipOverlay.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -31,13 +31,11 @@
 #include <QUrl>
 #include <QFileIconProvider>
 #include <QApplication>
-#include <QFile>
-#include <QDate>
-#include <QTextBrowser>
 #include <QProcess>
 #include <QClipboard>
 #include <QMimeData>
 #include <QLineEdit>
+#include <QTextBrowser>
 #include <QInputDialog>
 #include <windows.h>
 #include <shellapi.h>
@@ -66,19 +64,19 @@ protected:
         
         // 1. 评级过滤
         if (!currentFilter.ratings.isEmpty()) {
-            int r = idx.data(ItemRole::RatingRole).toInt();
+            int r = idx.data(RatingRole).toInt();
             if (!currentFilter.ratings.contains(r)) return false;
         }
 
         // 2. 颜色过滤
         if (!currentFilter.colors.isEmpty()) {
-            QString c = idx.data(ItemRole::ColorRole).toString();
+            QString c = idx.data(ColorRole).toString();
             if (!currentFilter.colors.contains(c)) return false;
         }
 
         // 3. 标签过滤
         if (!currentFilter.tags.isEmpty()) {
-            QStringList itemTags = idx.data(ItemRole::TagsRole).toStringList();
+            QStringList itemTags = idx.data(TagsRole).toStringList();
             bool matchTag = false;
             for (const QString& fTag : currentFilter.tags) {
                 if (fTag == "__none__") {
@@ -92,8 +90,8 @@ protected:
 
         // 4. 类型过滤
         if (!currentFilter.types.isEmpty()) {
-            QString type = idx.data(ItemRole::TypeRole).toString(); // "folder" or "file"
-            QString ext = QFileInfo(idx.data(ItemRole::PathRole).toString()).suffix().toUpper();
+            QString type = idx.data(TypeRole).toString(); // "folder" or "file"
+            QString ext = QFileInfo(idx.data(PathRole).toString()).suffix().toUpper();
             bool matchType = false;
             for (const QString& fType : currentFilter.types) {
                 if (fType == "folder") {
@@ -107,7 +105,7 @@ protected:
 
         // 5. 创建日期过滤
         if (!currentFilter.createDates.isEmpty()) {
-            QDate d = QFileInfo(idx.data(ItemRole::PathRole).toString()).birthTime().date();
+            QDate d = QFileInfo(idx.data(PathRole).toString()).birthTime().date();
             QDate today = QDate::currentDate();
             QString dStr = d.toString("yyyy-MM-dd");
             bool matchDate = false;
@@ -121,7 +119,7 @@ protected:
 
         // 6. 修改日期过滤
         if (!currentFilter.modifyDates.isEmpty()) {
-            QDate d = QFileInfo(idx.data(ItemRole::PathRole).toString()).lastModified().date();
+            QDate d = QFileInfo(idx.data(PathRole).toString()).lastModified().date();
             QDate today = QDate::currentDate();
             QString dStr = d.toString("yyyy-MM-dd");
             bool matchDate = false;
@@ -138,8 +136,8 @@ protected:
 
     bool lessThan(const QModelIndex& source_left, const QModelIndex& source_right) const override {
         // 核心红线：置顶优先规则
-        bool leftPinned = source_left.data(ItemRole::IsLockedRole).toBool();
-        bool rightPinned = source_right.data(ItemRole::IsLockedRole).toBool();
+        bool leftPinned = source_left.data(IsLockedRole).toBool();
+        bool rightPinned = source_right.data(IsLockedRole).toBool();
 
         if (leftPinned != rightPinned) {
             if (sortOrder() == Qt::AscendingOrder)
@@ -170,6 +168,7 @@ ContentPanel::ContentPanel(QWidget* parent)
     m_proxyModel->setSourceModel(m_model);
 
     m_zoomLevel = 96;
+    m_isRecursive = false;
 
     initUi();
 }
@@ -204,24 +203,41 @@ void ContentPanel::initUi() {
     QLabel* titleLabel = new QLabel("预览数据", titleBar);
     titleLabel->setStyleSheet("font-size: 13px; font-weight: bold; color: #41F2F2; background: transparent; border: none;");
     
-    QPushButton* btnLayers = new QPushButton(titleBar);
-    btnLayers->setFixedSize(24, 24);
-    btnLayers->setIcon(UiHelper::getIcon("layers", QColor("#B0B0B0"), 18));
-    btnLayers->setToolTip("递归显示子目录所有文件");
-    btnLayers->setStyleSheet(
+    m_btnLayers = new QPushButton(titleBar);
+    m_btnLayers->setCheckable(true);
+    m_btnLayers->setFixedSize(24, 24);
+    m_btnLayers->setIcon(UiHelper::getIcon("layers", QColor("#B0B0B0"), 18));
+    m_btnLayers->setToolTip("递归显示子目录所有文件");
+    m_btnLayers->setStyleSheet(
         "QPushButton { background: transparent; border: none; border-radius: 4px; }"
         "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
-        "QPushButton:pressed { background: rgba(255, 255, 255, 0.2); }"
+        "QPushButton:checked { background: rgba(52, 152, 219, 0.2); border: 1px solid #3498db; }"
+        "QPushButton:disabled { opacity: 0.3; }"
     );
-    connect(btnLayers, &QPushButton::clicked, [this]() {
-        if (!m_currentPath.isEmpty() && m_currentPath != "computer://") {
+    connect(m_btnLayers, &QPushButton::clicked, [this]() {
+        if (m_currentPath.isEmpty() || m_currentPath == "computer://") {
+            m_btnLayers->setChecked(false);
+            return;
+        }
+
+        if (m_btnLayers->isChecked()) {
+            // 探测是否有子文件夹
+            QDir dir(m_currentPath);
+            bool hasSubDirs = !dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty();
+            if (!hasSubDirs) {
+                m_btnLayers->setChecked(false);
+                ToolTipOverlay::instance()->showText(QCursor::pos(), "当前文件夹不支持显示子文件夹项目", 1500, QColor("#E81123"));
+                return;
+            }
             loadDirectory(m_currentPath, true);
+        } else {
+            loadDirectory(m_currentPath, false);
         }
     });
 
     titleL->addWidget(titleLabel);
     titleL->addStretch();
-    titleL->addWidget(btnLayers);
+    titleL->addWidget(m_btnLayers);
 
     m_mainLayout->addWidget(titleBar);
 
@@ -229,11 +245,9 @@ void ContentPanel::initUi() {
     
     initGridView();
     initListView();
-    initMarkdownView();
 
     m_viewStack->addWidget(m_gridView);
     m_viewStack->addWidget(m_treeView);
-    m_viewStack->addWidget(m_markdownView);
     m_viewStack->setCurrentWidget(m_gridView);
 
     QVBoxLayout* contentWrapper = new QVBoxLayout();
@@ -242,6 +256,12 @@ void ContentPanel::initUi() {
     contentWrapper->addWidget(m_viewStack);
     
     m_mainLayout->addLayout(contentWrapper);
+
+    m_previewWidget = new QTextBrowser(this);
+    m_previewWidget->setStyleSheet("background-color: #1E1E1E; color: #EEEEEE; border: none; padding: 20px; font-family: 'Segoe UI'; font-size: 14px;");
+    m_previewWidget->hide();
+    m_mainLayout->addWidget(m_previewWidget, 1);
+
     m_gridView->installEventFilter(this);
 }
 
@@ -283,10 +303,10 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
-                        QString path = idx.data(ItemRole::PathRole).toString();
+                        QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
                             MetadataManager::instance().setRating(path.toStdWString(), rating);
-                            m_proxyModel->setData(idx, rating, ItemRole::RatingRole);
+                            m_proxyModel->setData(idx, rating, RatingRole);
                         }
                     }
                 }
@@ -298,11 +318,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const QModelIndex& idx : indexes) {
                     if (idx.column() == 0) {
-                        QString itemPath = idx.data(ItemRole::PathRole).toString();
+                        QString itemPath = idx.data(PathRole).toString();
                         if (!itemPath.isEmpty()) {
-                            bool current = idx.data(ItemRole::IsLockedRole).toBool();
+                            bool current = idx.data(IsLockedRole).toBool();
                             MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
-                            m_proxyModel->setData(idx, !current, ItemRole::IsLockedRole);
+                            m_proxyModel->setData(idx, !current, IsLockedRole);
                         }
                     }
                 }
@@ -328,10 +348,10 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 auto indexes = view->selectionModel()->selectedIndexes();
                 for (const auto& idx : indexes) {
                     if (idx.column() == 0) {
-                        QString path = idx.data(ItemRole::PathRole).toString();
+                        QString path = idx.data(PathRole).toString();
                         if (!path.isEmpty()) {
                             MetadataManager::instance().setColor(path.toStdWString(), color.toStdWString());
-                            m_proxyModel->setData(idx, color, ItemRole::ColorRole);
+                            m_proxyModel->setData(idx, color, ColorRole);
                         }
                     }
                 }
@@ -342,7 +362,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 if (keyEvent->key() == Qt::Key_C) {
                     QStringList paths;
                     auto indexes = view->selectionModel()->selectedIndexes();
-                    for (const auto& idx : indexes) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(ItemRole::PathRole).toString());
+                    for (const auto& idx : indexes) if (idx.column() == 0) paths << QDir::toNativeSeparators(idx.data(PathRole).toString());
                     if (!paths.isEmpty()) QApplication::clipboard()->setText(paths.join("\r\n"));
                     return true;
                 }
@@ -361,7 +381,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                 if (keyEvent->key() == Qt::Key_C && !(keyEvent->modifiers() & Qt::ShiftModifier)) {
                     QList<QUrl> urls;
                     auto indexes = view->selectionModel()->selectedIndexes();
-                    for (const auto& idx : indexes) if (idx.column() == 0) urls << QUrl::fromLocalFile(idx.data(ItemRole::PathRole).toString());
+                    for (const auto& idx : indexes) if (idx.column() == 0) urls << QUrl::fromLocalFile(idx.data(PathRole).toString());
                     if (!urls.isEmpty()) {
                         QMimeData* mime = new QMimeData();
                         mime->setUrls(urls);
@@ -394,7 +414,7 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
 
             if (keyEvent->key() == Qt::Key_Space) {
                 QModelIndex idx = view->currentIndex();
-                if (idx.isValid()) emit requestQuickLook(idx.data(ItemRole::PathRole).toString());
+                if (idx.isValid()) emit requestQuickLook(idx.data(PathRole).toString());
                 return true;
             }
             if (keyEvent->key() == Qt::Key_Backspace) {
@@ -429,8 +449,7 @@ void ContentPanel::wheelEvent(QWheelEvent* event) {
 
 void ContentPanel::setViewMode(ViewMode mode) {
     if (mode == GridView) m_viewStack->setCurrentWidget(m_gridView);
-    else if (mode == ListView) m_viewStack->setCurrentWidget(m_treeView);
-    else if (mode == MarkdownView) m_viewStack->setCurrentWidget(m_markdownView);
+    else m_viewStack->setCurrentWidget(m_treeView);
 }
 
 void ContentPanel::initGridView() {
@@ -468,21 +487,6 @@ void ContentPanel::initGridView() {
 
     connect(m_gridView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ContentPanel::onSelectionChanged);
     connect(m_gridView, &QListView::customContextMenuRequested, this, &ContentPanel::onCustomContextMenuRequested);
-}
-
-void ContentPanel::initMarkdownView() {
-    m_markdownView = new QTextBrowser(this);
-    m_markdownView->setOpenExternalLinks(true);
-    m_markdownView->setStyleSheet(
-        "QTextBrowser { "
-        "  background-color: #1E1E1E; "
-        "  color: #D4D4D4; "
-        "  border: none; "
-        "  padding: 20px; "
-        "  font-family: 'Segoe UI', 'Microsoft YaHei'; "
-        "  font-size: 14px; "
-        "}"
-    );
 }
 
 void ContentPanel::initListView() {
@@ -574,7 +578,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
 
     QString actionText = selectedAction->text();
     QModelIndex currentIndex = view->indexAt(pos);
-    QString path = currentIndex.data(ItemRole::PathRole).toString();
+    QString path = currentIndex.data(PathRole).toString();
 
     if (actionText == "在资源管理器中显示") {
         QStringList args;
@@ -601,11 +605,11 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         auto indexes = view->selectionModel()->selectedIndexes();
         for (const QModelIndex& idx : indexes) {
             if (idx.column() == 0) {
-                QString itemPath = idx.data(ItemRole::PathRole).toString();
+                QString itemPath = idx.data(PathRole).toString();
                 if (!itemPath.isEmpty()) {
-                    bool current = idx.data(ItemRole::IsLockedRole).toBool();
+                    bool current = idx.data(IsLockedRole).toBool();
                     MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
-                    m_proxyModel->setData(idx, !current, ItemRole::IsLockedRole);
+                    m_proxyModel->setData(idx, !current, IsLockedRole);
                 }
             }
         }
@@ -630,7 +634,7 @@ void ContentPanel::onSelectionChanged() {
     QModelIndexList indices = selectionModel->selectedIndexes();
     for (const QModelIndex& index : indices) {
         if (index.column() == 0) {
-            QString path = index.data(ItemRole::PathRole).toString();
+            QString path = index.data(PathRole).toString();
             if (!path.isEmpty()) selectedPaths.append(path);
         }
     }
@@ -639,7 +643,7 @@ void ContentPanel::onSelectionChanged() {
 
 void ContentPanel::onDoubleClicked(const QModelIndex& index) {
     if (!index.isValid()) return;
-    QString path = index.data(ItemRole::PathRole).toString();
+    QString path = index.data(PathRole).toString();
     if (path.isEmpty()) return;
 
     QFileInfo info(path);
@@ -650,85 +654,19 @@ void ContentPanel::onDoubleClicked(const QModelIndex& index) {
     }
 }
 
-void ContentPanel::loadPaths(const QStringList& paths) {
-    m_model->clear();
-    m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
-
-    QMap<int, int>     ratingCounts;
-    QMap<QString, int> colorCounts;
-    QMap<QString, int> tagCounts;
-    QMap<QString, int> typeCounts;
-    QMap<QString, int> createDateCounts;
-    QMap<QString, int> modifyDateCounts;
-    int noTagCount = 0;
-
-    QFileIconProvider iconProvider;
-    QDate today = QDate::currentDate();
-    QDate yesterday = today.addDays(-1);
-    auto dateKey = [&](const QDate& d) -> QString {
-        if (d == today)     return "today";
-        if (d == yesterday) return "yesterday";
-        return d.toString("yyyy-MM-dd");
-    };
-
-    for (const QString& fullPath : paths) {
-        QFileInfo info(fullPath);
-        if (!info.exists()) continue;
-
-        QString fileName = info.fileName();
-        QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, ItemRole::PathRole);
-        nameItem->setData(info.isDir() ? "folder" : "file", ItemRole::TypeRole);
-
-        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
-        nameItem->setData(runtimeMeta.rating, ItemRole::RatingRole);
-        nameItem->setData(QString::fromStdWString(runtimeMeta.color), ItemRole::ColorRole);
-        nameItem->setData(runtimeMeta.pinned, ItemRole::IsLockedRole);
-        nameItem->setData(runtimeMeta.encrypted, ItemRole::EncryptedRole);
-        nameItem->setData(runtimeMeta.tags, ItemRole::TagsRole);
-
-        for (const auto& t : runtimeMeta.tags) tagCounts[t]++;
-        ratingCounts[runtimeMeta.rating]++;
-        colorCounts[QString::fromStdWString(runtimeMeta.color)]++;
-        if (runtimeMeta.tags.isEmpty()) noTagCount++;
-        typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
-
-        row << nameItem;
-        row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
-        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
-        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
-        m_model->appendRow(row);
-    }
-
-    applyFilters();
-    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
-    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts);
-
-    // 如果是从预览模式切回，重置为网格视图
-    if (m_viewStack->currentWidget() == m_markdownView) {
-        setViewMode(GridView);
-    }
-}
-
-void ContentPanel::previewMarkdown(const QString& path) {
-    QFile file(path);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QString content = QString::fromUtf8(file.readAll());
-        m_markdownView->setMarkdown(content);
-        file.close();
-        setViewMode(MarkdownView);
-    }
-}
-
 void ContentPanel::loadDirectory(const QString& path, bool recursive) {
+    if (m_viewStack) m_viewStack->show();
+    if (m_previewWidget) m_previewWidget->hide();
+
+    m_isRecursive = recursive;
+    if (m_btnLayers) m_btnLayers->setChecked(recursive);
+
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
     if (path.isEmpty() || path == "computer://") {
         m_currentPath = "computer://";
+        updateLayersButtonState();
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
         
@@ -742,11 +680,11 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
-            item->setData(drivePath, ItemRole::PathRole);
-            item->setData("folder", ItemRole::TypeRole);
-            item->setData(0, ItemRole::RatingRole);
-            item->setData("", ItemRole::ColorRole);
-            item->setData(false, ItemRole::IsLockedRole);
+            item->setData(drivePath, PathRole);
+            item->setData("folder", TypeRole);
+            item->setData(0, RatingRole);
+            item->setData("", ColorRole);
+            item->setData(false, IsLockedRole);
 
             QList<QStandardItem*> row;
             row << item;
@@ -763,6 +701,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     }
 
     m_currentPath = path;
+    updateLayersButtonState();
     
     QMap<int, int>     ratingCounts;
     QMap<QString, int> colorCounts;
@@ -812,8 +751,8 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         QString fullPath = info.absoluteFilePath();
         QList<QStandardItem*> row;
         auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, ItemRole::PathRole);
-        nameItem->setData(info.isDir() ? "folder" : "file", ItemRole::TypeRole);
+        nameItem->setData(fullPath, PathRole);
+        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
 
         RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
         
@@ -822,11 +761,11 @@ void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
         QStringList itemTags = runtimeMeta.tags;
         bool    hasTags = !itemTags.isEmpty();
 
-        nameItem->setData(itemRating, ItemRole::RatingRole);
-        nameItem->setData(itemColor, ItemRole::ColorRole);
-        nameItem->setData(runtimeMeta.pinned, ItemRole::IsLockedRole);
-        nameItem->setData(runtimeMeta.encrypted, ItemRole::EncryptedRole);
-        nameItem->setData(itemTags, ItemRole::TagsRole);
+        nameItem->setData(itemRating, RatingRole);
+        nameItem->setData(itemColor, ColorRole);
+        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
+        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
+        nameItem->setData(itemTags, TagsRole);
 
         for (const auto& t : itemTags) tagCounts[t]++;
 
@@ -870,6 +809,48 @@ void ContentPanel::applyFilters() {
     proxy->updateFilter();
 }
 
+void ContentPanel::previewMarkdown(const QString& path) {
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        m_viewStack->hide();
+        m_previewWidget->setMarkdown(file.readAll());
+        m_previewWidget->show();
+        file.close();
+    }
+}
+
+void ContentPanel::loadPaths(const QStringList& paths) {
+    m_viewStack->show();
+    m_previewWidget->hide();
+
+    m_model->clear();
+    m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
+
+    QFileIconProvider iconProvider;
+    for (const QString& path : paths) {
+        QFileInfo info(path);
+        if (!info.exists()) continue;
+
+        QList<QStandardItem*> row;
+        auto* nameItem = new QStandardItem(iconProvider.icon(info), info.fileName());
+        nameItem->setData(path, PathRole);
+        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
+
+        RuntimeMeta rm = MetadataManager::instance().getMeta(path.toStdWString());
+        nameItem->setData(rm.rating, RatingRole);
+        nameItem->setData(QString::fromStdWString(rm.color), ColorRole);
+        nameItem->setData(rm.pinned, IsLockedRole);
+        nameItem->setData(rm.tags, TagsRole);
+
+        row << nameItem;
+        row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
+        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
+        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
+        m_model->appendRow(row);
+    }
+    applyFilters();
+}
+
 void ContentPanel::createNewItem(const QString& type) {
     if (m_currentPath.isEmpty() || m_currentPath == "computer://") return;
 
@@ -896,7 +877,7 @@ void ContentPanel::createNewItem(const QString& type) {
     }
 
     if (success) {
-        loadDirectory(m_currentPath);
+        loadDirectory(m_currentPath, m_isRecursive);
         auto results = m_model->findItems(finalName, Qt::MatchExactly, 0);
         if (!results.isEmpty()) {
             QModelIndex srcIdx = results.first()->index();
@@ -907,6 +888,20 @@ void ContentPanel::createNewItem(const QString& type) {
             }
         }
     }
+}
+
+void ContentPanel::updateLayersButtonState() {
+    if (!m_btnLayers) return;
+
+    if (m_currentPath.isEmpty() || m_currentPath == "computer://") {
+        m_btnLayers->setEnabled(false);
+        m_btnLayers->setChecked(false);
+        m_btnLayers->setToolTip("“此电脑”不支持递归显示");
+        return;
+    }
+
+    m_btnLayers->setEnabled(true);
+    m_btnLayers->setToolTip("递归显示子目录所有文件");
 }
 
 // --- Delegate ---
@@ -924,7 +919,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     painter->setBrush(cardBg);
     painter->drawRoundedRect(cardRect, 8, 8);
 
-    QString path = index.data(ItemRole::PathRole).toString();
+    QString path = index.data(PathRole).toString();
     QFileInfo info(path);
     QString ext = info.isDir() ? "DIR" : info.suffix().toUpper();
     if (ext.isEmpty()) ext = "FILE";
@@ -958,7 +953,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     icon.paint(painter, iconRect);
 
     int ratingY = iconRect.bottom() + gap1;
-    int rating = index.data(ItemRole::RatingRole).toInt();
+    int rating = index.data(RatingRole).toInt();
     
     int starSize = 12; 
     int starSpacing = 1; 
@@ -983,7 +978,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int nameY = ratingY + ratingH + gap2;
     QRect nameRect(cardRect.left() + 6, nameY, cardRect.width() - 12, nameH);
     
-    QString colorName = index.data(ItemRole::ColorRole).toString();
+    QString colorName = index.data(ColorRole).toString();
     if (!colorName.isEmpty()) {
         QColor dotC(colorName);
         if (!dotC.isValid()) {
@@ -1065,10 +1060,10 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
 
             QRect banRect(infoStartX, ratingY + (ratingH - 14) / 2, 14, 14);
             if (banRect.contains(mEvent->pos())) {
-                QString path = index.data(ItemRole::PathRole).toString();
+                QString path = index.data(PathRole).toString();
                 if (!path.isEmpty()) {
                     MetadataManager::instance().setRating(path.toStdWString(), 0);
-                    model->setData(index, 0, ItemRole::RatingRole);
+                    model->setData(index, 0, RatingRole);
                 }
                 return true;
             }
@@ -1078,10 +1073,10 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
                 QRect starRect(starsStartX + i * (starSize + starSpacing), ratingY + (ratingH - starSize) / 2, starSize, starSize);
                 if (starRect.contains(mEvent->pos())) {
                     int r = i + 1;
-                    QString path = index.data(ItemRole::PathRole).toString();
+                    QString path = index.data(PathRole).toString();
                     if (!path.isEmpty()) {
                         MetadataManager::instance().setRating(path.toStdWString(), r);
-                        model->setData(index, r, ItemRole::RatingRole);
+                        model->setData(index, r, RatingRole);
                     }
                     return true;
                 }
@@ -1098,7 +1093,7 @@ QWidget* GridItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewI
     editor->setAlignment(Qt::AlignCenter);
     editor->setFrame(false);
     
-    QString tagColorStr = index.data(ItemRole::ColorRole).toString();
+    QString tagColorStr = index.data(ColorRole).toString();
     QString bgColor = tagColorStr.isEmpty() ? "#3E3E42" : tagColorStr;
     QString textColor = tagColorStr.isEmpty() ? "#FFFFFF" : "#000000";
 
@@ -1128,13 +1123,13 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
     QString value = lineEdit->text();
     if(value.isEmpty() || value == index.data(Qt::DisplayRole).toString()) return;
 
-    QString oldPath = index.data(ItemRole::PathRole).toString();
+    QString oldPath = index.data(PathRole).toString();
     QFileInfo info(oldPath);
     QString newPath = info.absolutePath() + "/" + value;
     
     if (QFile::rename(oldPath, newPath)) {
         model->setData(index, value, Qt::EditRole);
-        model->setData(index, newPath, ItemRole::PathRole);
+        model->setData(index, newPath, PathRole);
         AmMetaJson::renameItem(info.absolutePath(), info.fileName(), value);
     } 
 }

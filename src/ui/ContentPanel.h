@@ -4,12 +4,13 @@
 #include <QListView>
 #include <QTreeView>
 #include <QStackedWidget>
+#include <QPushButton>
+#include <QTextBrowser>
 #include <QStandardItemModel>
 #include <QSortFilterProxyModel>
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
 #include <QMap>
-#include <QTextBrowser>
 #include "FilterPanel.h"
 
 namespace ArcMeta {
@@ -38,8 +39,7 @@ class ContentPanel : public QFrame {
 public:
     enum ViewMode {
         GridView,
-        ListView,
-        MarkdownView
+        ListView
     };
 
     explicit ContentPanel(QWidget* parent = nullptr);
@@ -98,17 +98,18 @@ private:
     void initUi();
     void initGridView();
     void initListView();
-    void initMarkdownView();
     void setupContextMenu();
+    void updateLayersButtonState();
 
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     QStackedWidget* m_viewStack = nullptr;
-    
+    QPushButton* m_btnLayers = nullptr;
+    QTextBrowser* m_previewWidget = nullptr;
+
     // 视图组件
     QListView* m_gridView = nullptr;
     QTreeView* m_treeView = nullptr;
-    QTextBrowser* m_markdownView = nullptr;
     QStandardItemModel* m_model = nullptr;
     QSortFilterProxyModel* m_proxyModel = nullptr;
 
@@ -116,6 +117,7 @@ private:
 
     int m_zoomLevel = 64;
     QString m_currentPath;
+    bool m_isRecursive = false;
     void updateGridSize();
 
     void addItemsFromDirectory(const QString& path, bool recursive,
@@ -138,16 +140,6 @@ public slots:
     void loadDirectory(const QString& path, bool recursive = false);
 
     /**
-     * @brief 加载指定的物理路径列表（用于分类联动）
-     */
-    void loadPaths(const QStringList& paths);
-
-    /**
-     * @brief 预览 Markdown 文件内容
-     */
-    void previewMarkdown(const QString& path);
-
-    /**
      * @brief 全局/本地搜索
      */
     void search(const QString& query);
@@ -162,6 +154,16 @@ public slots:
      * @brief 创建新条目（文件夹/Markdown/Txt）
      */
     void createNewItem(const QString& type);
+
+    /**
+     * @brief 预览 Markdown
+     */
+    void previewMarkdown(const QString& path);
+
+    /**
+     * @brief 加载指定路径列表 (分类联动使用)
+     */
+    void loadPaths(const QStringList& paths);
 
 protected:
     void wheelEvent(QWheelEvent* event) override;

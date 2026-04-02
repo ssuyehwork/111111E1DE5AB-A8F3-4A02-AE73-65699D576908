@@ -225,14 +225,14 @@ void MainWindow::initUi() {
                 info.lastModified().toString("yyyy-MM-dd"),
                 info.lastRead().toString("yyyy-MM-dd"),
                 info.absoluteFilePath(),
-                idx.data(ItemRole::EncryptedRole).toBool()
+                idx.data(EncryptedRole).toBool()
             );
 
             // 应用缓存中的元数据状态
-            m_metaPanel->setRating(idx.data(ItemRole::RatingRole).toInt());
-            m_metaPanel->setColor(idx.data(ItemRole::ColorRole).toString().toStdWString());
-            m_metaPanel->setPinned(idx.data(ItemRole::IsLockedRole).toBool());
-            m_metaPanel->setTags(idx.data(ItemRole::TagsRole).toStringList());
+            m_metaPanel->setRating(idx.data(RatingRole).toInt());
+            m_metaPanel->setColor(idx.data(ColorRole).toString().toStdWString());
+            m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
+            m_metaPanel->setTags(idx.data(TagsRole).toStringList());
 
             // 针对问题 3：自动预览 Markdown
             if (paths.size() == 1 && path.endsWith(".md", Qt::CaseInsensitive)) {
@@ -328,11 +328,11 @@ void MainWindow::initUi() {
             if (rating != -1) {
                 // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
                 // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
-                m_contentPanel->getProxyModel()->setData(idx, rating, ItemRole::RatingRole);
+                m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
                 meta.items()[info.fileName().toStdWString()].rating = rating;
             }
             if (color != L"__NO_CHANGE__") {
-                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ItemRole::ColorRole);
+                m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
                 meta.items()[info.fileName().toStdWString()].color = color;
             }
             meta.save();
