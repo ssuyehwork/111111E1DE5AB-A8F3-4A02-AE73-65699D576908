@@ -220,18 +220,21 @@ void ContentPanel::initUi() {
             return;
         }
 
-        if (m_btnLayers->isChecked()) {
-            // 探测是否有子文件夹
-            QDir dir(m_currentPath);
-            bool hasSubDirs = !dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty();
-            if (!hasSubDirs) {
-                m_btnLayers->setChecked(false);
-                ToolTipOverlay::instance()->showText(QCursor::pos(), "当前文件夹不支持显示子文件夹项目", 1500, QColor("#E81123"));
-                return;
-            }
-            loadDirectory(m_currentPath, true);
+        bool recursive = m_btnLayers->isChecked();
+        if (m_currentPath == "category://" || m_currentPath.startsWith("分类: ") || m_currentPath.startsWith("分类：")) {
+            loadPaths(m_lastCategoryPaths, recursive);
         } else {
-            loadDirectory(m_currentPath, false);
+            if (recursive) {
+                // 探测是否有子文件夹
+                QDir dir(m_currentPath);
+                bool hasSubDirs = !dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty();
+                if (!hasSubDirs) {
+                    m_btnLayers->setChecked(false);
+                    ToolTipOverlay::instance()->showText(QCursor::pos(), "当前文件夹不支持显示子文件夹项目", 1500, QColor("#E81123"));
+                    return;
+                }
+            }
+            loadDirectory(m_currentPath, recursive);
         }
     });
 
@@ -658,8 +661,15 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     if (m_viewStack) m_viewStack->show();
     if (m_previewWidget) m_previewWidget->hide();
 
+    // 物理还原：拦截虚拟分类路径，防止进入磁盘 IO 逻辑
+    if (path.startsWith("分类: ") || path.startsWith("分类：")) {
+        loadPaths(m_lastCategoryPaths, recursive);
+        return;
+    }
+
     m_isRecursive = recursive;
     if (m_btnLayers) m_btnLayers->setChecked(recursive);
+    m_lastCategoryPaths.clear();
 
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
@@ -819,36 +829,75 @@ void ContentPanel::previewMarkdown(const QString& path) {
     }
 }
 
-void ContentPanel::loadPaths(const QStringList& paths) {
+void ContentPanel::loadPaths(const QStringList& paths, bool recursive) {
     m_viewStack->show();
-    m_previewWidget->hide();
+    if (m_previewWidget) m_previewWidget->hide();
+
+    // 保持 m_currentPath 为 category:// 以便 updateLayersButtonState 识别
+    m_currentPath = "category://";
+    m_lastCategoryPaths = paths;
+    m_isRecursive = recursive;
+    if (m_btnLayers) m_btnLayers->setChecked(recursive);
 
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
+    QMap<int, int>     ratingCounts;
+    QMap<QString, int> colorCounts;
+    QMap<QString, int> tagCounts;
+    QMap<QString, int> typeCounts;
+    QMap<QString, int> createDateCounts;
+    QMap<QString, int> modifyDateCounts;
+    int noTagCount = 0;
+
     QFileIconProvider iconProvider;
-    for (const QString& path : paths) {
-        QFileInfo info(path);
-        if (!info.exists()) continue;
+    auto addSinglePath = [&](const QString& p) {
+        QFileInfo info(p);
+        if (!info.exists()) return;
 
         QList<QStandardItem*> row;
         auto* nameItem = new QStandardItem(iconProvider.icon(info), info.fileName());
-        nameItem->setData(path, PathRole);
+        nameItem->setData(p, PathRole);
         nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
 
-        RuntimeMeta rm = MetadataManager::instance().getMeta(path.toStdWString());
+        RuntimeMeta rm = MetadataManager::instance().getMeta(p.toStdWString());
         nameItem->setData(rm.rating, RatingRole);
         nameItem->setData(QString::fromStdWString(rm.color), ColorRole);
         nameItem->setData(rm.pinned, IsLockedRole);
+        nameItem->setData(rm.encrypted, EncryptedRole);
         nameItem->setData(rm.tags, TagsRole);
+
+        ratingCounts[rm.rating]++;
+        colorCounts[QString::fromStdWString(rm.color)]++;
+        if (rm.tags.isEmpty()) noTagCount++;
+        for (const auto& t : rm.tags) tagCounts[t]++;
+        typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
+
+        // 日期统计简化处理
+        QString dKey = info.lastModified().date().toString("yyyy-MM-dd");
+        createDateCounts[info.birthTime().date().toString("yyyy-MM-dd")]++;
+        modifyDateCounts[dKey]++;
 
         row << nameItem;
         row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
         row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
         row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
         m_model->appendRow(row);
+    };
+
+    for (const QString& p : paths) {
+        addSinglePath(p);
+        if (recursive && QFileInfo(p).isDir()) {
+            addItemsFromDirectory(p, true, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
+        }
     }
+
     applyFilters();
+    updateLayersButtonState();
+
+    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
+    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
+                              createDateCounts, modifyDateCounts);
 }
 
 void ContentPanel::createNewItem(const QString& type) {
@@ -900,6 +949,7 @@ void ContentPanel::updateLayersButtonState() {
         return;
     }
 
+    // 分类模式或普通目录模式下均启用
     m_btnLayers->setEnabled(true);
     m_btnLayers->setToolTip("递归显示子目录所有文件");
 }

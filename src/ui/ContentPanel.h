@@ -117,6 +117,7 @@ private:
 
     int m_zoomLevel = 64;
     QString m_currentPath;
+    QStringList m_lastCategoryPaths;
     bool m_isRecursive = false;
     void updateGridSize();
 
@@ -163,7 +164,7 @@ public slots:
     /**
      * @brief 加载指定路径列表 (分类联动使用)
      */
-    void loadPaths(const QStringList& paths);
+    void loadPaths(const QStringList& paths, bool recursive = false);
 
 protected:
     void wheelEvent(QWheelEvent* event) override;

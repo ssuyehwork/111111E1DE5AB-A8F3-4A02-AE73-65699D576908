@@ -181,7 +181,9 @@ void MainWindow::initUi() {
     // 1a. 分类选择 -> 内容面板执行数据加载 (针对问题 2)
     connect(m_categoryPanel, &CategoryPanel::categorySelected, [this](int id, const QString& name) {
         m_pathStack->setCurrentWidget(m_pathEdit);
-        m_pathEdit->setText("分类: " + name);
+        QString virtualPath = "分类: " + name;
+        m_pathEdit->setText(virtualPath);
+        m_currentPath = virtualPath; // 物理对齐：更新全局路径状态，确保递归按钮能识别当前模式
 
         if (id > 0) {
             // 从数据库拉取分类下的物理路径
