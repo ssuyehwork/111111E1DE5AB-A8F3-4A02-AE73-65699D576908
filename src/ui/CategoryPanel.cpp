@@ -540,8 +540,10 @@ void CategoryPanel::initUi() {
         else if (itemType == "bookmark") {
             // 分支 B：拖拽至系统预设的“收藏”项
             for (const QString& path : paths) {
+                // 2026-03-xx 物理强化：强制使用原生分隔符，确保数据库路径匹配成功
+                QString normPath = QDir::toNativeSeparators(path);
                 // 物理写入：更新 items 表的 pinned 状态
-                MetadataManager::instance().setPinned(path.toStdWString(), true);
+                MetadataManager::instance().setPinned(normPath.toStdWString(), true);
                 count++;
             }
             changed = (count > 0);

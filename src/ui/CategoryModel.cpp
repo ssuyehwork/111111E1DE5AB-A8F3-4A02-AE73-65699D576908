@@ -165,8 +165,12 @@ bool CategoryModel::dropMimeData(const QMimeData* mimeData, Qt::DropAction actio
     if (actualParent.isValid()) {
         QStandardItem* parentItem = itemFromIndex(actualParent);
         if (!parentItem) return false;
+
+        QString type = parentItem->data(TypeRole).toString();
         QString name = parentItem->data(NameRole).toString();
-        if (parentItem->data(TypeRole).toString() != "category" && name != "我的分类") {
+
+        // 2026-03-xx 按照用户要求：物理放开“收藏”项的投放权限，允许接收外部文件拖入
+        if (type != "category" && type != "bookmark" && name != "我的分类") {
             return false; 
         }
     }
