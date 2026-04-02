@@ -17,6 +17,9 @@
 #include <QScrollBar>
 #include <QMenu>
 #include <QAction>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QProcess>
 #include <QApplication>
 #include <QRandomGenerator>
 #include <QSet>
@@ -99,6 +102,39 @@ void CategoryPanel::setupContextMenu() {
                 pwdMenu->setStyleSheet(menu.styleSheet());
                 pwdMenu->addAction("设置密码", this, &CategoryPanel::onSetPassword);
                 pwdMenu->addAction("清除密码", this, &CategoryPanel::onClearPassword);
+            } else if (type == "file" || type == "folder") {
+                QString path = index.data(CategoryModel::PathRole).toString();
+
+                menu.addAction(UiHelper::getIcon("link", QColor("#3498db"), 18), "打开", [path]() {
+                    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+                });
+
+                menu.addAction(UiHelper::getIcon("search", QColor("#aaaaaa"), 18), "在资源管理器中显示", [path]() {
+#ifdef Q_OS_WIN
+                    QStringList args;
+                    args << "/select," << QDir::toNativeSeparators(path);
+                    QProcess::startDetached("explorer.exe", args);
+#endif
+                });
+
+                menu.addSeparator();
+
+                menu.addAction(UiHelper::getIcon("trash", QColor("#e74c3c"), 18), "从分类中移除", [this, index, path]() {
+                    int catId = index.parent().data(CategoryModel::IdRole).toInt();
+                    if (catId > 0) {
+                        if (CategoryRepo::removeItemFromCategory(catId, path.toStdWString())) {
+                            // 2026-03-xx 按照用户要求：补全侧边栏子项“移除关联”逻辑，并执行状态保持刷新
+                            QSet<int> expandedIds;
+                            QStringList expandedNames;
+                            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+
+                            m_categoryModel->refresh();
+
+                            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+                            ToolTipOverlay::instance()->showText(QCursor::pos(), "已从分类中移除", 1000);
+                        }
+                    }
+                });
             }
         }
         
