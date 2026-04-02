@@ -25,6 +25,8 @@ public:
     static bool add(Category& cat);
     static bool update(const Category& cat);
     static bool remove(int id);
+    static bool reorder(int parentId, bool ascending);
+    static bool reorderAll(bool ascending);
     static std::vector<Category> getAll();
     static std::vector<std::pair<int, int>> getCounts();
     static int getUniqueItemCount();

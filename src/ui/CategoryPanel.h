@@ -42,7 +42,6 @@ private slots:
     void onCreateSubCategory();
     void onRenameCategory();
     void onDeleteCategory();
-    void onAddData();
     void onClassifyToCategory();
     void onSetColor();
     void onRandomColor();
@@ -50,6 +49,10 @@ private slots:
     void onTogglePin();
     void onSetPassword();
     void onClearPassword();
+    void onSortByNameAsc();
+    void onSortByNameDesc();
+    void onSortAllByNameAsc();
+    void onSortAllByNameDesc();
 
 private:
     void initUi();

@@ -35,15 +35,37 @@ bool CategoryRepo::add(Category& cat) {
     return false;
 }
 
+bool CategoryRepo::reorderAll(bool ascending) {
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
+    q.prepare("SELECT id FROM categories ORDER BY name " + QString(ascending ? "ASC" : "DESC"));
+
+    if (q.exec()) {
+        int order = 0;
+        db.transaction();
+        while (q.next()) {
+            int id = q.value(0).toInt();
+            QSqlQuery upd(db);
+            upd.prepare("UPDATE categories SET sort_order = ? WHERE id = ?");
+            upd.addBindValue(order++);
+            upd.addBindValue(id);
+            upd.exec();
+        }
+        return db.commit();
+    }
+    return false;
+}
+
 bool CategoryRepo::update(const Category& cat) {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
-    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ? WHERE id = ?");
+    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ?, encrypted = ? WHERE id = ?");
     q.addBindValue(cat.parentId);
     q.addBindValue(QString::fromStdWString(cat.name));
     q.addBindValue(QString::fromStdWString(cat.color));
     q.addBindValue(cat.sortOrder);
     q.addBindValue(cat.pinned ? 1 : 0);
+    q.addBindValue(cat.encrypted ? 1 : 0);
     q.addBindValue(cat.id);
     return q.exec();
 }
@@ -176,6 +198,29 @@ bool CategoryRepo::remove(int id) {
     q2.prepare("DELETE FROM categories WHERE id = ?");
     q2.addBindValue(id);
     return q2.exec();
+}
+
+bool CategoryRepo::reorder(int parentId, bool ascending) {
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    // 逻辑：获取该父级下的所有分类，按名称排序，然后重新赋予 sort_order
+    QSqlQuery q(db);
+    q.prepare("SELECT id FROM categories WHERE parent_id = ? ORDER BY name " + QString(ascending ? "ASC" : "DESC"));
+    q.addBindValue(parentId);
+
+    if (q.exec()) {
+        int order = 0;
+        db.transaction();
+        while (q.next()) {
+            int id = q.value(0).toInt();
+            QSqlQuery upd(db);
+            upd.prepare("UPDATE categories SET sort_order = ? WHERE id = ?");
+            upd.addBindValue(order++);
+            upd.addBindValue(id);
+            upd.exec();
+        }
+        return db.commit();
+    }
+    return false;
 }
 
 std::vector<std::wstring> CategoryRepo::getItemPathsInCategory(int categoryId) {
