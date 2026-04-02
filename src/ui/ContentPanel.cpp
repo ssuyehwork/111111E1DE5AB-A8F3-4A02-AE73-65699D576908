@@ -215,13 +215,13 @@ void ContentPanel::initUi() {
         "QPushButton:disabled { opacity: 0.3; }"
     );
     connect(m_btnLayers, &QPushButton::clicked, [this]() {
-        if (m_currentPath.isEmpty() || m_currentPath == "computer://") {
+        if (m_pathMode == ComputerMode) {
             m_btnLayers->setChecked(false);
             return;
         }
 
         bool recursive = m_btnLayers->isChecked();
-        if (m_currentPath == "category://" || m_currentPath.startsWith("分类: ") || m_currentPath.startsWith("分类：")) {
+        if (m_pathMode == CategoryMode) {
             loadPaths(m_lastCategoryPaths, recursive);
         } else {
             if (recursive) {
@@ -662,7 +662,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     if (m_previewWidget) m_previewWidget->hide();
 
     // 物理还原：拦截虚拟分类路径，防止进入磁盘 IO 逻辑
-    if (path.startsWith("分类: ") || path.startsWith("分类：")) {
+    if (path.startsWith("分类: ")) {
         loadPaths(m_lastCategoryPaths, recursive);
         return;
     }
@@ -676,6 +676,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
 
     if (path.isEmpty() || path == "computer://") {
         m_currentPath = "computer://";
+        m_pathMode = ComputerMode;
         updateLayersButtonState();
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
@@ -711,6 +712,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     }
 
     m_currentPath = path;
+    m_pathMode = DirectoryMode;
     updateLayersButtonState();
     
     QMap<int, int>     ratingCounts;
@@ -833,8 +835,7 @@ void ContentPanel::loadPaths(const QStringList& paths, bool recursive) {
     m_viewStack->show();
     if (m_previewWidget) m_previewWidget->hide();
 
-    // 保持 m_currentPath 为 category:// 以便 updateLayersButtonState 识别
-    m_currentPath = "category://";
+    m_pathMode = CategoryMode;
     m_lastCategoryPaths = paths;
     m_isRecursive = recursive;
     if (m_btnLayers) m_btnLayers->setChecked(recursive);
@@ -942,14 +943,13 @@ void ContentPanel::createNewItem(const QString& type) {
 void ContentPanel::updateLayersButtonState() {
     if (!m_btnLayers) return;
 
-    if (m_currentPath.isEmpty() || m_currentPath == "computer://") {
+    if (m_pathMode == ComputerMode) {
         m_btnLayers->setEnabled(false);
         m_btnLayers->setChecked(false);
         m_btnLayers->setToolTip("“此电脑”不支持递归显示");
         return;
     }
 
-    // 分类模式或普通目录模式下均启用
     m_btnLayers->setEnabled(true);
     m_btnLayers->setToolTip("递归显示子目录所有文件");
 }

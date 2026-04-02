@@ -288,7 +288,12 @@ void MainWindow::initUi() {
     // 7. 工具栏极速搜索对接 (MFT 并行引擎)
     connect(m_searchEdit, &QLineEdit::textEdited, [this](const QString& text) {
         if (text.isEmpty()) {
-            m_contentPanel->loadDirectory(m_pathEdit->text());
+            // 物理还原：根据当前路径状态恢复显示
+            if (m_currentPath.startsWith("分类: ")) {
+                m_contentPanel->loadDirectory(m_currentPath); // 将由拦截逻辑转发至 loadPaths
+            } else {
+                m_contentPanel->loadDirectory(m_currentPath);
+            }
         } else if (text.length() >= 2) {
             m_contentPanel->search(text);
         }

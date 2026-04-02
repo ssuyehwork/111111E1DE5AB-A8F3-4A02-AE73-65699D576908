@@ -42,6 +42,12 @@ public:
         ListView
     };
 
+    enum PathMode {
+        ComputerMode,
+        DirectoryMode,
+        CategoryMode
+    };
+
     explicit ContentPanel(QWidget* parent = nullptr);
     ~ContentPanel() override = default;
 
@@ -118,6 +124,7 @@ private:
     int m_zoomLevel = 64;
     QString m_currentPath;
     QStringList m_lastCategoryPaths;
+    PathMode m_pathMode = ComputerMode;
     bool m_isRecursive = false;
     void updateGridSize();
 
