@@ -19,7 +19,7 @@
 #include <QRandomGenerator>
 #include <QSet>
 #include <QSettings>
-#include <QDebug>
+#include "Logger.h"
 
 namespace ArcMeta {
 
@@ -517,7 +517,7 @@ void CategoryPanel::initUi() {
 
     connect(m_categoryTree, &DropTreeView::pathsDropped, [this](const QStringList& paths, const QModelIndex& index) {
         if (!index.isValid()) {
-            qDebug() << "[CategoryPanel] pathsDropped | Invalid target index!";
+            Logger::log("[CategoryPanel] pathsDropped | Invalid target index!");
             return;
         }
         
@@ -525,9 +525,8 @@ void CategoryPanel::initUi() {
         QString itemType = index.data(CategoryModel::TypeRole).toString();
         QString itemName = index.data(CategoryModel::NameRole).toString();
 
-        qDebug() << "[CategoryPanel] pathsDropped | Target:" << itemName
-                 << "(ID:" << categoryId << ", Type:" << itemType << ")"
-                 << "| Paths:" << paths;
+        Logger::log(QString("[CategoryPanel] pathsDropped | Target: %1 (ID: %2, Type: %3) | Paths: %4")
+                    .arg(itemName).arg(categoryId).arg(itemType).arg(paths.join(",")));
         
         int count = 0;
         bool changed = false;

@@ -4,7 +4,7 @@
 #include <QMimeData>
 #include <QUrl>
 #include <QFileInfo>
-#include <QDebug>
+#include "Logger.h"
 
 namespace ArcMeta {
 
@@ -14,7 +14,7 @@ void DropListView::startDrag(Qt::DropActions supportedActions) {
     QModelIndexList indexes = selectedIndexes();
     if (indexes.isEmpty()) return;
 
-    qDebug() << "[DropListView] startDrag | Selected Count:" << indexes.count();
+    Logger::log(QString("[DropListView] startDrag | Selected Count: %1").arg(indexes.count()));
 
     // 核心增强：拦截并注入物理路径 QUrl，确保 CategoryPanel 接收校验通过
     QMimeData* mimeData = model()->mimeData(indexes);
@@ -22,14 +22,16 @@ void DropListView::startDrag(Qt::DropActions supportedActions) {
     for (const QModelIndex& idx : indexes) {
         // ContentPanel 网格视图主要使用 PathRole (UserRole+5)
         QString path = idx.data(Qt::UserRole + 5).toString();
-        qDebug() << "[DropListView] Extracting Path (Role+5) for" << idx.data().toString() << ":" << path;
+        Logger::log(QString("[DropListView] Extracting Path (Role+5) for %1 : %2").arg(idx.data().toString()).arg(path));
 
         if (!path.isEmpty() && QFileInfo::exists(path)) {
             urls << QUrl::fromLocalFile(path);
         }
     }
 
-    qDebug() << "[DropListView] Final URLs injected:" << urls;
+    QStringList urlStrs;
+    for(const QUrl& u : urls) urlStrs << u.toString();
+    Logger::log(QString("[DropListView] Final URLs injected: %1").arg(urlStrs.join(",")));
     if (!urls.isEmpty()) {
         mimeData->setUrls(urls);
     }
