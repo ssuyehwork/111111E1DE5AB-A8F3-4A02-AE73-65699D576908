@@ -43,6 +43,44 @@ CategoryPanel::CategoryPanel(QWidget* parent)
     setupContextMenu();
 }
 
+/**
+ * @brief 递归保存 QTreeView 的展开状态
+ */
+static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<int>& expandedIds, QStringList& expandedNames) {
+    if (!tree || !tree->model()) return;
+    for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
+        QModelIndex idx = tree->model()->index(i, 0, parent);
+        if (tree->isExpanded(idx)) {
+            int id = idx.data(CategoryModel::IdRole).toInt();
+            if (id > 0) expandedIds.insert(id);
+            else expandedNames << idx.data(CategoryModel::NameRole).toString();
+            saveExpandedState(tree, idx, expandedIds, expandedNames);
+        }
+    }
+}
+
+/**
+ * @brief 递归恢复 QTreeView 的展开状态
+ */
+static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds, const QStringList& expandedNames) {
+    if (!tree || !tree->model()) return;
+    for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
+        QModelIndex idx = tree->model()->index(i, 0, parent);
+        int id = idx.data(CategoryModel::IdRole).toInt();
+        QString name = idx.data(CategoryModel::NameRole).toString();
+
+        bool shouldExpand = false;
+        if (expandedNames.contains(name) || (id > 0 && expandedIds.contains(id)) || name == "我的分类") {
+            shouldExpand = true;
+        }
+
+        if (shouldExpand) {
+            tree->setExpanded(idx, true);
+            restoreExpandedState(tree, idx, expandedIds, expandedNames);
+        }
+    }
+}
+
 void CategoryPanel::setupContextMenu() {
     m_categoryTree->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_categoryTree, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
@@ -142,44 +180,6 @@ void CategoryPanel::setupContextMenu() {
             menu.exec(m_categoryTree->viewport()->mapToGlobal(pos));
         }
     });
-}
-
-/**
- * @brief 递归保存 QTreeView 的展开状态
- */
-static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<int>& expandedIds, QStringList& expandedNames) {
-    if (!tree || !tree->model()) return;
-    for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
-        QModelIndex idx = tree->model()->index(i, 0, parent);
-        if (tree->isExpanded(idx)) {
-            int id = idx.data(CategoryModel::IdRole).toInt();
-            if (id > 0) expandedIds.insert(id);
-            else expandedNames << idx.data(CategoryModel::NameRole).toString();
-            saveExpandedState(tree, idx, expandedIds, expandedNames);
-        }
-    }
-}
-
-/**
- * @brief 递归恢复 QTreeView 的展开状态
- */
-static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds, const QStringList& expandedNames) {
-    if (!tree || !tree->model()) return;
-    for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
-        QModelIndex idx = tree->model()->index(i, 0, parent);
-        int id = idx.data(CategoryModel::IdRole).toInt();
-        QString name = idx.data(CategoryModel::NameRole).toString();
-        
-        bool shouldExpand = false;
-        if (expandedNames.contains(name) || (id > 0 && expandedIds.contains(id)) || name == "我的分类") {
-            shouldExpand = true;
-        }
-
-        if (shouldExpand) {
-            tree->setExpanded(idx, true);
-            restoreExpandedState(tree, idx, expandedIds, expandedNames);
-        }
-    }
 }
 
 void CategoryPanel::onCreateCategory() {
