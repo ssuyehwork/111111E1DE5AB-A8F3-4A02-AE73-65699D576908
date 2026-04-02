@@ -234,10 +234,6 @@ void MainWindow::initUi() {
             m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
             m_metaPanel->setTags(idx.data(TagsRole).toStringList());
 
-            // 2026-03-xx 按照用户要求：实现全能自动预览，不再局限于 Markdown
-            if (paths.size() == 1) {
-                m_contentPanel->previewFile(path);
-            }
         }
         // 状态栏右侧显示已选数量
         if (m_statusRight) {
