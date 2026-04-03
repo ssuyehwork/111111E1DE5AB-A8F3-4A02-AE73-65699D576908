@@ -59,13 +59,14 @@ bool CategoryRepo::reorderAll(bool ascending) {
 bool CategoryRepo::update(const Category& cat) {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
-    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ?, encrypted = ? WHERE id = ?");
+    q.prepare("UPDATE categories SET parent_id = ?, name = ?, color = ?, sort_order = ?, pinned = ?, encrypted = ?, encrypt_hint = ? WHERE id = ?");
     q.addBindValue(cat.parentId);
     q.addBindValue(QString::fromStdWString(cat.name));
     q.addBindValue(QString::fromStdWString(cat.color));
     q.addBindValue(cat.sortOrder);
     q.addBindValue(cat.pinned ? 1 : 0);
     q.addBindValue(cat.encrypted ? 1 : 0);
+    q.addBindValue(QString::fromStdWString(cat.encryptHint));
     q.addBindValue(cat.id);
     return q.exec();
 }
@@ -84,7 +85,7 @@ std::vector<Category> CategoryRepo::getAll() {
     std::vector<Category> results;
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     // 物理还原：置顶优先，其次按 sort_order 排序
-    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned, encrypted FROM categories ORDER BY pinned DESC, sort_order ASC", db);
+    QSqlQuery q("SELECT id, parent_id, name, color, preset_tags, sort_order, pinned, encrypted, encrypt_hint FROM categories ORDER BY pinned DESC, sort_order ASC", db);
     while (q.next()) {
         Category cat;
         cat.id = q.value(0).toInt();
@@ -100,6 +101,7 @@ std::vector<Category> CategoryRepo::getAll() {
         cat.sortOrder = q.value(5).toInt();
         cat.pinned = q.value(6).toBool();
         cat.encrypted = q.value(7).toBool();
+        cat.encryptHint = q.value(8).toString().toStdWString();
         results.push_back(cat);
     }
     return results;

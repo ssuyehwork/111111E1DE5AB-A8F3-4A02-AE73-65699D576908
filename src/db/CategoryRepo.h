@@ -15,6 +15,7 @@ struct Category {
     int sortOrder = 0;
     bool pinned = false;
     bool encrypted = false;
+    std::wstring encryptHint;
 };
 
 /**

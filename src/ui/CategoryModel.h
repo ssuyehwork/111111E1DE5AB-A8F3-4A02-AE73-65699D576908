@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QStandardItemModel>
+#include <QSet>
 
 namespace ArcMeta {
 
@@ -15,9 +16,13 @@ public:
         NameRole,
         PinnedRole,
         PathRole,
-        EncryptedRole
+        EncryptedRole,
+        EncryptHintRole
     };
     explicit CategoryModel(Type type, QObject* parent = nullptr);
+
+    void setUnlockedIds(const QSet<int>& ids);
+
 public slots:
     void refresh();
 
@@ -29,6 +34,7 @@ public slots:
 
 private:
     Type m_type;
+    QSet<int> m_unlockedIds;
 };
 
 } // namespace ArcMeta

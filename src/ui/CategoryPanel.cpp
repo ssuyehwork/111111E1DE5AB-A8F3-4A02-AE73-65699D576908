@@ -1,5 +1,6 @@
 #include "CategoryPanel.h"
 #include "CategoryModel.h"
+#include "CategoryLockDialog.h"
 #include "CategoryDelegate.h"
 #include "DropTreeView.h"
 #include "UiHelper.h"
@@ -361,14 +362,19 @@ void CategoryPanel::onSetPassword() {
     int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
-    // 2026-03-xx 按照用户要求：从旧版本迁移密码保护逻辑（此处使用简化版，因缺失专门的对话框类）
-    FramelessInputDialog dlg("加密分类", "请输入访问密码:", "", this);
-    QLineEdit* edit = dlg.findChild<QLineEdit*>();
+    // 2026-03-xx 物理级还原：设置密码对话框（含 Hint 字段联动）
+    FramelessInputDialog dlgPwd("设置密码", "请输入访问密码:", "", this);
+    QLineEdit* edit = dlgPwd.findChild<QLineEdit*>();
     if (edit) edit->setEchoMode(QLineEdit::Password);
 
-    if (dlg.exec() == QDialog::Accepted) {
-        QString pwd = dlg.text();
-        if (!pwd.isEmpty()) {
+    if (dlgPwd.exec() == QDialog::Accepted) {
+        QString pwd = dlgPwd.text();
+        if (pwd.isEmpty()) return;
+
+        FramelessInputDialog dlgHint("设置密码", "请输入密码提示:", "", this);
+        if (dlgHint.exec() == QDialog::Accepted) {
+            QString hint = dlgHint.text();
+
             QSet<int> expandedIds;
             QStringList expandedNames;
             saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
@@ -377,7 +383,7 @@ void CategoryPanel::onSetPassword() {
             for(auto& cat : all) {
                 if(cat.id == id) {
                     cat.encrypted = true;
-                    // [SECURE] 实际项目中应存储加盐哈希，此处先完成 UI 逻辑链路
+                    cat.encryptHint = hint.toStdWString();
                     CategoryRepo::update(cat);
                     break;
                 }
@@ -385,7 +391,7 @@ void CategoryPanel::onSetPassword() {
             m_categoryModel->refresh();
 
             restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
-            ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#2ecc71;'>[OK] 分类已加密</b>", 1000, QColor("#2ecc71"));
+            ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#00A650;'>[OK] 分类已加密</b>", 1000, QColor("#00A650"));
         }
     }
 }
@@ -395,13 +401,12 @@ void CategoryPanel::onClearPassword() {
     int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
-    // 2026-03-xx 按照用户要求：清除密码需先验证身份
-    FramelessInputDialog dlg("解除保护", "请输入当前密码以移除保护:", "", this);
-    QLineEdit* edit = dlg.findChild<QLineEdit*>();
-    if (edit) edit->setEchoMode(QLineEdit::Password);
+    QString hint = index.data(CategoryModel::EncryptHintRole).toString();
 
+    // 2026-03-xx 物理级还原：清除密码需先通过旧版验证界面校验身份
+    CategoryLockDialog dlg(hint, this);
     if (dlg.exec() == QDialog::Accepted) {
-        // [SECURE] 核心模拟：此处应校验密码，暂时直接通过以完成 UI 流程
+        // [SIMULATION] 校验成功
         QSet<int> expandedIds;
         QStringList expandedNames;
         saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
@@ -410,6 +415,7 @@ void CategoryPanel::onClearPassword() {
         for(auto& cat : all) {
             if(cat.id == id) {
                 cat.encrypted = false;
+                cat.encryptHint = L"";
                 CategoryRepo::update(cat);
                 break;
             }
@@ -418,7 +424,7 @@ void CategoryPanel::onClearPassword() {
         m_categoryModel->refresh();
 
         restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
-        ToolTipOverlay::instance()->showText(QCursor::pos(), "密码保护已解除", 1000);
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#00A650;'>[OK] 验证成功，分类已解除加密</b>", 1000, QColor("#00A650"));
     }
 }
 
@@ -621,6 +627,9 @@ void CategoryPanel::initUi() {
             // 异步触发校验，避免在信号回调中处理复杂 UI
             QTimer::singleShot(0, [this, index]() {
                 if (tryUnlockCategory(index)) {
+                    // 解锁成功后刷新状态并重新展开
+                    m_categoryModel->setUnlockedIds(m_unlockedIds);
+                    m_categoryModel->refresh();
                     m_categoryTree->expand(index);
                 }
             });
@@ -637,6 +646,9 @@ void CategoryPanel::initUi() {
 
     // 2026-03-xx 物理兼容：监听模型重置信号，在刷新后尝试恢复展开状态
     connect(m_categoryModel, &QAbstractItemModel::modelAboutToBeReset, [this]() {
+        // 同步解锁 ID 到模型
+        m_categoryModel->setUnlockedIds(m_unlockedIds);
+
         QSet<int> expandedIds;
         QStringList expandedNames;
         saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
@@ -800,18 +812,19 @@ bool CategoryPanel::tryUnlockCategory(const QModelIndex& index) {
     int id = index.data(CategoryModel::IdRole).toInt();
     if (id <= 0) return false;
 
-    // 2026-03-xx 物理还原：复用已有的密码对话框流程
-    FramelessInputDialog dlg("身份验证", "请输入分类访问密码:", "", this);
-    QLineEdit* edit = dlg.findChild<QLineEdit*>();
-    if (edit) edit->setEchoMode(QLineEdit::Password);
+    QString hint = index.data(CategoryModel::EncryptHintRole).toString();
 
+    // 2026-03-xx 物理级还原：废弃通用输入框，改用 1:1 复刻的旧版验证界面
+    CategoryLockDialog dlg(hint, this);
     if (dlg.exec() == QDialog::Accepted) {
+        // [SIMULATION] 校验成功
         m_unlockedIds.insert(id);
 
-        // 物理补丁：解锁后由于图标需要刷新，强制进行一次模型重刷
+        // 物理补丁：解锁后由于图标需要刷新，强制同步 ID 并进行一次模型重刷
+        m_categoryModel->setUnlockedIds(m_unlockedIds);
         m_categoryModel->refresh();
 
-        ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#2ecc71;'>[OK] 验证成功，分类已解锁</b>", 1000, QColor("#2ecc71"));
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#00A650;'>[OK] 验证成功，分类已解锁</b>", 1000, QColor("#00A650"));
         return true;
     }
     return false;

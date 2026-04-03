@@ -52,6 +52,8 @@ list(APPEND SOURCES
     "src/ui/DropListView.h"
     "src/ui/DropListView.cpp"
     "src/ui/TreeItemDelegate.h"
+    "src/ui/CategoryLockDialog.h"
+    "src/ui/CategoryLockDialog.cpp"
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
