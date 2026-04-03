@@ -135,8 +135,9 @@ int CategoryRepo::getUniqueItemCount() {
 
 int CategoryRepo::getUncategorizedItemCount() {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
-    // 物理修复：避免出现负数，仅统计存在于 items 表且未删除、同时不在任何分类中的项目
-    QSqlQuery q("SELECT COUNT(*) FROM items WHERE deleted=0 AND path NOT IN (SELECT DISTINCT item_path FROM category_items)", db);
+    // 2026-03-xx 物理修复：统计存在于 items 表且未删除、同时不在任何自定义分类中的项目数量
+    // 逻辑：所有非删除项目 - 已关联分类的项目（去重）
+    QSqlQuery q("SELECT (SELECT COUNT(*) FROM items WHERE deleted=0) - (SELECT COUNT(DISTINCT item_path) FROM category_items WHERE item_path IN (SELECT path FROM items WHERE deleted=0))", db);
     if (q.next()) return q.value(0).toInt();
     return 0; 
 }

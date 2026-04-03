@@ -73,6 +73,10 @@ void Database::createTables() {
     q.exec("CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER DEFAULT 0, name TEXT NOT NULL, color TEXT DEFAULT '', preset_tags TEXT DEFAULT '', sort_order INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, encrypted INTEGER DEFAULT 0, encrypt_salt TEXT DEFAULT '', encrypt_iv TEXT DEFAULT '', encrypt_verify_hash TEXT DEFAULT '', encrypt_hint TEXT DEFAULT '', created_at REAL)");
     q.exec("CREATE TABLE IF NOT EXISTS category_items (category_id INTEGER, item_path TEXT, added_at REAL, PRIMARY KEY (category_id, item_path))");
     q.exec("CREATE TABLE IF NOT EXISTS sync_state (key TEXT PRIMARY KEY, value TEXT)");
+
+    // 紧急补丁：由于 CREATE TABLE IF NOT EXISTS 不会修改已存在的表，
+    // 显式检查并添加缺失的 encrypt_hint 字段，防止查询挂掉。
+    q.exec("ALTER TABLE categories ADD COLUMN encrypt_hint TEXT DEFAULT ''");
 }
 
 void Database::createIndexes() {
