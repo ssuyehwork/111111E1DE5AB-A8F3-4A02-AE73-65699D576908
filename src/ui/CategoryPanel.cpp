@@ -60,7 +60,8 @@ void CategoryPanel::setupContextMenu() {
                            "QMenu::separator { height: 1px; background: #444; margin: 4px 8px; }");
 
         // 基于规范逻辑：如果没有选中项，或者选中了“我的分类”根节点
-        if (!index.isValid() || index.data(CategoryModel::NameRole).toString() == "我的分类") {
+        QString itemName = index.data(CategoryModel::NameRole).toString();
+        if (!index.isValid() || itemName == "我的分类") {
             menu.addAction(UiHelper::getIcon("add", QColor("#aaaaaa"), 18), "新建分类", this, &CategoryPanel::onCreateCategory);
             
             auto* sortMenu = menu.addMenu(UiHelper::getIcon("list_ul", QColor("#aaaaaa"), 18), "排列");
@@ -68,10 +69,11 @@ void CategoryPanel::setupContextMenu() {
             sortMenu->addAction("标题(全部) (A→Z)", this, &CategoryPanel::onSortAllByNameAsc);
             sortMenu->addAction("标题(全部) (Z→A)", this, &CategoryPanel::onSortAllByNameDesc);
         } else {
-            // 2026-03-xx 按照用户要求：打破类型封锁，无论是 category 还是物理项都弹出完整菜单（“它们都是分类”）
+            // 2026-03-xx 按照用户要求：补全子层级（子分类、文件、文件夹）的右键菜单
             QString type = index.data(CategoryModel::TypeRole).toString();
+
+            // 只要不是系统根节点，都弹出完整菜单
             if (type == "category" || type == "file" || type == "folder") {
-                // 2026-03-xx 按照用户要求：彻底移除“新建数据”选项
                 menu.addAction(UiHelper::getIcon("branch", QColor("#3498db"), 18), "归类到此分类", this, &CategoryPanel::onClassifyToCategory);
                 
                 menu.addSeparator();
@@ -608,6 +610,21 @@ void CategoryPanel::initUi() {
             m_categoryTree->setExpanded(idx, true);
         }
     }
+
+    // 2026-03-xx 物理兼容：监听模型重置信号，在刷新后尝试恢复展开状态
+    connect(m_categoryModel, &QAbstractItemModel::modelAboutToBeReset, [this]() {
+        QSet<int> expandedIds;
+        QStringList expandedNames;
+        saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+        m_categoryTree->setProperty("expandedIds", QVariant::fromValue(expandedIds));
+        m_categoryTree->setProperty("expandedNames", expandedNames);
+    });
+
+    connect(m_categoryModel, &QAbstractItemModel::modelReset, [this]() {
+        QSet<int> expandedIds = m_categoryTree->property("expandedIds").value<QSet<int>>();
+        QStringList expandedNames = m_categoryTree->property("expandedNames").toStringList();
+        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+    });
 
     connect(m_categoryTree, &QTreeView::clicked, [this](const QModelIndex& index) {
         QString type = index.data(CategoryModel::TypeRole).toString();
