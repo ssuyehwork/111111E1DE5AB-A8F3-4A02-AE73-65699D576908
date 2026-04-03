@@ -63,6 +63,12 @@ private:
      */
     int getTargetCategoryId(const QModelIndex& index);
 
+    /**
+     * @brief 2026-03-xx 持久化记忆：保存与加载展开状态到 QSettings
+     */
+    void saveExpandedStateToSettings();
+    void loadExpandedStateFromSettings();
+
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     

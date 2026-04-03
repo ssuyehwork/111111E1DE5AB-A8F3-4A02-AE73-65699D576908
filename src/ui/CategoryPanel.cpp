@@ -616,13 +616,19 @@ void CategoryPanel::initUi() {
         QSet<int> expandedIds;
         QStringList expandedNames;
         saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
-        m_categoryTree->setProperty("expandedIds", QVariant::fromValue(expandedIds));
+
+        QList<int> idList;
+        for (int id : expandedIds) idList << id;
+        m_categoryTree->setProperty("expandedIds", QVariant::fromValue(idList));
         m_categoryTree->setProperty("expandedNames", expandedNames);
     });
 
     connect(m_categoryModel, &QAbstractItemModel::modelReset, [this]() {
-        QSet<int> expandedIds = m_categoryTree->property("expandedIds").value<QSet<int>>();
+        QList<int> idList = m_categoryTree->property("expandedIds").value<QList<int>>();
         QStringList expandedNames = m_categoryTree->property("expandedNames").toStringList();
+
+        QSet<int> expandedIds;
+        for (int id : idList) expandedIds.insert(id);
         restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
     });
 
@@ -727,6 +733,36 @@ void CategoryPanel::initUi() {
     
     sbContentLayout->addWidget(m_categoryTree);
     m_mainLayout->addWidget(sbContent, 1);
+
+    // 2026-03-xx 物理记忆：初始化后加载持久化的展开状态
+    QTimer::singleShot(100, this, &CategoryPanel::loadExpandedStateFromSettings);
+
+    // 2026-03-xx 物理记忆：连接展开/折叠信号，实时持久化
+    connect(m_categoryTree, &QTreeView::expanded, this, &CategoryPanel::saveExpandedStateToSettings);
+    connect(m_categoryTree, &QTreeView::collapsed, this, &CategoryPanel::saveExpandedStateToSettings);
+}
+
+void CategoryPanel::saveExpandedStateToSettings() {
+    QSet<int> ids;
+    QStringList names;
+    saveExpandedState(m_categoryTree, QModelIndex(), ids, names);
+
+    QSettings settings("ArcMeta团队", "ArcMeta");
+    QList<QVariant> idList;
+    for (int id : ids) idList << id;
+    settings.setValue("Category/ExpandedIds", idList);
+    settings.setValue("Category/ExpandedNames", names);
+}
+
+void CategoryPanel::loadExpandedStateFromSettings() {
+    QSettings settings("ArcMeta团队", "ArcMeta");
+    QList<QVariant> idList = settings.value("Category/ExpandedIds").toList();
+    QStringList names = settings.value("Category/ExpandedNames").toStringList();
+
+    QSet<int> ids;
+    for (const auto& v : idList) ids.insert(v.toInt());
+
+    restoreExpandedState(m_categoryTree, QModelIndex(), ids, names);
 }
 
 bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
