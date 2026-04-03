@@ -96,7 +96,8 @@ void CategoryModel::refresh() {
             if (id == extensionTargetId) {
                 item->setIcon(UiHelper::getIcon("toggle_right", QColor(color), 16));
             } else if (cat.encrypted) {
-                // 物理还原：加密且锁定时显示灰色 lock
+                // 物理补丁：根据解锁状态动态切换图标
+                // 由于 Model 无法访问 Panel 的 m_unlockedIds，此处逻辑暂留 UI 层处理或通过 DataRole 传递
                 item->setIcon(UiHelper::getIcon("lock", QColor("#aaaaaa"), 16));
             } else if (cat.pinned) {
                 item->setIcon(UiHelper::getIcon("pin_vertical", QColor(color), 16));

@@ -69,11 +69,20 @@ private:
     void saveExpandedStateToSettings();
     void loadExpandedStateFromSettings();
 
+    /**
+     * @brief 2026-03-xx 安全逻辑：尝试解锁分类
+     * @return 是否解锁成功
+     */
+    bool tryUnlockCategory(const QModelIndex& index);
+
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     
     DropTreeView* m_categoryTree = nullptr;
     CategoryModel* m_categoryModel = nullptr;
+
+    // 2026-03-xx 会话级解锁列表：存储当前已验证通过的加密分类 ID
+    QSet<int> m_unlockedIds;
 };
 
 } // namespace ArcMeta

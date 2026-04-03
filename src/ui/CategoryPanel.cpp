@@ -144,22 +144,29 @@ static void saveExpandedState(QTreeView* tree, const QModelIndex& parent, QSet<i
 
 /**
  * @brief 递归恢复 QTreeView 的展开状态
+ * 2026-03-xx 物理拦截：加密且未解锁的分类在恢复时强制跳过展开
  */
-static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds, const QStringList& expandedNames) {
+static void restoreExpandedState(QTreeView* tree, const QModelIndex& parent, const QSet<int>& expandedIds, const QStringList& expandedNames, const QSet<int>& unlockedIds) {
     if (!tree || !tree->model()) return;
     for (int i = 0; i < tree->model()->rowCount(parent); ++i) {
         QModelIndex idx = tree->model()->index(i, 0, parent);
         int id = idx.data(CategoryModel::IdRole).toInt();
         QString name = idx.data(CategoryModel::NameRole).toString();
+        bool isEncrypted = idx.data(CategoryModel::EncryptedRole).toBool();
         
         bool shouldExpand = false;
         if (expandedNames.contains(name) || (id > 0 && expandedIds.contains(id)) || name == "我的分类") {
-            shouldExpand = true;
+            // 物理硬核防御：如果是加密分类且未在当前会话解锁，则无视记忆，强制不展开
+            if (isEncrypted && id > 0 && !unlockedIds.contains(id)) {
+                shouldExpand = false;
+            } else {
+                shouldExpand = true;
+            }
         }
 
         if (shouldExpand) {
             tree->setExpanded(idx, true);
-            restoreExpandedState(tree, idx, expandedIds, expandedNames);
+            restoreExpandedState(tree, idx, expandedIds, expandedNames, unlockedIds);
         }
     }
 }
@@ -181,7 +188,7 @@ void CategoryPanel::onCreateCategory() {
             CategoryRepo::add(cat);
             m_categoryModel->refresh();
 
-            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
         }
     }
 }
@@ -208,7 +215,7 @@ void CategoryPanel::onCreateSubCategory() {
             CategoryRepo::add(cat);
             m_categoryModel->refresh();
 
-            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
         }
     }
 }
@@ -227,7 +234,7 @@ void CategoryPanel::onClassifyToCategory() {
 
     m_categoryModel->refresh();
 
-    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
 
     QString name = index.data(CategoryModel::NameRole).toString();
     ToolTipOverlay::instance()->showText(QCursor::pos(), QString("已设为归类目标: %1").arg(name), 1000);
@@ -257,7 +264,7 @@ void CategoryPanel::onSetColor() {
 
     m_categoryModel->refresh();
 
-    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
     
     ToolTipOverlay::instance()->showText(QCursor::pos(), "分类颜色已更新", 1000);
 }
@@ -290,7 +297,7 @@ void CategoryPanel::onRandomColor() {
 
     m_categoryModel->refresh();
 
-    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
 }
 
 void CategoryPanel::onSetPresetTags() {
@@ -319,7 +326,7 @@ void CategoryPanel::onSetPresetTags() {
         CategoryRepo::update(current);
         m_categoryModel->refresh();
 
-        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
         ToolTipOverlay::instance()->showText(QCursor::pos(), "预设标签已更新", 1000);
     }
 }
@@ -346,7 +353,7 @@ void CategoryPanel::onTogglePin() {
 
     m_categoryModel->refresh();
 
-    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+    restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
 }
 
 void CategoryPanel::onSetPassword() {
@@ -377,7 +384,7 @@ void CategoryPanel::onSetPassword() {
             }
             m_categoryModel->refresh();
 
-            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
             ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#2ecc71;'>[OK] 分类已加密</b>", 1000, QColor("#2ecc71"));
         }
     }
@@ -410,7 +417,7 @@ void CategoryPanel::onClearPassword() {
 
         m_categoryModel->refresh();
 
-        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
         ToolTipOverlay::instance()->showText(QCursor::pos(), "密码保护已解除", 1000);
     }
 }
@@ -445,7 +452,7 @@ void CategoryPanel::onDeleteCategory() {
                 CategoryRepo::removeItemFromCategory(parentCatId, path.toStdWString());
                 m_categoryModel->refresh();
 
-                restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+                restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
                 ToolTipOverlay::instance()->showText(QCursor::pos(), "已从该分类中解除关联", 1000);
             }
             return;
@@ -459,7 +466,7 @@ void CategoryPanel::onDeleteCategory() {
             ArcMeta::CategoryRepo::remove(id);
             m_categoryModel->refresh();
 
-            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
         }
     }
 }
@@ -603,6 +610,23 @@ void CategoryPanel::initUi() {
     m_categoryTree->setDefaultDropAction(Qt::MoveAction);
     m_categoryTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
+    // 2026-03-xx 物理拦截：严禁加密分类在未解锁时被展开
+    connect(m_categoryTree, &QTreeView::expanded, [this](const QModelIndex& index) {
+        int id = index.data(CategoryModel::IdRole).toInt();
+        bool isEncrypted = index.data(CategoryModel::EncryptedRole).toBool();
+
+        if (isEncrypted && id > 0 && !m_unlockedIds.contains(id)) {
+            // 物理阻断：立即折叠，防止闪烁
+            m_categoryTree->collapse(index);
+            // 异步触发校验，避免在信号回调中处理复杂 UI
+            QTimer::singleShot(0, [this, index]() {
+                if (tryUnlockCategory(index)) {
+                    m_categoryTree->expand(index);
+                }
+            });
+        }
+    });
+
     // 默认展开“我的分类”
     for (int i = 0; i < m_categoryModel->rowCount(); ++i) {
         QModelIndex idx = m_categoryModel->index(i, 0);
@@ -636,6 +660,13 @@ void CategoryPanel::initUi() {
         QString type = index.data(CategoryModel::TypeRole).toString();
         QString name = index.data(CategoryModel::NameRole).toString();
         int id = index.data(CategoryModel::IdRole).toInt();
+        bool isEncrypted = index.data(CategoryModel::EncryptedRole).toBool();
+
+        // 2026-03-xx 物理防御：加密分类点击时触发校验
+        if (isEncrypted && id > 0 && !m_unlockedIds.contains(id)) {
+            tryUnlockCategory(index);
+            return;
+        }
 
         // 核心联动：如果点击的是分类节点
         if (type == "category") {
@@ -727,7 +758,7 @@ void CategoryPanel::initUi() {
             // 物理联动：强制刷新模型以触发 CategoryRepo::getCounts/getSystemCounts 重新统计
             m_categoryModel->refresh();
 
-            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
         }
     });
     
@@ -762,7 +793,28 @@ void CategoryPanel::loadExpandedStateFromSettings() {
     QSet<int> ids;
     for (const auto& v : idList) ids.insert(v.toInt());
 
-    restoreExpandedState(m_categoryTree, QModelIndex(), ids, names);
+    restoreExpandedState(m_categoryTree, QModelIndex(), ids, names, m_unlockedIds);
+}
+
+bool CategoryPanel::tryUnlockCategory(const QModelIndex& index) {
+    int id = index.data(CategoryModel::IdRole).toInt();
+    if (id <= 0) return false;
+
+    // 2026-03-xx 物理还原：复用已有的密码对话框流程
+    FramelessInputDialog dlg("身份验证", "请输入分类访问密码:", "", this);
+    QLineEdit* edit = dlg.findChild<QLineEdit*>();
+    if (edit) edit->setEchoMode(QLineEdit::Password);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        m_unlockedIds.insert(id);
+
+        // 物理补丁：解锁后由于图标需要刷新，强制进行一次模型重刷
+        m_categoryModel->refresh();
+
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#2ecc71;'>[OK] 验证成功，分类已解锁</b>", 1000, QColor("#2ecc71"));
+        return true;
+    }
+    return false;
 }
 
 bool CategoryPanel::eventFilter(QObject* obj, QEvent* event) {
