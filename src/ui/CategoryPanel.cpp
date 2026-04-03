@@ -653,7 +653,7 @@ void CategoryPanel::initUi() {
 
         QSet<int> expandedIds;
         for (int id : idList) expandedIds.insert(id);
-        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
+        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
     });
 
     connect(m_categoryTree, &QTreeView::clicked, [this](const QModelIndex& index) {
