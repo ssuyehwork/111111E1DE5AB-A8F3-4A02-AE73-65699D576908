@@ -107,10 +107,14 @@ void CategoryPanel::setupContextMenu() {
                 auto* pwdMenu = menu.addMenu(UiHelper::getIcon("lock", QColor("#aaaaaa"), 18), "密码保护");
                 pwdMenu->setStyleSheet(menu.styleSheet());
 
-                bool hasPassword = index.data(CategoryModel::IdRole).toInt() > 0 && index.data(CategoryModel::TypeRole).toString() == "category" && index.data(Qt::DecorationRole).isValid(); // 暂用此判断
-                // [CRITICAL] 这里仅实装设置与清除，暂不支持“修改”和“立即锁定”，因底层 DB 表结构有限
-                pwdMenu->addAction("设置密码", this, &CategoryPanel::onSetPassword);
-                pwdMenu->addAction("清除密码", this, &CategoryPanel::onClearPassword);
+                // 2026-03-xx 按照用户要求：通过 EncryptedRole 动态判断显示“设置”或“清除”
+                bool isEncrypted = index.data(CategoryModel::EncryptedRole).toBool();
+
+                if (!isEncrypted) {
+                    pwdMenu->addAction("设置密码", this, &CategoryPanel::onSetPassword);
+                } else {
+                    pwdMenu->addAction("清除密码", this, &CategoryPanel::onClearPassword);
+                }
             }
         }
         

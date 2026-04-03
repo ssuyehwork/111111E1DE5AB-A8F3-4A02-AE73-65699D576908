@@ -93,6 +93,7 @@ void CategoryModel::refresh() {
             item->setData(color, ColorRole);
             item->setData(name, NameRole);
             item->setData(cat.pinned, PinnedRole);
+            item->setData(cat.encrypted, EncryptedRole);
             item->setFlags(item->flags() | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
             
             if (id == extensionTargetId) {
