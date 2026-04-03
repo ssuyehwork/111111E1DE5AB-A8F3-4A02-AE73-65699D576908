@@ -1,6 +1,7 @@
 #include "CategoryPanel.h"
 #include "CategoryModel.h"
 #include "CategoryLockDialog.h"
+#include "CategorySetPasswordDialog.h"
 #include "CategoryDelegate.h"
 #include "DropTreeView.h"
 #include "UiHelper.h"
@@ -362,37 +363,30 @@ void CategoryPanel::onSetPassword() {
     int id = getTargetCategoryId(index);
     if (id <= 0) return;
 
-    // 2026-03-xx 物理级还原：设置密码对话框（含 Hint 字段联动）
-    FramelessInputDialog dlgPwd("设置密码", "请输入访问密码:", "", this);
-    QLineEdit* edit = dlgPwd.findChild<QLineEdit*>();
-    if (edit) edit->setEchoMode(QLineEdit::Password);
+    // 2026-03-xx 物理级 1:1 还原：废弃通用输入框，调用三字段密码对话框
+    CategorySetPasswordDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        QString pwd = dlg.password();
+        QString hint = dlg.hint();
 
-    if (dlgPwd.exec() == QDialog::Accepted) {
-        QString pwd = dlgPwd.text();
-        if (pwd.isEmpty()) return;
+        QSet<int> expandedIds;
+        QStringList expandedNames;
+        saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
-        FramelessInputDialog dlgHint("设置密码", "请输入密码提示:", "", this);
-        if (dlgHint.exec() == QDialog::Accepted) {
-            QString hint = dlgHint.text();
-
-            QSet<int> expandedIds;
-            QStringList expandedNames;
-            saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
-
-            auto all = CategoryRepo::getAll();
-            for(auto& cat : all) {
-                if(cat.id == id) {
-                    cat.encrypted = true;
-                    cat.encryptHint = hint.toStdWString();
-                    CategoryRepo::update(cat);
-                    break;
-                }
+        auto all = CategoryRepo::getAll();
+        for(auto& cat : all) {
+            if(cat.id == id) {
+                cat.encrypted = true;
+                cat.encryptHint = hint.toStdWString();
+                CategoryRepo::update(cat);
+                break;
             }
-            m_categoryModel->refresh();
-
-            restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
-            ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#00A650;'>[OK] 分类已加密</b>", 1000, QColor("#00A650"));
         }
+
+        m_categoryModel->refresh();
+
+        restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "<b style='color:#00A650;'>[OK] 分类已加密</b>", 1000, QColor("#00A650"));
     }
 }
 

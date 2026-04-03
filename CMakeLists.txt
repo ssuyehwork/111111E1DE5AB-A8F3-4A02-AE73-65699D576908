@@ -54,6 +54,8 @@ list(APPEND SOURCES
     "src/ui/TreeItemDelegate.h"
     "src/ui/CategoryLockDialog.h"
     "src/ui/CategoryLockDialog.cpp"
+    "src/ui/CategorySetPasswordDialog.h"
+    "src/ui/CategorySetPasswordDialog.cpp"
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)

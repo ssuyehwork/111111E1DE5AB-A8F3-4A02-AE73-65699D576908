@@ -49,9 +49,6 @@ void CategoryModel::refresh() {
         addSystemItem("今日数据", "today", "today", "#2ecc71");
         addSystemItem("昨日数据", "yesterday", "today", "#f39c12");
         addSystemItem("最近访问", "recently_visited", "clock", "#9b59b6");
-        addSystemItem("未分类", "uncategorized", "folder", "#aaaaaa");
-        addSystemItem("未标签", "untagged", "tag", "#aaaaaa");
-        addSystemItem("收藏", "bookmark", "star", "#f1c40f");
         addSystemItem("回收站", "trash", "trash", "#e74c3c");
     }
     
