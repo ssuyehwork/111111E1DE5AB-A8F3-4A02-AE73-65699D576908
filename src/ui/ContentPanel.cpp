@@ -1049,8 +1049,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     textFont.setPointSize(8);
     textFont.setBold(false);
     painter->setFont(textFont);
-    // 2026-03-xx 按照用户要求：开启名称自动换行渲染
-    painter->drawText(nameRect.adjusted(4, 0, -4, 0), Qt::AlignCenter | Qt::TextWordBreak, name);
+    // 2026-03-xx 按照用户要求：开启名称自动换行渲染 (修复编译标识符未声明错误)
+    painter->drawText(nameRect.adjusted(4, 0, -4, 0), static_cast<int>(Qt::AlignCenter) | static_cast<int>(Qt::TextWordBreak), name);
 
     painter->restore();
 }
