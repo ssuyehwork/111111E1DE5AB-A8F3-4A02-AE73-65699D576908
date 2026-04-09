@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 project(ArcMeta)
 
+# 2026-03-xx 按照用户要求：将 Release 模式设为预设（默认）构建模式
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -13,7 +18,9 @@ endif()
 
 # 强制 MSVC 编译器及选项 (文档红线: /W4 /O2)
 if(MSVC)
-    add_compile_options(/W4 /O2 /utf-8)
+    add_compile_options(/W4 /utf-8)
+    # 2026-03-xx 按照用户反馈修复编译选项冲突：仅在非 Debug 模式下应用 /O2 优化，防止与 /RTC1 冲突
+    add_compile_options("$<$<NOT:$<CONFIG:Debug>>:/O2>")
 endif()
 
 # Qt 6 基础组件
