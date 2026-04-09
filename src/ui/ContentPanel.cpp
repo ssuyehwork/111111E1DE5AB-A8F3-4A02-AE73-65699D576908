@@ -275,8 +275,9 @@ void ContentPanel::updateGridSize() {
     m_zoomLevel = qBound(32, m_zoomLevel, 128);
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
-    int cardW = m_zoomLevel + 30; 
-    int cardH = m_zoomLevel + 60; 
+    // 2026-03-xx 按照用户要求：增加网格项高度以适配换行名称，并同比例增加宽度
+    int cardW = m_zoomLevel + 50;
+    int cardH = m_zoomLevel + 80;
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
 
@@ -468,7 +469,8 @@ void ContentPanel::initGridView() {
     m_gridView->setResizeMode(QListView::Adjust);
     m_gridView->setWrapping(true);
     m_gridView->setIconSize(QSize(96, 96));
-    m_gridView->setGridSize(QSize(126, 156)); 
+    // 2026-03-xx 按照用户要求：初始化网格尺寸，适配换行名称比例
+    m_gridView->setGridSize(QSize(146, 176));
     m_gridView->setSpacing(0);
     m_gridView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_gridView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -983,7 +985,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    int nameH = 18;
+    // 2026-03-xx 按照用户要求：增加名称高度为 36px 以容纳两行文字
+    int nameH = 36;
     int gap1 = 6;
     int gap2 = 4;
     
@@ -1046,7 +1049,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     textFont.setPointSize(8);
     textFont.setBold(false);
     painter->setFont(textFont);
-    painter->drawText(nameRect.adjusted(4, 0, -4, 0), Qt::AlignCenter | Qt::ElideRight, name);
+    // 2026-03-xx 按照用户要求：开启名称自动换行渲染
+    painter->drawText(nameRect.adjusted(4, 0, -4, 0), Qt::AlignCenter | Qt::TextWordBreak, name);
 
     painter->restore();
 }
@@ -1087,7 +1091,7 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             if (baseIconSize <= 0) baseIconSize = 64; 
             int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
             int ratingH = 12;
-            int nameH = 18;
+            int nameH = 36;
             int gap1 = 6;
             int gap2 = 4;
             int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
@@ -1184,7 +1188,7 @@ void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionV
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    int nameH = 18;
+    int nameH = 36;
     int gap1 = 6;
     int gap2 = 4;
     
