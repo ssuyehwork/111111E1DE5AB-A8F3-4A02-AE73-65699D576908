@@ -374,6 +374,11 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
                     if (!paths.isEmpty()) QApplication::clipboard()->setText(paths.join("\r\n"));
                     return true;
                 }
+                // 2026-03-xx 按照用户要求：补全批量重命名 (Ctrl+Shift+R) 快捷键绑定
+                if (keyEvent->key() == Qt::Key_R) {
+                    performBatchRename();
+                    return true;
+                }
             }
 
             if (keyEvent->key() == Qt::Key_F2) {
@@ -386,36 +391,19 @@ bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
             }
             
             if (keyEvent->modifiers() & Qt::ControlModifier) {
+                // 2026-03-xx 按照用户要求：逻辑重构，统一调用 performCopy 业务函数
                 if (keyEvent->key() == Qt::Key_C && !(keyEvent->modifiers() & Qt::ShiftModifier)) {
-                    QList<QUrl> urls;
-                    auto indexes = view->selectionModel()->selectedIndexes();
-                    for (const auto& idx : indexes) if (idx.column() == 0) urls << QUrl::fromLocalFile(idx.data(PathRole).toString());
-                    if (!urls.isEmpty()) {
-                        QMimeData* mime = new QMimeData();
-                        mime->setUrls(urls);
-                        QApplication::clipboard()->setMimeData(mime);
-                    }
+                    performCopy(false);
                     return true;
                 }
+                // 2026-03-xx 按照用户要求：实现剪切逻辑 (Ctrl+X)
+                if (keyEvent->key() == Qt::Key_X) {
+                    performCopy(true);
+                    return true;
+                }
+                // 2026-03-xx 按照用户要求：逻辑重构，统一调用 performPaste 业务函数
                 if (keyEvent->key() == Qt::Key_V) {
-                    const QMimeData* mime = QApplication::clipboard()->mimeData();
-                    if (mime && mime->hasUrls()) {
-                        QList<QUrl> urls = mime->urls();
-                        std::wstring fromPaths;
-                        for (const QUrl& url : urls) {
-                            fromPaths += QDir::toNativeSeparators(url.toLocalFile()).toStdWString() + L'\0';
-                        }
-                        if (!fromPaths.empty()) {
-                            fromPaths += L'\0';
-                            std::wstring toPath = m_currentPath.toStdWString() + L'\0' + L'\0';
-                            SHFILEOPSTRUCTW fileOp = { 0 };
-                            fileOp.wFunc = FO_COPY;
-                            fileOp.pFrom = fromPaths.c_str();
-                            fileOp.pTo = toPath.c_str();
-                            fileOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
-                            if (SHFileOperationW(&fileOp) == 0) loadDirectory(m_currentPath);
-                        }
-                    }
+                    performPaste();
                     return true;
                 }
             }
@@ -571,13 +559,13 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     cryptoMenu->addAction("修改密码");
     
     menu.addSeparator();
-    menu.addAction("批量重命名 (Ctrl+Shift+R)");
+    QAction* actBatchRename = menu.addAction("批量重命名 (Ctrl+Shift+R)");
     menu.addSeparator();
     
     menu.addAction("重命名");
-    menu.addAction("复制");
-    menu.addAction("剪切");
-    menu.addAction("粘贴");
+    QAction* actCopy = menu.addAction("复制");
+    QAction* actCut  = menu.addAction("剪切");
+    QAction* actPaste = menu.addAction("粘贴");
     menu.addAction("删除（移入回收站）");
     menu.addSeparator();
     
@@ -605,6 +593,14 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         QApplication::clipboard()->setText(QDir::toNativeSeparators(path));
     } else if (actionText == "重命名") {
         view->edit(currentIndex);
+    } else if (selectedAction == actCopy) {
+        performCopy(false);
+    } else if (selectedAction == actCut) {
+        performCopy(true);
+    } else if (selectedAction == actPaste) {
+        performPaste();
+    } else if (selectedAction == actBatchRename) {
+        performBatchRename();
     } else if (actionText.startsWith("删除")) {
         std::wstring wpath = path.toStdWString() + L'\0' + L'\0';
         SHFILEOPSTRUCTW fileOp = { 0 };
@@ -634,6 +630,100 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         ShellExecuteExW(&sei);
     } else if (actionText == "打开" || actionText == "用系统默认程序打开") {
         onDoubleClicked(currentIndex);
+    }
+}
+
+void ContentPanel::performCopy(bool cutMode) {
+    // 2026-03-xx 按照用户要求：封装标准化文件复制/剪切逻辑
+    QModelIndexList indexes = getSelectedIndexes();
+    QList<QUrl> urls;
+    for (const auto& idx : indexes) {
+        if (idx.column() == 0) {
+            QString path = idx.data(PathRole).toString();
+            if (!path.isEmpty()) urls << QUrl::fromLocalFile(path);
+        }
+    }
+
+    if (urls.isEmpty()) return;
+
+    QMimeData* mime = new QMimeData();
+    mime->setUrls(urls);
+
+    if (cutMode) {
+        // 核心规范：告知系统这是剪切操作 (DROPEFFECT_MOVE = 2)
+        QByteArray data;
+        data.append((char)2);
+        mime->setData("Preferred DropEffect", data);
+    }
+
+    QApplication::clipboard()->setMimeData(mime);
+}
+
+void ContentPanel::performPaste() {
+    // 2026-03-xx 按照用户要求：封装标准化文件粘贴逻辑，对接 Windows Shell
+    if (m_currentPath.isEmpty() || m_currentPath == "computer://") return;
+
+    const QMimeData* mime = QApplication::clipboard()->mimeData();
+    if (!mime || !mime->hasUrls()) return;
+
+    QList<QUrl> urls = mime->urls();
+    std::wstring fromPaths;
+    for (const QUrl& url : urls) {
+        fromPaths += QDir::toNativeSeparators(url.toLocalFile()).toStdWString() + L'\0';
+    }
+
+    if (fromPaths.empty()) return;
+    fromPaths += L'\0';
+
+    // 探测是否为剪切模式
+    bool isMove = false;
+    if (mime->hasFormat("Preferred DropEffect")) {
+        QByteArray effect = mime->data("Preferred DropEffect");
+        if (!effect.isEmpty() && (effect.at(0) & 0x02)) isMove = true;
+    }
+
+    std::wstring toPath = m_currentPath.toStdWString() + L'\0' + L'\0';
+    SHFILEOPSTRUCTW fileOp = { 0 };
+    fileOp.wFunc = isMove ? FO_MOVE : FO_COPY;
+    fileOp.pFrom = fromPaths.c_str();
+    fileOp.pTo = toPath.c_str();
+    fileOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
+
+    if (SHFileOperationW(&fileOp) == 0) {
+        loadDirectory(m_currentPath, m_isRecursive);
+    }
+}
+
+void ContentPanel::performBatchRename() {
+    // 2026-03-xx 按照用户要求：填补批量重命名空壳，对接 BatchRenameEngine
+    QModelIndexList indexes = getSelectedIndexes();
+    std::vector<std::wstring> originalPaths;
+    for (const auto& idx : indexes) {
+        if (idx.column() == 0) {
+            QString path = idx.data(PathRole).toString();
+            if (!path.isEmpty()) originalPaths.push_back(path.toStdWString());
+        }
+    }
+
+    if (originalPaths.size() < 2) {
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "请至少选择两个项目进行批量重命名", 2000, QColor("#E81123"));
+        return;
+    }
+
+    bool ok;
+    QString prefix = QInputDialog::getText(this, "批量重命名", "输入文件名前缀:", QLineEdit::Normal, "新名称", &ok);
+    if (!ok || prefix.isEmpty()) return;
+
+    // 构造规则：[前缀] + [三位补零序列]
+    std::vector<RenameRule> rules;
+    rules.push_back({ RenameComponentType::Text, prefix });
+    rules.push_back({ RenameComponentType::Sequence, "", 1, 1, 3 });
+
+    if (BatchRenameEngine::instance().execute(originalPaths, rules)) {
+        loadDirectory(m_currentPath, m_isRecursive);
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "批量重命名已完成", 1500, QColor("#2ecc71"));
+    } else {
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "重命名过程中发生错误", 2000, QColor("#E81123"));
     }
 }
 

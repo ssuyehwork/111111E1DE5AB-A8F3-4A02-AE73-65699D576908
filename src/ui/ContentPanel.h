@@ -100,6 +100,13 @@ private:
     void setupContextMenu();
     void updateLayersButtonState();
 
+    /**
+     * @brief 内部业务辅助逻辑
+     */
+    void performCopy(bool cutMode);
+    void performPaste();
+    void performBatchRename();
+
     QVBoxLayout* m_mainLayout = nullptr;
     QWidget* m_focusLine = nullptr;
     QStackedWidget* m_viewStack = nullptr;
