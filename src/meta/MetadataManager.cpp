@@ -21,6 +21,7 @@ namespace ArcMeta {
  * @brief 内部辅助：获取路径所在磁盘的卷序列号
  */
 static std::wstring getVolumeSerialNumber(const std::wstring& path) {
+    if (path.length() < 2 || path[1] != L':') return L"UNKNOWN";
     wchar_t root[4] = { path[0], L':', L'\\', L'\0' };
     DWORD serialNumber = 0;
     if (GetVolumeInformationW(root, nullptr, 0, &serialNumber, nullptr, nullptr, nullptr, 0)) {
@@ -29,6 +30,34 @@ static std::wstring getVolumeSerialNumber(const std::wstring& path) {
         return buf;
     }
     return L"UNKNOWN";
+}
+
+/**
+ * @brief 内部辅助：建立卷序列号到当前盘符的映射
+ */
+static std::unordered_map<std::wstring, std::wstring> getVolumeToDriveMap() {
+    std::unordered_map<std::wstring, std::wstring> map;
+    DWORD drives = GetLogicalDrives();
+    for (int i = 0; i < 26; i++) {
+        if (drives & (1 << i)) {
+            std::wstring drive = std::wstring(1, L'A' + i) + L":\\";
+            std::wstring serial = getVolumeSerialNumber(drive);
+            if (serial != L"UNKNOWN") {
+                map[serial] = drive;
+            }
+        }
+    }
+    return map;
+}
+
+/**
+ * @brief 内部辅助：获取相对路径（如 G:\Folder -> \Folder）
+ */
+static std::wstring getRelativePath(const std::wstring& fullPath) {
+    if (fullPath.length() >= 3 && fullPath[1] == L':' && fullPath[2] == L'\\') {
+        return fullPath.substr(2);
+    }
+    return fullPath;
 }
 
 /**
@@ -50,10 +79,9 @@ MetadataManager& MetadataManager::instance() {
 MetadataManager::MetadataManager(QObject* parent) : QObject(parent) {}
 
 void MetadataManager::initFromDatabase() {
-    qDebug() << "[MetadataManager] 开始从数据库加载内存镜像...";
-    // 2026-03-xx 架构重构：采用“双缓冲”加载策略。
-    // 先在本地容器加载数据，仅在最终交换时持有写锁，彻底消除主线程查询时的长时间阻塞（死锁）。
+    qDebug() << "[MetadataManager] 开始从数据库加载内存镜像(硬件卷映射模式)...";
     std::unordered_map<std::wstring, RuntimeMeta> tempCache;
+    auto volToDriveMap = getVolumeToDriveMap();
 
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     if (!db.isOpen()) {
@@ -61,47 +89,44 @@ void MetadataManager::initFromDatabase() {
         return;
     }
 
-    QSqlQuery query(db);
-    // 1. 加载条目元数据
-    query.exec("SELECT path, rating, color, tags, pinned, encrypted, note FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''");
-    int itemCount = 0;
-    while (query.next()) {
-        std::wstring path = query.value(0).toString().toStdWString();
-        RuntimeMeta meta;
-        meta.rating = query.value(1).toInt();
-        meta.color = query.value(2).toString().toStdWString();
-        QJsonDocument doc = QJsonDocument::fromJson(query.value(3).toByteArray());
-        if (doc.isArray()) {
-            for (const auto& v : doc.array()) meta.tags << v.toString();
+    auto loadTable = [&](const char* sql, int& count) {
+        QSqlQuery query(db);
+        if (!query.exec(sql)) {
+            qCritical() << "[MetadataManager] 执行查询失败:" << query.lastError().text();
+            return;
         }
-        meta.pinned = query.value(4).toInt() != 0;
-        meta.encrypted = query.value(5).toInt() != 0;
-        meta.note = query.value(6).toString().toStdWString();
-        tempCache[path] = std::move(meta);
-        itemCount++;
-    }
+        while (query.next()) {
+            std::wstring dbVol = query.value(0).toString().toStdWString();
+            std::wstring dbPath = query.value(1).toString().toStdWString();
+
+            std::wstring finalPath = dbPath;
+            if (volToDriveMap.count(dbVol)) {
+                QString base = QString::fromStdWString(volToDriveMap[dbVol]);
+                if (base.endsWith('\\')) base.chop(1);
+                finalPath = (base + QString::fromStdWString(getRelativePath(dbPath))).toStdWString();
+            }
+
+            RuntimeMeta meta;
+            meta.rating = query.value(2).toInt();
+            meta.color = query.value(3).toString().toStdWString();
+            QJsonDocument doc = QJsonDocument::fromJson(query.value(4).toByteArray());
+            if (doc.isArray()) {
+                for (const auto& v : doc.array()) meta.tags << v.toString();
+            }
+            meta.pinned = query.value(5).toInt() != 0;
+            meta.encrypted = query.value(6).toInt() != 0;
+            meta.note = query.value(7).toString().toStdWString();
+            tempCache[finalPath] = std::move(meta);
+            count++;
+        }
+    };
+
+    int itemCount = 0;
+    loadTable("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''", itemCount);
     qDebug() << "[MetadataManager] 已从 items 表加载" << itemCount << "条记录";
 
-    // 2. 加载文件夹元数据（修复启动后文件夹星级等消失的关键补丁）
-    // 2026-04-10 深度重构：绑定卷序列号，解决盘符变化导致的丢失问题
-    query.exec("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM folders WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''");
     int folderCount = 0;
-    while (query.next()) {
-        std::wstring dbVolume = query.value(0).toString().toStdWString();
-        std::wstring dbPath = query.value(1).toString().toStdWString();
-
-        // 逻辑：如果路径是盘符相关的（如 G:\），我们需要根据当前的卷序列号进行动态匹配
-        std::wstring finalPath = dbPath;
-        if (dbPath.length() >= 3 && dbPath[1] == L':' && dbPath[2] == L'\\') {
-             std::wstring currentSerial = getVolumeSerialNumber(dbPath);
-             if (currentSerial != dbVolume && dbVolume != L"UNKNOWN" && !dbVolume.empty()) {
-                 // 序列号不匹配，说明该盘符已经换了硬盘，或者该硬盘换了盘符
-                 // 此处需要扫描当前系统所有盘符来找回它（性能开销较大，暂通过持久化时的同步解决，此处标记日志）
-                 qDebug() << "[MetadataManager] 卷序列号不匹配，DB:" << QString::fromStdWString(dbVolume) << "当前:" << QString::fromStdWString(currentSerial);
-             }
-        }
-
-    }
+    loadTable("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM folders WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''", folderCount);
     qDebug() << "[MetadataManager] 已从 folders 表加载" << folderCount << "条记录";
 
     {
@@ -110,7 +135,6 @@ void MetadataManager::initFromDatabase() {
     }
     qDebug() << "[MetadataManager] 内存镜像初始化完成";
     
-    // 加载完成后，触发全局刷新信号，补全 UI 界面
     emit metaChanged(L"__RELOAD_ALL__");
 }
 

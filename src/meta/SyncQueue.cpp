@@ -117,9 +117,15 @@ bool SyncQueue::processBatch() {
 
             std::wstring volSerial = getVolumeSerial(path);
 
+            // 2026-04-10 深度优化：存储相对路径，实现真正的硬件级绑定，忽略盘符变化
+            std::wstring relPath = path;
+            if (path.length() >= 3 && path[1] == L':' && path[2] == L'\\') {
+                relPath = path.substr(2);
+            }
+
             // 1. 使用 Repository 同步文件夹 (更新 folders 表)
-            if (FolderRepo::save(volSerial, path, meta.folder())) {
-                qDebug() << "[SyncQueue] 同步到 folders 表成功:" << QString::fromStdWString(path) << "卷序列号:" << QString::fromStdWString(volSerial);
+            if (FolderRepo::save(volSerial, relPath, meta.folder())) {
+                qDebug() << "[SyncQueue] 同步到 folders 表成功:" << QString::fromStdWString(relPath) << "卷序列号:" << QString::fromStdWString(volSerial);
             } else {
                 qCritical() << "[SyncQueue] 同步到 folders 表失败:" << QString::fromStdWString(path);
             }

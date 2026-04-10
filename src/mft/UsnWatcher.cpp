@@ -1,6 +1,7 @@
 #include "UsnWatcher.h"
 #include "PathBuilder.h"
 #include "../db/Database.h"
+#include <windows.h>
 #include "../db/ItemRepo.h"
 #include "../db/FolderRepo.h"
 #include <winioctl.h>
@@ -10,6 +11,20 @@
 #include <QString>
 
 namespace ArcMeta {
+
+/**
+ * @brief 内部辅助：获取磁盘卷序列号
+ */
+static std::wstring getVolSerial(const std::wstring& volLetter) {
+    wchar_t root[4] = { volLetter[0], L':', L'\\', L'\0' };
+    DWORD serialNumber = 0;
+    if (GetVolumeInformationW(root, nullptr, 0, &serialNumber, nullptr, nullptr, nullptr, 0)) {
+        wchar_t buf[16];
+        swprintf(buf, 16, L"%08X", serialNumber);
+        return buf;
+    }
+    return L"UNKNOWN";
+}
 
 UsnWatcher::UsnWatcher(const std::wstring& volume) : m_volume(volume) {}
 
@@ -113,7 +128,7 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
         MftReader::instance().removeEntry(m_volume, pRecord->FileReferenceNumber);
         std::wstring fullPath = PathBuilder::getPath(m_volume, pRecord->FileReferenceNumber);
         if (!fullPath.empty()) {
-            FolderRepo::remove(fullPath);
+            FolderRepo::remove(getVolSerial(m_volume), fullPath);
         }
     }
 
