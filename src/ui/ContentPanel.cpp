@@ -597,7 +597,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         QStringList args;
         args << "/select," << QDir::toNativeSeparators(path);
         QProcess::startDetached("explorer", args);
-    } else if (selectedAction->parentWidget() == categorizeMenu) {
+    } else if (qobject_cast<QMenu*>(selectedAction->parent()) == categorizeMenu) {
         int catId = selectedAction->data().toInt();
         auto indexes = view->selectionModel()->selectedIndexes();
         for (const auto& idx : indexes) {

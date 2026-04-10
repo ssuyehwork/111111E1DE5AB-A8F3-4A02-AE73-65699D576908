@@ -94,6 +94,15 @@ void MetadataManager::setTags(const std::wstring& path, const QStringList& tags)
     persistAsync(path);
 }
 
+void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
+    {
+        std::unique_lock<std::shared_mutex> lock(m_mutex);
+        m_cache[path].encrypted = encrypted;
+    }
+    emit metaChanged(path);
+    persistAsync(path);
+}
+
 void MetadataManager::persistAsync(const std::wstring& path) {
     // 异步链式持久化逻辑
     // 2026-03-xx 按照编译器建议：使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告
@@ -110,6 +119,7 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         itemMeta.rating = meta.rating;
         itemMeta.color = meta.color;
         itemMeta.pinned = meta.pinned;
+        itemMeta.encrypted = meta.encrypted;
         itemMeta.tags.clear();
         for (const auto& t : meta.tags) itemMeta.tags.push_back(t.toStdWString());
         json.save();
