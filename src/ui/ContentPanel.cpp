@@ -558,7 +558,13 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     
     menu.addSeparator();
     
-    menu.addAction("置顶 / 取消置顶");
+    // 2026-03-xx 按照用户要求：右键菜单根据选中项状态动态显示“置顶”或“取消置顶”
+    QAbstractItemView* view = qobject_cast<QAbstractItemView*>(sender());
+    if (!view) return;
+    QModelIndex currentIndex = view->indexAt(pos);
+    bool isPinned = currentIndex.data(IsLockedRole).toBool();
+    menu.addAction(isPinned ? "取消置顶" : "置顶");
+
     QMenu* cryptoMenu = menu.addMenu("加密保护");
     cryptoMenu->addAction("加密保护");
     cryptoMenu->addAction("解除加密");
@@ -578,17 +584,14 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     menu.addAction("复制路径");
     menu.addAction("属性");
 
-    QAbstractItemView* view = qobject_cast<QAbstractItemView*>(sender());
-    if (!view) return;
-    
     QAction* selectedAction = menu.exec(view->viewport()->mapToGlobal(pos));
     if (!selectedAction) return;
 
     QString actionText = selectedAction->text();
-    QModelIndex currentIndex = view->indexAt(pos);
     QString path = currentIndex.data(PathRole).toString();
 
-    if (actionText == "在资源管理器中显示") {
+    // 2026-03-xx 按照用户要求：修正书名号失配导致的失效 Bug，统一使用“在“资源管理器”中显示”进行匹配
+    if (actionText == "在“资源管理器”中显示") {
         QStringList args;
         args << "/select," << QDir::toNativeSeparators(path);
         QProcess::startDetached("explorer", args);
@@ -609,7 +612,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         fileOp.pFrom = wpath.c_str();
         fileOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
         if (SHFileOperationW(&fileOp) == 0) loadDirectory(m_currentPath);
-    } else if (actionText == "置顶 / 取消置顶") {
+    } else if (actionText == "置顶" || actionText == "取消置顶") {
         auto indexes = view->selectionModel()->selectedIndexes();
         for (const QModelIndex& idx : indexes) {
             if (idx.column() == 0) {
