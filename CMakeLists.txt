@@ -30,36 +30,21 @@ set(CMAKE_AUTOUIC OFF)
 set(CMAKE_AUTORCC ON)
 
 # 搜集源文件
+# 2026-03-xx 按照用户要求：使用递归搜集源码，并包含资源文件与清单资源文件以确保编译完整性
 file(GLOB_RECURSE SOURCES 
     "src/*.cpp"
     "src/*.h"
 )
-# 修复：显式包含新添加的文件，防止 CMake 缓存导致 GLOB 滞后
+
+# 修复：将 .rc 资源文件加入源码列表，确保图标和清单正确嵌入
 list(APPEND SOURCES 
-    "src/ui/BreadcrumbBar.h"
-    "src/ui/BreadcrumbBar.cpp"
-    "src/ui/CategoryModel.cpp"
-    "src/ui/CategoryModel.h"
-    "src/ui/CategoryDelegate.h"
-    "src/ui/DropTreeView.cpp"
-    "src/ui/DropTreeView.h"
-    "src/core/CoreController.h"
-    "src/core/CoreController.cpp"
-    "src/meta/MetadataManager.h"
-    "src/meta/MetadataManager.cpp"
-    "src/ui/FramelessDialog.h"
-    "src/ui/FramelessDialog.cpp"
-    "src/ui/DropListView.h"
-    "src/ui/DropListView.cpp"
-    "src/ui/TreeItemDelegate.h"
-    "src/ui/CategoryLockDialog.h"
-    "src/ui/CategoryLockDialog.cpp"
-    "src/ui/CategorySetPasswordDialog.h"
-    "src/ui/CategorySetPasswordDialog.cpp"
+    "ArcMeta.rc"
+    "resources/resources.qrc"
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest" "resources/resources.qrc")
+# 修复：移除直接引用的 "ArcMeta.manifest"，改由 ArcMeta.rc 引入以杜绝 mt.exe 冲突
+add_executable(ArcMeta WIN32 ${SOURCES})
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
@@ -72,4 +57,8 @@ target_link_libraries(ArcMeta PRIVATE
     bcrypt
 )
 
-# 声明管理员权限 Manifest (现代 CMake 方式通过直接将 ArcMeta.manifest 加入 add_executable 处理)
+# 2026-03-xx 按照用户要求及《记忆碎片》规范：
+# 为避免 mt.exe 清单合并冲突，通过 ArcMeta.rc 嵌入清单并禁用链接器的默认清单生成
+if(MSVC)
+    target_link_options(ArcMeta PRIVATE "/MANIFEST:NO")
+endif()
