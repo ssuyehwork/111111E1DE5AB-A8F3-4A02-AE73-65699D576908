@@ -61,16 +61,14 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // 3. 构造主窗口 (暂不显示)
-    // 2026-03-xx 按照用户要求：预先构造对象但不显示，待初始化完成后再弹出窗口。
-    ArcMeta::MainWindow w;
-
-    // 4. 建立“万事俱备”联动逻辑：
-    // 2026-03-xx 按照用户要求：必须等到数据库元数据载入、同步引擎启动等核心逻辑全部完成后，才打开主窗口。
-    // 2026-03-xx 最终修复：明确指定 Qt::QueuedConnection 确保跨线程信号能正确排队投递到 UI 线程。
-    QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished, &w, [&w]() {
-        qDebug() << "[Main] 收到初始化完成信号，准备打开窗口...";
-        w.show();
+    // 3. 建立“延迟构造”联动逻辑：
+    // 2026-03-xx 物理修复：为了彻底杜绝启动期间的死锁与“未响应”，改为在初始化彻底完成后再构造 MainWindow。
+    // 这确保了 UI 线程在数据库高峰期保持绝对空闲，不产生任何锁竞争。
+    ArcMeta::MainWindow* w = nullptr;
+    QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished, [&w]() {
+        qDebug() << "[Main] 后台就绪，正在主线程动态构造 MainWindow...";
+        w = new ArcMeta::MainWindow();
+        w->show();
     }, Qt::QueuedConnection);
 
     // 5. 启动异步初始化中控

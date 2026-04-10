@@ -44,15 +44,19 @@ std::wstring Database::getDbPath() const {
 }
 
 QSqlDatabase Database::getThreadDatabase() {
-    QString connectionName = QString("conn_%1").arg((quintptr)QThread::currentThreadId());
+    // 2026-03-xx 性能优化：通过线程本地变量缓存连接名称，减少字符串拼接开销
+    static thread_local QString threadConnectionName;
+    if (threadConnectionName.isEmpty()) {
+        threadConnectionName = QString("conn_%1").arg((quintptr)QThread::currentThreadId());
+    }
     
     // 如果该线程已经建立过连接，直接返回现有连接
-    if (QSqlDatabase::contains(connectionName)) {
-        return QSqlDatabase::database(connectionName);
+    if (QSqlDatabase::contains(threadConnectionName)) {
+        return QSqlDatabase::database(threadConnectionName);
     }
 
     // 否则，为新线程建立独立连接
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", threadConnectionName);
     db.setDatabaseName(QString::fromStdWString(m_impl->dbPath));
     if (db.open()) {
         // 对新连接同样应用 WAL 优化，防止写入锁死

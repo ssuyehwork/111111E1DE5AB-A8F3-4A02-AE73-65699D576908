@@ -40,6 +40,8 @@ void SyncEngine::runIncrementalSync() {
     // 执行全表增量扫描逻辑
     QSqlQuery query(db);
     query.exec("SELECT path FROM folders");
+
+    int count = 0;
     while (query.next()) {
         std::wstring path = query.value(0).toString().toStdWString();
         std::wstring jsonPath = path + L"\\.am_meta.json";
@@ -47,8 +49,16 @@ void SyncEngine::runIncrementalSync() {
         QFileInfo info(QString::fromStdWString(jsonPath));
         if (info.exists() && info.lastModified().toMSecsSinceEpoch() > lastSyncTime) {
             SyncQueue::instance().enqueue(path);
+            count++;
+
+            // 2026-03-xx 物理防御：增量同步批处理限流
+            // 每处理 50 个文件夹强制挂起 10ms，防止瞬间撑爆同步队列导致 IO 风暴或 CPU 抢占
+            if (count % 50 == 0) {
+                QThread::msleep(10);
+            }
         }
     }
+    qDebug() << "[Sync] 增量扫描完成，共识别出" << count << "个变动文件夹";
 }
 
 /**
