@@ -12,7 +12,9 @@
 #include <QFile>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QVBoxLayout>
 #include <QTableWidgetItem>
+#include <QRadioButton>
 
 namespace ArcMeta {
 

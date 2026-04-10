@@ -6,7 +6,10 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QScrollArea>
+#include <QGroupBox>
+#include <QList>
 #include <vector>
 #include <string>
 
@@ -25,7 +28,6 @@ public:
 
 private slots:
     void onAddRow();
-    void onRemoveRow();
     void updatePreview();
     void onExecute();
     void onBrowseTarget();
