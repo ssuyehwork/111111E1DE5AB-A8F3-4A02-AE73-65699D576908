@@ -234,6 +234,9 @@ void MainWindow::initUi() {
             m_metaPanel->setPinned(idx.data(IsLockedRole).toBool());
             m_metaPanel->setTags(idx.data(TagsRole).toStringList());
 
+            // 加载备注
+            RuntimeMeta rm = MetadataManager::instance().getMeta(path.toStdWString());
+            m_metaPanel->setNote(rm.note);
         }
         // 状态栏右侧显示已选数量
         if (m_statusRight) {

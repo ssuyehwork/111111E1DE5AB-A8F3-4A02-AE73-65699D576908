@@ -598,6 +598,35 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     bool isPinned = currentIndex.data(IsLockedRole).toBool();
     menu.addAction(isPinned ? "取消置顶" : "置顶");
 
+    // 2026-03-xx 按照用户要求：补全右键菜单设定颜色标签功能
+    QMenu* colorMenu = menu.addMenu("设定颜色标签");
+    colorMenu->setIcon(UiHelper::getIcon("color_plate", QColor("#EEEEEE")));
+    struct ColorItem { QString name; QString label; QColor preview; };
+    QList<ColorItem> colorItems = {
+        {"", "无颜色", QColor("#888780")},
+        {"red", "红色", QColor("#E24B4A")},
+        {"orange", "橙色", QColor("#EF9F27")},
+        {"yellow", "黄色", QColor("#FAC775")},
+        {"green", "绿色", QColor("#639922")},
+        {"cyan", "青色", QColor("#1D9E75")},
+        {"blue", "蓝色", QColor("#378ADD")},
+        {"purple", "紫色", QColor("#7F77DD")},
+        {"gray", "灰色", QColor("#5F5E5A")}
+    };
+    for (const auto& ci : colorItems) {
+        QAction* ca = colorMenu->addAction(ci.label);
+        ca->setData(ci.name);
+        // 绘制一个小圆点作为图标
+        QPixmap pix(12, 12);
+        pix.fill(Qt::transparent);
+        QPainter p(&pix);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setBrush(ci.preview);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(0, 0, 12, 12);
+        ca->setIcon(QIcon(pix));
+    }
+
     // 2026-03-xx 按照用户要求：补全“加密保护”菜单项及逻辑
     QMenu* cryptoMenu = menu.addMenu("加密保护");
     QAction* actEncrypt = cryptoMenu->addAction("执行加密保护");
@@ -705,6 +734,18 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
                     bool current = idx.data(IsLockedRole).toBool();
                     MetadataManager::instance().setPinned(itemPath.toStdWString(), !current);
                     m_proxyModel->setData(idx, !current, IsLockedRole);
+                }
+            }
+        }
+    } else if (qobject_cast<QMenu*>(selectedAction->parent()) == colorMenu) {
+        QString colorName = selectedAction->data().toString();
+        auto indexes = view->selectionModel()->selectedIndexes();
+        for (const auto& idx : indexes) {
+            if (idx.column() == 0) {
+                QString itemPath = idx.data(PathRole).toString();
+                if (!itemPath.isEmpty()) {
+                    MetadataManager::instance().setColor(itemPath.toStdWString(), colorName.toStdWString());
+                    m_proxyModel->setData(idx, colorName, ColorRole);
                 }
             }
         }

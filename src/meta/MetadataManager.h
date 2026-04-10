@@ -17,6 +17,7 @@ struct RuntimeMeta {
     int rating = 0;
     std::wstring color;
     QStringList tags;
+    std::wstring note;
     bool pinned = false;
     bool encrypted = false;
 };
@@ -53,6 +54,7 @@ public:
     void setColor(const std::wstring& path, const std::wstring& color);
     void setPinned(const std::wstring& path, bool pinned);
     void setTags(const std::wstring& path, const QStringList& tags);
+    void setNote(const std::wstring& path, const std::wstring& note);
     void setEncrypted(const std::wstring& path, bool encrypted);
 
 signals:

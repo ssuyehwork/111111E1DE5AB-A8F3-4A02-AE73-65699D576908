@@ -11,6 +11,7 @@
 #include <QLabel>
 #include "UiHelper.h"
 #include "../meta/AmMetaJson.h"
+#include "../meta/MetadataManager.h"
 
 namespace ArcMeta {
 
@@ -296,6 +297,10 @@ void MetaPanel::initUi() {
     m_noteEdit->setStyleSheet("QPlainTextEdit { background: #2B2B2B; border: 1px solid #333333; border-radius: 6px; font-size: 12px; padding: 6px; color: #EEEEEE; }");
     m_containerLayout->addWidget(m_noteEdit);
 
+    // 2026-03-xx 按照用户要求：实现备注失去焦点自动保存
+    connect(m_noteEdit, &QPlainTextEdit::destroyed, [](){}); // 占位
+    m_noteEdit->installEventFilter(this);
+
     m_containerLayout->addWidget(createSeparator());
 
     btnEncrypt = new QPushButton("加密保护", m_container); 
@@ -342,24 +347,22 @@ QFrame* MetaPanel::createSeparator() {
 void MetaPanel::onTagAdded() {
     QString text = m_tagEdit->text().trimmed();
     if (!text.isEmpty()) {
-        TagPill* pill = new TagPill(text, m_tagContainer);
-        connect(pill, &TagPill::deleteRequested, this, &MetaPanel::onTagDeleted);
-        m_tagFlowLayout->addWidget(pill);
-        m_tagEdit->clear();
-
-        // [持久化写入] 将标签物理保存至 .am-meta.json
+        // [持久化写入] 统一归口至 MetadataManager
         QString currentPath = lblPath->text();
         if (currentPath != "-" && !currentPath.isEmpty()) {
-            QFileInfo info(currentPath);
-            AmMetaJson meta(info.absolutePath().toStdWString());
-            meta.load();
-            auto& tags = meta.items()[info.fileName().toStdWString()].tags;
-            std::wstring wText = text.toStdWString();
-            if (std::find(tags.begin(), tags.end(), wText) == tags.end()) {
-                tags.push_back(wText);
-                meta.save();
+            std::wstring wPath = currentPath.toStdWString();
+            RuntimeMeta rm = MetadataManager::instance().getMeta(wPath);
+            if (!rm.tags.contains(text)) {
+                rm.tags << text;
+                MetadataManager::instance().setTags(wPath, rm.tags);
+
+                // UI 局部刷新
+                TagPill* pill = new TagPill(text, m_tagContainer);
+                connect(pill, &TagPill::deleteRequested, this, &MetaPanel::onTagDeleted);
+                m_tagFlowLayout->addWidget(pill);
             }
         }
+        m_tagEdit->clear();
     }
 }
 
@@ -372,19 +375,13 @@ void MetaPanel::onTagDeleted(const QString& text) {
             pill->deleteLater();
             delete item;
 
-            // [持久化写入] 将标签从 .am-meta.json 中剥除
+            // [持久化写入] 统一归口至 MetadataManager
             QString currentPath = lblPath->text();
             if (currentPath != "-" && !currentPath.isEmpty()) {
-                QFileInfo info(currentPath);
-                AmMetaJson meta(info.absolutePath().toStdWString());
-                meta.load();
-                auto& tags = meta.items()[info.fileName().toStdWString()].tags;
-                std::wstring wText = text.toStdWString();
-                auto it = std::find(tags.begin(), tags.end(), wText);
-                if (it != tags.end()) {
-                    tags.erase(it);
-                    meta.save();
-                }
+                std::wstring wPath = currentPath.toStdWString();
+                RuntimeMeta rm = MetadataManager::instance().getMeta(wPath);
+                rm.tags.removeAll(text);
+                MetadataManager::instance().setTags(wPath, rm.tags);
             }
             return;
         }
@@ -425,6 +422,22 @@ void MetaPanel::setTags(const QStringList& tags) {
         connect(pill, &TagPill::deleteRequested, this, &MetaPanel::onTagDeleted);
         m_tagFlowLayout->addWidget(pill);
     }
+}
+
+void MetaPanel::setNote(const std::wstring& note) {
+    m_noteEdit->blockSignals(true);
+    m_noteEdit->setPlainText(QString::fromStdWString(note));
+    m_noteEdit->blockSignals(false);
+}
+
+bool MetaPanel::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == m_noteEdit && event->type() == QEvent::FocusOut) {
+        QString currentPath = lblPath->text();
+        if (currentPath != "-" && !currentPath.isEmpty()) {
+            MetadataManager::instance().setNote(currentPath.toStdWString(), m_noteEdit->toPlainText().toStdWString());
+        }
+    }
+    return QFrame::eventFilter(watched, event);
 }
 
 } // namespace ArcMeta

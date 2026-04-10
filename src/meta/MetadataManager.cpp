@@ -33,7 +33,7 @@ void MetadataManager::initFromDatabase() {
 
     QSqlQuery query(db);
     // 仅载入有元数据的项，减少内存占用
-    query.exec("SELECT path, rating, color, tags, pinned, encrypted FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1");
+    query.exec("SELECT path, rating, color, tags, pinned, encrypted, note FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''");
     
     while (query.next()) {
         std::wstring path = query.value(0).toString().toStdWString();
@@ -48,6 +48,7 @@ void MetadataManager::initFromDatabase() {
         
         meta.pinned = query.value(4).toInt() != 0;
         meta.encrypted = query.value(5).toInt() != 0;
+        meta.note = query.value(6).toString().toStdWString();
 
         tempCache[path] = std::move(meta);
     }
@@ -84,6 +85,7 @@ void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
                 meta.color = pair.second.color;
                 meta.pinned = pair.second.pinned;
                 meta.encrypted = pair.second.encrypted;
+                meta.note = pair.second.note;
                 for (const auto& t : pair.second.tags) meta.tags << QString::fromStdWString(t);
                 
                 m_cache[wFullPath] = std::move(meta);
@@ -128,6 +130,15 @@ void MetadataManager::setTags(const std::wstring& path, const QStringList& tags)
     persistAsync(path);
 }
 
+void MetadataManager::setNote(const std::wstring& path, const std::wstring& note) {
+    {
+        std::unique_lock<std::shared_mutex> lock(m_mutex);
+        m_cache[path].note = note;
+    }
+    emit metaChanged(path);
+    persistAsync(path);
+}
+
 void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
@@ -154,6 +165,7 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         itemMeta.color = meta.color;
         itemMeta.pinned = meta.pinned;
         itemMeta.encrypted = meta.encrypted;
+        itemMeta.note = meta.note;
         itemMeta.tags.clear();
         for (const auto& t : meta.tags) itemMeta.tags.push_back(t.toStdWString());
         json.save();

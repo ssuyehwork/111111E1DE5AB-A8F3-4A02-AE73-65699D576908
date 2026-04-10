@@ -134,6 +134,10 @@ public:
     void setColor(const std::wstring& color);
     void setPinned(bool pinned);
     void setTags(const QStringList& tags);
+    void setNote(const std::wstring& note);
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void initUi();
