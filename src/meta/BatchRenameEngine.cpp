@@ -1,5 +1,6 @@
 #include "BatchRenameEngine.h"
 #include "MetadataManager.h"
+#include "AmMetaJson.h"
 #include <QFileInfo>
 #include <QDateTime>
 #include <filesystem>
