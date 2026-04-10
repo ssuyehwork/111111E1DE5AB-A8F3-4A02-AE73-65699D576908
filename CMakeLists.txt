@@ -12,17 +12,19 @@ else()
 endif()
 
 # 强制 MSVC 编译器及选项 (文档红线: /W4 /O2)
+# 修复：/O2 与 /RTC1 (Debug 默认) 冲突，改用生成器表达式
 if(MSVC)
-    add_compile_options(/W4 /O2 /utf-8)
+    add_compile_options(/W4 /utf-8)
+    add_compile_options("$<$<NOT:$<CONFIG:Debug>>:/O2>")
 endif()
 
 # Qt 6 基础组件
 find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql Concurrent)
 
-# 优化输出目录，按照用户要求生成到项目根目录下的 ArcMeta.exe 文件夹中
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta.exe")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta.exe")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta.exe")
+# 优化输出目录，按照用户要求生成到项目根目录下的 bin 文件夹中 (修复 mt.exe 文件夹命名冲突)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
 # 自动生成 MOC/UIC/RCC
 set(CMAKE_AUTOMOC ON)
@@ -59,7 +61,8 @@ list(APPEND SOURCES
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest" "resources/resources.qrc")
+# 修复：使用绝对路径显式引用 Manifest，防止嵌入工具定位失败
+add_executable(ArcMeta WIN32 ${SOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/ArcMeta.manifest" "resources/resources.qrc")
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
