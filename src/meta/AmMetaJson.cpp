@@ -91,6 +91,7 @@ bool AmMetaJson::load() {
  * @brief 安全写入元数据文件
  */
 bool AmMetaJson::save() const {
+    qDebug() << "[AmMetaJson] 正在保存到文件:" << QString::fromStdWString(m_filePath);
     // 1. 构建 JSON 根对象
     QJsonObject root;
     root["version"] = "1";
@@ -142,10 +143,13 @@ bool AmMetaJson::save() const {
     // Windows API: MoveFileExW 使用 MOVEFILE_REPLACE_EXISTING 模拟原子替换
     // 虽然真正的原子性在 NTFS 下有限，但这能最大程度防止断电等破坏
     if (!MoveFileExW(tmpPath.toStdWString().c_str(), m_filePath.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        qCritical() << "[AmMetaJson] 原子替换失败，错误代码:" << GetLastError();
         // 重命名失败，清理临时文件
         QFile::remove(tmpPath);
         return false;
     }
+
+    qDebug() << "[AmMetaJson] 保存成功";
 
     // 5. 设置隐藏属性（关键红线要求）
     SetFileAttributesW(m_filePath.c_str(), FILE_ATTRIBUTE_HIDDEN);
