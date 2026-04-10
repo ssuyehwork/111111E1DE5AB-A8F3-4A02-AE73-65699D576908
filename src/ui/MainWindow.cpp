@@ -432,7 +432,10 @@ void MainWindow::initToolbar() {
         btn->setIcon(icon);
         btn->setIconSize(QSize(18, 18));
         
-        btn->setToolTip(tip);
+        // 2026-03-xx 按照宪法要求：禁绝原生 ToolTip，强制对接 ToolTipOverlay
+        btn->setProperty("tooltipText", tip);
+        btn->installEventFilter(this);
+
         // 极致精简样式：无边框，仅悬停可见背景
         btn->setStyleSheet(
             "QPushButton { background: transparent; border: none; border-radius: 4px; }"
@@ -738,6 +741,7 @@ void MainWindow::initTrayIcon() {
     // 2026-03-xx 按照用户要求：集成系统托盘功能
     m_trayIcon = new QSystemTrayIcon(this);
     m_trayIcon->setIcon(QIcon(":/app_icon.png"));
+    // 托盘图标由于是 OS 级容器，不受 ToolTipOverlay 控制，允许保留原生或根据系统行为处理
     m_trayIcon->setToolTip("ArcMeta");
 
     QMenu* trayMenu = new QMenu(this);

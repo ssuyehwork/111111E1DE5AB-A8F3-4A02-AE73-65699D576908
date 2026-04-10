@@ -244,7 +244,9 @@ void ContentPanel::initUi() {
     m_btnLayers->setCheckable(true);
     m_btnLayers->setFixedSize(24, 24);
     m_btnLayers->setIcon(UiHelper::getIcon("layers", QColor("#B0B0B0"), 18));
-    m_btnLayers->setToolTip("递归显示子目录所有文件");
+    // 2026-03-xx 按照宪法要求：禁绝原生 ToolTip，强制对接 ToolTipOverlay
+    m_btnLayers->setProperty("tooltipText", "递归显示子目录所有文件");
+    m_btnLayers->installEventFilter(this);
     m_btnLayers->setStyleSheet(
         "QPushButton { background: transparent; border: none; border-radius: 4px; }"
         "QPushButton:hover { background: rgba(255, 255, 255, 0.1); }"
@@ -320,6 +322,16 @@ void ContentPanel::updateGridSize() {
 }
 
 bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
+    // 2026-03-xx 按照宪法要求：物理拦截 Hover 事件以触发 ToolTipOverlay
+    if (event->type() == QEvent::HoverEnter) {
+        QString text = obj->property("tooltipText").toString();
+        if (!text.isEmpty()) {
+            ToolTipOverlay::instance()->showText(QCursor::pos(), text);
+        }
+    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
+        ToolTipOverlay::hideTip();
+    }
+
     if ((obj == m_gridView || obj == m_gridView->viewport()) && event->type() == QEvent::Wheel) {
         QWheelEvent* wEvent = static_cast<QWheelEvent*>(event);
         if (wEvent->modifiers() & Qt::ControlModifier) {
@@ -1188,12 +1200,12 @@ void ContentPanel::updateLayersButtonState() {
     if (m_currentPath.isEmpty() || m_currentPath == "computer://") {
         m_btnLayers->setEnabled(false);
         m_btnLayers->setChecked(false);
-        m_btnLayers->setToolTip("“此电脑”不支持递归显示");
+        m_btnLayers->setProperty("tooltipText", "“此电脑”不支持递归显示");
         return;
     }
 
     m_btnLayers->setEnabled(true);
-    m_btnLayers->setToolTip("递归显示子目录所有文件");
+    m_btnLayers->setProperty("tooltipText", "递归显示子目录所有文件");
 }
 
 // --- Delegate ---
