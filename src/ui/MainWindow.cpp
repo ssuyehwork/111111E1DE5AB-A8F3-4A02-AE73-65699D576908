@@ -145,6 +145,7 @@ MainWindow::MainWindow(QWidget* parent)
     setStyleSheet(qss);
 
     initUi();
+    initTrayIcon();
 
     // 启动时和顶级目录均显示“此电脑”（磁盘分区列表）
     navigateTo("computer://");
@@ -722,6 +723,47 @@ void MainWindow::setupCustomTitleBarButtons() {
 
     // 逻辑：置顶切换
     connect(m_btnPinTop, &QPushButton::toggled, this, &MainWindow::onPinToggled);
+}
+
+void MainWindow::initTrayIcon() {
+    // 2026-03-xx 按照用户要求：集成系统托盘功能
+    m_trayIcon = new QSystemTrayIcon(this);
+    m_trayIcon->setIcon(QIcon(":/app_icon.png"));
+    m_trayIcon->setToolTip("ArcMeta");
+
+    QMenu* trayMenu = new QMenu(this);
+    trayMenu->setStyleSheet(
+        "QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; }"
+        "QMenu::item { padding: 6px 25px 6px 10px; border-radius: 4px; font-size: 12px; }"
+        "QMenu::item:selected { background-color: #3E3E42; color: white; }"
+    );
+
+    QAction* showAction = trayMenu->addAction("显示主界面");
+    trayMenu->addSeparator();
+    QAction* quitAction = trayMenu->addAction("退出 ArcMeta");
+
+    connect(showAction, &QAction::triggered, this, [this]() {
+        showNormal();
+        activateWindow();
+    });
+
+    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
+
+    m_trayIcon->setContextMenu(trayMenu);
+
+    // 点击托盘图标逻辑
+    connect(m_trayIcon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
+            if (isVisible()) {
+                hide();
+            } else {
+                showNormal();
+                activateWindow();
+            }
+        }
+    });
+
+    m_trayIcon->show();
 }
 
 void MainWindow::navigateTo(const QString& path, bool record) {

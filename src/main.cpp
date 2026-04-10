@@ -47,6 +47,10 @@ int main(int argc, char *argv[]) {
     // 设置高 DPI 支持 (Qt 6 默认开启，此处显式设置)
     QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QApplication a(argc, argv);
+
+    // 2026-03-xx 按照用户要求：设置全局应用图标，确保任务栏及窗口显示 Logo
+    a.setWindowIcon(QIcon(":/app_icon.png"));
+
     a.setApplicationName("ArcMeta");
     a.setOrganizationName("ArcMetaTeam");
 

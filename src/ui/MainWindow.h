@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QStackedWidget>
 #include <QHBoxLayout>
+#include <QSystemTrayIcon>
 
 namespace ArcMeta {
 
@@ -59,6 +60,7 @@ private:
     void initToolbar();
     void setupSplitters();
     void setupCustomTitleBarButtons();
+    void initTrayIcon();
 
     // 面包屑地址栏
     BreadcrumbBar* m_breadcrumbBar = nullptr;
@@ -102,6 +104,9 @@ private:
     // 窗口拖动
     bool m_isDragging = false;
     QPoint m_dragPosition;
+
+    // 系统托盘
+    QSystemTrayIcon* m_trayIcon = nullptr;
 };
 
 } // namespace ArcMeta
