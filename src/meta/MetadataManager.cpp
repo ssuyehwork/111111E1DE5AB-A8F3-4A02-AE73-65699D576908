@@ -5,6 +5,7 @@
 #include "SyncQueue.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QSqlRecord>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -12,8 +13,11 @@
 #include <QtConcurrent>
 #include <QThreadPool>
 #include <QDir>
+#include <QDebug>
+#include <mutex>
+#include <shared_mutex>
+#include <cwchar>
 #include <windows.h>
-#include "AmMetaJson.h"
 
 namespace ArcMeta {
 

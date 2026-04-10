@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <QFile>
 #include <QFileInfo>
+#include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
