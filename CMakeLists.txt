@@ -21,10 +21,10 @@ endif()
 # Qt 6 基础组件
 find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql Concurrent)
 
-# 优化输出目录，按照用户要求生成到项目根目录下的 bin 文件夹中 (修复 mt.exe 文件夹命名冲突)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+# 优化输出目录，按照用户要求生成到项目根目录下的 ArcMeta 文件夹中
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta")
 
 # 自动生成 MOC/UIC/RCC
 set(CMAKE_AUTOMOC ON)
@@ -57,10 +57,10 @@ target_link_libraries(ArcMeta PRIVATE
 # 1. 禁用增量链接：解决 Release/RelWithDebInfo 模式下 mt.exe 合并 ilk 导致的锁定错误
 set_target_properties(ArcMeta PROPERTIES LINK_FLAGS "/INCREMENTAL:NO")
 
-# 2. 强制定向输出：不仅是运行时，PDB 等调试符号也一并重定向至 bin，防止路径残留
+# 2. 强制定向输出：不仅是运行时，PDB 等调试符号也一并重定向至 ArcMeta 文件夹
 set_target_properties(ArcMeta PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
-    PDB_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta"
+    PDB_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/ArcMeta"
 )
 
 # 3. 彻底禁用 CMake 自动清单处理：防止 mt.exe 在 build 目录下生成同名文件夹导致冲突
