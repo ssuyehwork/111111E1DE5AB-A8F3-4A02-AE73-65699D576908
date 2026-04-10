@@ -966,6 +966,13 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     painter->setBrush(cardBg);
     painter->drawRoundedRect(cardRect, 8, 8);
 
+    // 2026-03-xx 按照用户要求：若条目被置顶，在卡片右上角显示垂直置顶图标
+    if (index.data(IsLockedRole).toBool()) {
+        QRect pinRect(cardRect.right() - 22, cardRect.top() + 8, 16, 16);
+        QIcon pinIcon = UiHelper::getIcon("pin_vertical", QColor("#FF551C"), 16);
+        pinIcon.paint(painter, pinRect);
+    }
+
     QString path = index.data(PathRole).toString();
     QFileInfo info(path);
     QString ext = info.isDir() ? "DIR" : info.suffix().toUpper();
