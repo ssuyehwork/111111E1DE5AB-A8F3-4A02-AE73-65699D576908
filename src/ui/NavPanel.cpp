@@ -137,15 +137,16 @@ void NavPanel::initUi() {
     connect(m_treeView, &QTreeView::expanded, this, &NavPanel::onItemExpanded);
 
     // 树形控件样式美化
+    // 2026-03-xx 按照用户要求：同步左侧“数据分类”样式，为三角形图标添加 padding 以实现清秀感，杜绝粗大感
     m_treeView->setStyleSheet(
         "QTreeView { background-color: transparent; border: none; font-size: 12px; outline: none; }"
         "QTreeView::item { height: 28px; padding-left: 0px; color: #EEEEEE; }"
         
-        "/* 物理还原：复原三角形折叠图标 */"
-        "QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); }"
-        "QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); }"
-        "QTreeView::branch:has-children:closed:has-siblings { image: url(:/icons/arrow_right.svg); }"
-        "QTreeView::branch:has-children:open:has-siblings   { image: url(:/icons/arrow_down.svg); }"
+        "/* 物理还原：复原三角形折叠图标，增加 padding 以实现极致精简视觉 */"
+        "QTreeView::branch:has-children:closed { image: url(:/icons/arrow_right.svg); padding: 4px; }"
+        "QTreeView::branch:has-children:open   { image: url(:/icons/arrow_down.svg); padding: 4px; }"
+        "QTreeView::branch:has-children:closed:has-siblings { image: url(:/icons/arrow_right.svg); padding: 4px; }"
+        "QTreeView::branch:has-children:open:has-siblings   { image: url(:/icons/arrow_down.svg); padding: 4px; }"
     );
 
 
