@@ -272,11 +272,13 @@ void ContentPanel::initUi() {
 }
 
 void ContentPanel::updateGridSize() {
+    // 2026-03-xx 按照用户要求：支持长名称自动换行。
+    // 为了容纳 2 行文本并将高度增加 (从 +60 到 +80)，必须同步增加宽度 (从 +30 到 +46) 以保持比例和谐
     m_zoomLevel = qBound(32, m_zoomLevel, 128);
     m_gridView->setIconSize(QSize(m_zoomLevel, m_zoomLevel));
     
-    int cardW = m_zoomLevel + 30; 
-    int cardH = m_zoomLevel + 60; 
+    int cardW = m_zoomLevel + 46;
+    int cardH = m_zoomLevel + 80;
     m_gridView->setGridSize(QSize(cardW, cardH));
 }
 
@@ -983,7 +985,7 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    int nameH = 18;
+    int nameH = 32; // 2026-03-xx 按照用户要求：高度由 18 增至 32 以支持两行换行显示
     int gap1 = 6;
     int gap2 = 4;
     
@@ -1046,7 +1048,8 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     textFont.setPointSize(8);
     textFont.setBold(false);
     painter->setFont(textFont);
-    painter->drawText(nameRect.adjusted(4, 0, -4, 0), Qt::AlignCenter | Qt::ElideRight, name);
+    // 2026-03-xx 按照用户要求：使用 TextWordWrap 实现自动换行，不再使用 ElideRight 截断
+    painter->drawText(nameRect.adjusted(4, 0, -4, 0), Qt::AlignCenter | Qt::TextWordWrap, name);
 
     painter->restore();
 }
@@ -1087,7 +1090,7 @@ bool GridItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* model, con
             if (baseIconSize <= 0) baseIconSize = 64; 
             int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
             int ratingH = 12;
-            int nameH = 18;
+            int nameH = 32; // 2026-03-xx 同步修改判定高度
             int gap1 = 6;
             int gap2 = 4;
             int totalH = iconDrawSize + gap1 + ratingH + gap2 + nameH;
@@ -1184,7 +1187,7 @@ void GridItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionV
     int iconDrawSize = static_cast<int>(baseIconSize * 0.65); 
     
     int ratingH = 12;
-    int nameH = 18;
+    int nameH = 32; // 2026-03-xx 同步修改编辑器高度
     int gap1 = 6;
     int gap2 = 4;
     
