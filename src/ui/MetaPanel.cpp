@@ -270,32 +270,7 @@ void MetaPanel::initUi() {
     m_containerLayout->addSpacing(10);
     m_containerLayout->addWidget(createSeparator());
 
-    chkPinned = new QCheckBox("置顶条目", m_container); 
-    // 2026-03-xx 按照用户要求：置顶仅显示勾选状态，禁止用户交互
-    chkPinned->setAttribute(Qt::WA_TransparentForMouseEvents);
-    chkPinned->setFocusPolicy(Qt::NoFocus);
-    chkPinned->setStyleSheet(
-        "QCheckBox { font-size: 11px; color: #5F5E5A; spacing: 5px; }"
-        "QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #555; border-radius: 2px; background: #1E1E1E; }"
-        "QCheckBox::indicator:checked { "
-        "   border: 1px solid #378ADD; "
-        "   background: #1E1E1E; "
-        "   image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzc4QUREIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiI+PC9wb2x5bGluZT48L3N2Zz4=);"
-        "}"
-    );
-    m_containerLayout->addWidget(chkPinned);
-
-    QLabel* lR = new QLabel("星级", m_container); 
-    lR->setStyleSheet("font-size: 11px; color: #5F5E5A;"); 
-    m_containerLayout->addWidget(lR);
-    m_starRating = new StarRatingWidget(m_container); 
-    m_containerLayout->addWidget(m_starRating);
-
-    QLabel* lC = new QLabel("颜色标记", m_container); 
-    lC->setStyleSheet("font-size: 11px; color: #5F5E5A;"); 
-    m_containerLayout->addWidget(lC);
-    m_colorPicker = new ColorPickerWidget(m_container); 
-    m_containerLayout->addWidget(m_colorPicker);
+    // 2026-03-xx 按照用户要求：元数据面板不再显示“置顶条目”、“星级”与“颜色标记”，相关 UI 已物理移除
 
     QLabel* lT = new QLabel("标签 / 关键字", m_container); 
     lT->setStyleSheet("font-size: 11px; color: #5F5E5A;"); 
@@ -333,24 +308,7 @@ void MetaPanel::initUi() {
         m_containerLayout->addWidget(b); 
     }
     
-    // 连接内部信号并向上转发
-    connect(chkPinned, &QCheckBox::clicked, this, [this](bool checked) {
-        QString currentPath = lblPath->text();
-        if (currentPath != "-" && !currentPath.isEmpty()) {
-            QFileInfo info(currentPath);
-            AmMetaJson meta(info.absolutePath().toStdWString());
-            meta.load();
-            meta.items()[info.fileName().toStdWString()].pinned = checked;
-            meta.save();
-        }
-    });
-
-    connect(m_starRating, &StarRatingWidget::ratingChanged, [this](int r) {
-        emit metadataChanged(r, L"__NO_CHANGE__");
-    });
-    connect(m_colorPicker, &ColorPickerWidget::colorChanged, [this](const std::wstring& c) {
-        emit metadataChanged(-1, c);
-    });
+    // 2026-03-xx 按照用户要求：UI 移除后，不再连接置顶、星级与颜色的变更信号
 
     m_containerLayout->addStretch(); 
     m_scrollArea->setWidget(m_container); 
@@ -439,17 +397,18 @@ void MetaPanel::updateInfo(const QString& n, const QString& t, const QString& s,
 }
 
 void MetaPanel::setRating(int rating) {
-    m_starRating->setRating(rating);
+    // 2026-03-xx 按照用户要求：仅隐藏显示，保留接口空实现以确保外部调用（如 MainWindow）编译正常
+    Q_UNUSED(rating);
 }
 
 void MetaPanel::setColor(const std::wstring& color) {
-    m_colorPicker->setColor(color);
+    // 2026-03-xx 按照用户要求：仅隐藏显示，保留接口空实现以确保外部调用（如 MainWindow）编译正常
+    Q_UNUSED(color);
 }
 
 void MetaPanel::setPinned(bool pinned) {
-    chkPinned->blockSignals(true);
-    chkPinned->setChecked(pinned);
-    chkPinned->blockSignals(false);
+    // 2026-03-xx 按照用户要求：仅隐藏显示，保留接口空实现以确保外部调用正常
+    Q_UNUSED(pinned);
 }
 
 void MetaPanel::setTags(const QStringList& tags) {

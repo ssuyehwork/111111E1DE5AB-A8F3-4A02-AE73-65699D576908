@@ -148,9 +148,6 @@ private:
     QLabel* lblName = nullptr, *lblType = nullptr, *lblSize = nullptr;
     QLabel* lblCtime = nullptr, *lblMtime = nullptr, *lblAtime = nullptr;
     QLabel* lblPath = nullptr, *lblEncrypted = nullptr;
-    QCheckBox* chkPinned = nullptr;
-    StarRatingWidget* m_starRating = nullptr;
-    ColorPickerWidget* m_colorPicker = nullptr;
     QWidget* m_tagContainer = nullptr;
     FlowLayout* m_tagFlowLayout = nullptr;
     QLineEdit* m_tagEdit = nullptr;
