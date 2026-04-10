@@ -11,6 +11,8 @@
 #include <QFileInfo>
 #include <QtConcurrent>
 #include <QThreadPool>
+#include <QDir>
+#include "AmMetaJson.h"
 
 namespace ArcMeta {
 

@@ -40,6 +40,9 @@
 #include <QtConcurrent>
 #include <QThreadPool>
 #include <QTimer>
+#include <functional>
+#include <QPointer>
+#include <QPersistentModelIndex>
 #include <windows.h>
 #include <shellapi.h>
 #include "../meta/AmMetaJson.h"
@@ -188,7 +191,8 @@ ContentPanel::ContentPanel(QWidget* parent)
 
         QFileIconProvider iconProvider;
         // 每次处理 20 个项目，在流畅度与加载速度间取得平衡
-        int batchSize = qMin(20, (int)m_iconPendingPaths.size());
+        // 修复：显式转换 size 为 int 以消除类型匹配警告
+        int batchSize = qMin(20, static_cast<int>(m_iconPendingPaths.size()));
         for (int i = 0; i < batchSize; ++i) {
             QString path = m_iconPendingPaths.takeFirst();
             if (m_pathToIndexMap.contains(path)) {
@@ -862,6 +866,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
 
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
+        QMap<int, int> rc; QMap<QString, int> cc, tc, tyc, cdc, mdc;
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
@@ -874,7 +879,9 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             QList<QStandardItem*> row;
             row << item << new QStandardItem("-") << new QStandardItem("磁盘分区") << new QStandardItem("-");
             m_model->appendRow(row);
+            tyc["folder"]++;
         }
+        emit directoryStatsReady(rc, cc, tc, tyc, cdc, mdc);
         return;
     }
 
@@ -886,28 +893,11 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     QPointer<ContentPanel> panelPtr(this);
     QThreadPool::globalInstance()->start([panelPtr, path, recursive]() {
         if (!panelPtr) return;
-        struct ItemData {
-            QString name;
-            QString fullPath;
-            bool isDir;
-            QString suffix;
-            qint64 size;
-            QDateTime mtime;
-            RuntimeMeta meta;
-        };
 
-        struct Stats {
-            QMap<int, int> ratingCounts;
-            QMap<QString, int> colorCounts;
-            QMap<QString, int> tagCounts;
-            QMap<QString, int> typeCounts;
-            QMap<QString, int> createDateCounts;
-            QMap<QString, int> modifyDateCounts;
-            int noTagCount = 0;
-        } globalStats;
+        ScanStats globalStats;
+        QList<ScanItemData> currentBatch;
 
-        QList<ItemData> currentBatch;
-        auto flushBatch = [&](const QList<ItemData>& batch) {
+        auto flushBatch = [panelPtr, path](const QList<ScanItemData>& batch) {
             QMetaObject::invokeMethod(qApp, [panelPtr, path, batch]() {
                 if (!panelPtr || panelPtr->m_currentPath != path) return;
 
@@ -960,7 +950,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             for (const QFileInfo& info : entries) {
                 if (info.fileName().startsWith(".am_meta.json")) continue;
 
-                ItemData data;
+                ScanItemData data;
                 data.name = info.fileName();
                 data.fullPath = info.absoluteFilePath();
                 data.isDir = info.isDir();
@@ -1081,16 +1071,22 @@ void ContentPanel::loadPaths(const QStringList& paths) {
     if (m_textPreview) m_textPreview->hide();
     if (m_imagePreview) m_imagePreview->hide();
     
+    m_lazyIconTimer->stop();
+    m_iconPendingPaths.clear();
+    m_pathToIndexMap.clear();
+
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
     
-    QFileIconProvider iconProvider;
+    static QIcon folderIcon = QFileIconProvider().icon(QFileIconProvider::Folder);
+    static QIcon fileIcon = QFileIconProvider().icon(QFileIconProvider::File);
+
     for (const QString& path : paths) {
         QFileInfo info(path);
         if (!info.exists()) continue;
 
         QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), info.fileName());
+        auto* nameItem = new QStandardItem(info.isDir() ? folderIcon : fileIcon, info.fileName());
         nameItem->setData(path, PathRole);
         nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
         
@@ -1105,8 +1101,12 @@ void ContentPanel::loadPaths(const QStringList& paths) {
         row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
         row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
         m_model->appendRow(row);
+
+        m_iconPendingPaths << path;
+        m_pathToIndexMap[path] = QPersistentModelIndex(nameItem->index());
     }
     applyFilters();
+    if (!m_lazyIconTimer->isActive()) m_lazyIconTimer->start();
 }
 
 void ContentPanel::createNewItem(const QString& type) {
