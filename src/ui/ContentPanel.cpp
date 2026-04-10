@@ -1443,6 +1443,8 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
         model->setData(index, value, Qt::EditRole);
         model->setData(index, newPath, PathRole);
         AmMetaJson::renameItem(info.absolutePath(), info.fileName(), value);
+        // 2026-03-xx 物理还原：重命名后同步更新内存元数据缓存
+        MetadataManager::instance().renameItem(oldPath.toStdWString(), newPath.toStdWString());
     } 
 }
 

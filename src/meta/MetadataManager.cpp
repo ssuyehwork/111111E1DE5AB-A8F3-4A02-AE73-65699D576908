@@ -148,18 +148,55 @@ void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
     persistAsync(path);
 }
 
+void MetadataManager::renameItem(const std::wstring& oldPath, const std::wstring& newPath) {
+    {
+        std::unique_lock<std::shared_mutex> lock(m_mutex);
+        auto it = m_cache.find(oldPath);
+        if (it != m_cache.end()) {
+            m_cache[newPath] = std::move(it->second);
+            m_cache.erase(it);
+        }
+    }
+    emit metaChanged(newPath);
+}
+
 void MetadataManager::persistAsync(const std::wstring& path) {
     // 异步链式持久化逻辑
     // 2026-03-xx 按照编译器建议：使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告
     QThreadPool::globalInstance()->start([this, path]() {
         RuntimeMeta meta = getMeta(path);
-        QFileInfo info(QString::fromStdWString(path));
-        std::wstring parentDir = info.absolutePath().toStdWString();
-        std::wstring fileName = info.fileName().toStdWString();
+
+        // 2026-03-xx 修复文件夹记录丢失：针对根目录文件夹进行路径健壮性处理
+        QString qPath = QDir::toNativeSeparators(QString::fromStdWString(path));
+        QFileInfo info(qPath);
+
+        std::wstring parentDir;
+        std::wstring fileName;
+
+        if (info.isRoot()) {
+            // 如果是根目录本身（如 G:\），其没有父目录，元数据存放在自身下
+            parentDir = qPath.toStdWString();
+            fileName = L""; // 根目录级别的元数据通常存放在 folder 节点
+        } else {
+            parentDir = QDir::toNativeSeparators(info.absolutePath()).toStdWString();
+            fileName = info.fileName().toStdWString();
+        }
 
         // 1. 同步到 JSON 文件
         AmMetaJson json(parentDir);
         json.load();
+
+        if (fileName.empty()) {
+            // 处理文件夹自身的元数据
+            auto& fMeta = json.folder();
+            fMeta.rating = meta.rating;
+            fMeta.color = meta.color;
+            fMeta.pinned = meta.pinned;
+            fMeta.note = meta.note;
+            fMeta.tags.clear();
+            for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
+        }
+
         auto& itemMeta = json.items()[fileName];
         itemMeta.rating = meta.rating;
         itemMeta.color = meta.color;

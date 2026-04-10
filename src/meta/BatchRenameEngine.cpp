@@ -1,4 +1,5 @@
 #include "BatchRenameEngine.h"
+#include "MetadataManager.h"
 #include <QFileInfo>
 #include <QDateTime>
 #include <filesystem>
@@ -67,8 +68,13 @@ bool BatchRenameEngine::execute(const std::vector<std::wstring>& originalPaths, 
         
         try {
             std::filesystem::rename(oldP, newP);
-            // 关键：重命名成功后，USN Watcher 会处理 FRN 追踪，
-            // 但此处需确保 .am_meta.json 键值同步更新逻辑能够触发。
+            // 2026-03-xx 按照用户要求：物理重命名成功后，必须同步更新 .am_meta.json 中的键值
+            QString folderPath = QString::fromStdWString(oldP.parent_path().wstring());
+            QString oldName = QString::fromStdWString(oldP.filename().wstring());
+            QString newName = QString::fromStdWString(newP.filename().wstring());
+            AmMetaJson::renameItem(folderPath, oldName, newName);
+            // 同步更新内存缓存
+            MetadataManager::instance().renameItem(oldP.wstring(), newP.wstring());
         } catch (...) {
             return false; // 任一失败则中断（实际生产应支持回滚）
         }

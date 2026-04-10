@@ -3,6 +3,7 @@
 #include "UiHelper.h"
 #include "../meta/BatchRenameEngine.h"
 #include "../meta/AmMetaJson.h"
+#include "../meta/MetadataManager.h"
 #include <QHeaderView>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -197,6 +198,8 @@ void BatchRenameDialog::onExecute() {
             // 迁移元数据逻辑 (物理重命名后的关键同步)
             if (!m_rbCopy->isChecked()) {
                 AmMetaJson::renameItem(oldInfo.absolutePath(), oldInfo.fileName(), QString::fromStdWString(newNames[i]));
+                // 2026-03-xx 按照用户要求：批量重命名后同步更新内存元数据缓存
+                MetadataManager::instance().renameItem(oldInfo.absoluteFilePath().toStdWString(), QDir(finalTargetDir).absoluteFilePath(QString::fromStdWString(newNames[i])).toStdWString());
             }
         }
     }

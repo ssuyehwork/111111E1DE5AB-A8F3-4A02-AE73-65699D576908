@@ -57,6 +57,11 @@ public:
     void setNote(const std::wstring& path, const std::wstring& note);
     void setEncrypted(const std::wstring& path, bool encrypted);
 
+    /**
+     * @brief 同步更新内存缓存中的路径键值（重命名时调用）
+     */
+    void renameItem(const std::wstring& oldPath, const std::wstring& newPath);
+
 signals:
     /**
      * @brief 元数据变更信号，UI 订阅此信号以实现局部刷新
