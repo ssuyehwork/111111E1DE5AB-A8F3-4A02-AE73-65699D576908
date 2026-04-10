@@ -243,6 +243,9 @@ void MetadataManager::persistAsync(const std::wstring& path) {
             fMeta.tags.clear();
             for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
             selfJson.save();
+
+            // 2026-04-10 关键修复：文件夹自身也需要加入同步队列，以更新数据库的 folders 表
+            SyncQueue::instance().enqueue(path);
         }
 
         if (fileName.empty()) {
@@ -262,6 +265,12 @@ void MetadataManager::persistAsync(const std::wstring& path) {
 
         // 更新父目录 JSON 中的条目记录
         auto& itemMeta = json.items()[fileName];
+        // 2026-04-10 修复：显式修正类型，防止文件夹被误认为文件
+        if (info.isDir()) {
+            itemMeta.type = L"folder";
+        } else {
+            itemMeta.type = L"file";
+        }
         itemMeta.rating = meta.rating;
         itemMeta.color = meta.color;
         itemMeta.pinned = meta.pinned;

@@ -4,12 +4,38 @@
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include <QCryptographicHash>
 
 namespace ArcMeta {
 
 bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta) {
     // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，确保在 SyncQueue 等后台线程中正常保存数据。
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+
+    std::wstring fullPath = parentPath;
+    if (!fullPath.empty() && fullPath.back() != L'\\' && fullPath.back() != L'/') fullPath += L'\\';
+    fullPath += name;
+
+    std::wstring volume = meta.volume;
+    std::wstring frn = meta.frn;
+
+    // 2026-04-10 关键修复：如果 JSON 中主键为空（常发生于非 MFT 扫描结果），尝试根据路径反查原有主键，防止主键冲突导致数据覆盖
+    if (volume.empty() || frn.empty()) {
+        QSqlQuery check(db);
+        check.prepare("SELECT volume, frn FROM items WHERE path = ?");
+        check.addBindValue(QString::fromStdWString(fullPath));
+        if (check.exec() && check.next()) {
+            volume = check.value(0).toString().toStdWString();
+            frn = check.value(1).toString().toStdWString();
+        }
+    }
+
+    // 如果仍然为空（新条目），则使用路径 MD5 生成一个伪 FRN 以保证主键唯一性
+    if (volume.empty() || frn.empty()) {
+        volume = L"VIRTUAL";
+        frn = QString(QCryptographicHash::hash(QString::fromStdWString(fullPath).toUtf8(), QCryptographicHash::Md5).toHex()).toStdWString();
+    }
+
     QSqlQuery q(db);
     q.prepare(R"sql(
         INSERT OR REPLACE INTO items 
@@ -18,12 +44,8 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     )sql");
 
-    std::wstring fullPath = parentPath;
-    if (!fullPath.empty() && fullPath.back() != L'\\' && fullPath.back() != L'/') fullPath += L'\\';
-    fullPath += name;
-
-    q.addBindValue(QString::fromStdWString(meta.volume));
-    q.addBindValue(QString::fromStdWString(meta.frn));
+    q.addBindValue(QString::fromStdWString(volume));
+    q.addBindValue(QString::fromStdWString(frn));
     q.addBindValue(QString::fromStdWString(fullPath));
     q.addBindValue(QString::fromStdWString(parentPath));
     q.addBindValue(QString::fromStdWString(meta.type));
