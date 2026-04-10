@@ -63,7 +63,9 @@ set_target_properties(ArcMeta PROPERTIES
     PDB_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
 )
 
-# 3. 链接器直接嵌入清单：通过链接期参数嵌入 ArcMeta.manifest，彻底跳过不稳定的 mt.exe 独立步骤
+# 3. 彻底禁用 CMake 自动清单处理：防止 mt.exe 在 build 目录下生成同名文件夹导致冲突
 if(MSVC)
-    target_link_options(ArcMeta PRIVATE "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/ArcMeta.manifest")
+    set_target_properties(ArcMeta PROPERTIES MSVC_MANIFEST OFF)
+    # 通过链接器强制嵌入，并明确指定输入，完全接管清单行为
+    target_link_options(ArcMeta PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/ArcMeta.manifest")
 endif()
