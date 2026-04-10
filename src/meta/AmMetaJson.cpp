@@ -187,6 +187,12 @@ QJsonObject AmMetaJson::folderToEntry(const FolderMeta& meta) {
     obj["color"] = toQString(meta.color);
     obj["pinned"] = meta.pinned;
     obj["note"] = toQString(meta.note);
+    obj["encrypted"] = meta.encrypted;
+    obj["encrypt_salt"] = QString::fromStdString(meta.encryptSalt);
+
+    QByteArray ivData = QByteArray::fromStdString(meta.encryptIv);
+    obj["encrypt_iv"] = QString::fromLatin1(ivData.toBase64());
+    obj["encrypt_verify_hash"] = QString::fromStdString(meta.encryptVerifyHash);
 
     QJsonArray tagsArr;
     for (const auto& tag : meta.tags) {
@@ -205,6 +211,14 @@ FolderMeta AmMetaJson::entryToFolder(const QJsonObject& obj) {
     if (obj.contains("color")) meta.color = toStdWString(obj["color"].toString());
     if (obj.contains("pinned")) meta.pinned = obj["pinned"].toBool();
     if (obj.contains("note")) meta.note = toStdWString(obj["note"].toString());
+    if (obj.contains("encrypted")) meta.encrypted = obj["encrypted"].toBool();
+    if (obj.contains("encrypt_salt")) meta.encryptSalt = obj["encrypt_salt"].toString().toStdString();
+
+    if (obj.contains("encrypt_iv")) {
+        QByteArray base64Iv = obj["encrypt_iv"].toString().toLatin1();
+        meta.encryptIv = QByteArray::fromBase64(base64Iv).toStdString();
+    }
+    if (obj.contains("encrypt_verify_hash")) meta.encryptVerifyHash = obj["encrypt_verify_hash"].toString().toStdString();
 
     if (obj.contains("tags") && obj["tags"].isArray()) {
         QJsonArray tagsArr = obj["tags"].toArray();

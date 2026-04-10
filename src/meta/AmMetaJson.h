@@ -21,11 +21,15 @@ struct FolderMeta {
     std::vector<std::wstring> tags;
     bool pinned = false;
     std::wstring note = L"";
+    bool encrypted = false;
+    std::string encryptSalt;
+    std::string encryptIv;
+    std::string encryptVerifyHash;
 
     // 判断是否为空（即均为默认值，无需写入 items 列表时使用，此处用于 folder 节点总是存在）
     bool isDefault() const {
         return sortBy == L"name" && sortOrder == L"asc" && rating == 0 &&
-               color.empty() && tags.empty() && !pinned && note.empty();
+               color.empty() && tags.empty() && !pinned && note.empty() && !encrypted;
     }
 };
 

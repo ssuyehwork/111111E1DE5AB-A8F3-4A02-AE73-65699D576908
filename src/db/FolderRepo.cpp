@@ -11,7 +11,8 @@ bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
     // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，确保在后台同步任务中正确持久化。
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
-    q.prepare("INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+
+    q.prepare("INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order, encrypted, encrypt_salt, encrypt_iv, encrypt_verify_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     q.addBindValue(QString::fromStdWString(path));
     q.addBindValue(meta.rating);
     q.addBindValue(QString::fromStdWString(meta.color));
@@ -24,6 +25,10 @@ bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
     q.addBindValue(QString::fromStdWString(meta.note));
     q.addBindValue(QString::fromStdWString(meta.sortBy));
     q.addBindValue(QString::fromStdWString(meta.sortOrder));
+    q.addBindValue(meta.encrypted ? 1 : 0);
+    q.addBindValue(QString::fromStdString(meta.encryptSalt));
+    q.addBindValue(QString::fromStdString(meta.encryptIv));
+    q.addBindValue(QString::fromStdString(meta.encryptVerifyHash));
     
     return q.exec();
 }
@@ -31,7 +36,7 @@ bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
 bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
-    q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order FROM folders WHERE path = ?");
+    q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order, encrypted, encrypt_salt, encrypt_iv, encrypt_verify_hash FROM folders WHERE path = ?");
     q.addBindValue(QString::fromStdWString(path));
     
     if (q.exec() && q.next()) {
@@ -48,6 +53,10 @@ bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
         meta.note = q.value(4).toString().toStdWString();
         meta.sortBy = q.value(5).toString().toStdWString();
         meta.sortOrder = q.value(6).toString().toStdWString();
+        meta.encrypted = q.value(7).toInt() != 0;
+        meta.encryptSalt = q.value(8).toString().toStdString();
+        meta.encryptIv = q.value(9).toString().toStdString();
+        meta.encryptVerifyHash = q.value(10).toString().toStdString();
         return true;
     }
     return false;

@@ -32,24 +32,37 @@ void MetadataManager::initFromDatabase() {
     if (!db.isOpen()) return;
 
     QSqlQuery query(db);
-    // 仅载入有元数据的项，减少内存占用
+    // 1. 加载条目元数据
     query.exec("SELECT path, rating, color, tags, pinned, encrypted, note FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''");
-    
     while (query.next()) {
         std::wstring path = query.value(0).toString().toStdWString();
         RuntimeMeta meta;
         meta.rating = query.value(1).toInt();
         meta.color = query.value(2).toString().toStdWString();
-        
         QJsonDocument doc = QJsonDocument::fromJson(query.value(3).toByteArray());
         if (doc.isArray()) {
             for (const auto& v : doc.array()) meta.tags << v.toString();
         }
-        
         meta.pinned = query.value(4).toInt() != 0;
         meta.encrypted = query.value(5).toInt() != 0;
         meta.note = query.value(6).toString().toStdWString();
+        tempCache[path] = std::move(meta);
+    }
 
+    // 2. 加载文件夹元数据（修复启动后文件夹星级等消失的关键补丁）
+    query.exec("SELECT path, rating, color, tags, pinned, encrypted, note FROM folders WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''");
+    while (query.next()) {
+        std::wstring path = query.value(0).toString().toStdWString();
+        RuntimeMeta meta;
+        meta.rating = query.value(1).toInt();
+        meta.color = query.value(2).toString().toStdWString();
+        QJsonDocument doc = QJsonDocument::fromJson(query.value(3).toByteArray());
+        if (doc.isArray()) {
+            for (const auto& v : doc.array()) meta.tags << v.toString();
+        }
+        meta.pinned = query.value(4).toInt() != 0;
+        meta.encrypted = query.value(5).toInt() != 0;
+        meta.note = query.value(6).toString().toStdWString();
         tempCache[path] = std::move(meta);
     }
 
@@ -202,17 +215,37 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         AmMetaJson json(parentDir);
         json.load();
 
+        if (info.isDir()) {
+            // 如果是文件夹，更新其自身的 .am_meta.json (folder 节点)
+            AmMetaJson selfJson(path);
+            selfJson.load();
+            auto& fMeta = selfJson.folder();
+            fMeta.rating = meta.rating;
+            fMeta.color = meta.color;
+            fMeta.pinned = meta.pinned;
+            fMeta.note = meta.note;
+            fMeta.encrypted = meta.encrypted;
+            fMeta.tags.clear();
+            for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
+            selfJson.save();
+        }
+
         if (fileName.empty()) {
-            // 处理文件夹自身的元数据
+            // 针对根目录的情况，更新并保存当前的 json（即自身的 json）
             auto& fMeta = json.folder();
             fMeta.rating = meta.rating;
             fMeta.color = meta.color;
             fMeta.pinned = meta.pinned;
             fMeta.note = meta.note;
+            fMeta.encrypted = meta.encrypted;
             fMeta.tags.clear();
             for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
+            json.save();
+            SyncQueue::instance().enqueue(parentDir);
+            return;
         }
 
+        // 更新父目录 JSON 中的条目记录
         auto& itemMeta = json.items()[fileName];
         itemMeta.rating = meta.rating;
         itemMeta.color = meta.color;
