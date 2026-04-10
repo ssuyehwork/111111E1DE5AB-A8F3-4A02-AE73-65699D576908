@@ -55,7 +55,8 @@ list(APPEND SOURCES
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.manifest" "resources/resources.qrc")
+# 2026-03-xx 按照用户要求：修复 mt.exe 错误。移除直接包含的 .manifest，改由 .rc 资源文件嵌入
+add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.rc" "resources/resources.qrc")
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
@@ -68,4 +69,7 @@ target_link_libraries(ArcMeta PRIVATE
     bcrypt
 )
 
-# 声明管理员权限 Manifest (现代 CMake 方式通过直接将 ArcMeta.manifest 加入 add_executable 处理)
+# 修复：显式禁用自动清单生成，防止与 ArcMeta.rc 中的清单冲突导致 mt.exe 报错
+if(MSVC)
+    target_link_options(ArcMeta PRIVATE "/MANIFEST:NO")
+endif()
