@@ -38,6 +38,7 @@
 #include <QTextBrowser>
 #include <QInputDialog>
 #include <QtConcurrent>
+#include <QThreadPool>
 #include <windows.h>
 #include <shellapi.h>
 #include "../meta/AmMetaJson.h"
@@ -846,7 +847,6 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             row << item << new QStandardItem("-") << new QStandardItem("磁盘分区") << new QStandardItem("-");
             m_model->appendRow(row);
         }
-        updateStatusBar();
         return;
     }
 
@@ -854,8 +854,8 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     updateLayersButtonState();
     
     // 2026-03-xx 核心重构：彻底异步化扫描。
-    // 使用 QtConcurrent 在子线程执行磁盘扫描与元数据检索，主线程保持 100% 响应。
-    QtConcurrent::run([this, path, recursive]() {
+    // 修复：使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告。
+    QThreadPool::globalInstance()->start([this, path, recursive]() {
         struct ScanResult {
             struct ItemData {
                 QString name;

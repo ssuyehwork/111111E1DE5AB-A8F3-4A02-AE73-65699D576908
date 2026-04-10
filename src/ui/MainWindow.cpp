@@ -25,6 +25,7 @@
 #include <QCloseEvent>
 #include <QMenu>
 #include <QAction>
+#include <QTimer>
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>

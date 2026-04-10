@@ -12,6 +12,10 @@
 #include <QFileInfo>
 #include <QIcon>
 #include <QStandardPaths>
+#include <QTimer>
+#include <QPointer>
+#include <QtConcurrent>
+#include <QApplication>
 
 namespace ArcMeta {
 
