@@ -121,8 +121,8 @@ void ToolTipOverlay::paintEvent(QPaintEvent*) {
     
     p.setPen(QPen(m_currentBorderColor, 1));
     p.setBrush(QColor("#2B2B2B"));
-    // 物理还原：ToolTip 6px 圆角
-    p.drawRoundedRect(rectF, 6, 6);
+    // 2026-03-xx 按照用户硬性要求：ToolTip 圆角必须锁定为 2px
+    p.drawRoundedRect(rectF, 2, 2);
     
     p.save();
     p.translate(12, 8); 
