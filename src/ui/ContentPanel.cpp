@@ -571,6 +571,7 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QAction* actEncrypt = cryptoMenu->addAction("执行加密保护");
     QAction* actDecrypt = cryptoMenu->addAction("解除加密");
     QAction* actChangePwd = cryptoMenu->addAction("修改加密密码");
+    Q_UNUSED(actChangePwd); // 2026-03-xx 按照编译器 W4 要求：处理暂未实现的 Action 引用
     
     menu.addSeparator();
     QAction* actBatchRename = menu.addAction("批量重命名 (Ctrl+Shift+R)");

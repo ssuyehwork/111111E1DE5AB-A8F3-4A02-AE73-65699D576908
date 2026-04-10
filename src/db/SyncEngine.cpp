@@ -3,6 +3,7 @@
 #include "../meta/SyncQueue.h"
 #include <windows.h>
 #include <QDateTime>
+#include <QThread>
 #include <QFileInfo>
 #include <QDir>
 #include <QSqlQuery>
