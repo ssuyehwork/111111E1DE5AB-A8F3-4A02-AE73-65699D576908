@@ -10,6 +10,9 @@
 #include <QDir>
 #include <QLabel>
 #include <QFile>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QTableWidgetItem>
 
 namespace ArcMeta {
 

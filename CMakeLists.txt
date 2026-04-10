@@ -44,6 +44,15 @@ file(GLOB_RECURSE SOURCES
     "src/*.h"
 )
 
+# 2026-04-10 修复：显式包含新增加的文件以确保构建系统捕获，解决 LNK2019 外部符号无法解析错误
+list(APPEND SOURCES
+    "src/ui/BatchRenameDialog.cpp"
+    "src/ui/BatchRenameDialog.h"
+    "src/ui/RuleRow.cpp"
+    "src/ui/RuleRow.h"
+)
+list(REMOVE_DUPLICATES SOURCES)
+
 # 修复：将 .rc 资源文件加入源码列表，确保图标和清单正确嵌入
 list(APPEND SOURCES 
     "ArcMeta.rc"
@@ -70,3 +79,4 @@ target_link_libraries(ArcMeta PRIVATE
 if(MSVC)
     target_link_options(ArcMeta PRIVATE "/MANIFEST:NO")
 endif()
+# Force Refresh CMake
