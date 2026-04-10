@@ -42,6 +42,11 @@ public:
     RuntimeMeta getMeta(const std::wstring& path);
 
     /**
+     * @brief 预热指定目录及其子项的元数据
+     */
+    void prefetchDirectory(const std::wstring& dirPath);
+
+    /**
      * @brief 统一更新接口
      */
     void setRating(const std::wstring& path, int rating);

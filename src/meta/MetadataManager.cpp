@@ -66,6 +66,30 @@ RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {
     return RuntimeMeta(); // 返回默认空元数据
 }
 
+void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
+    // 2026-03-xx 性能预判：在后台预读指定文件夹的 JSON 元数据，消除点击时的微小顿挫
+    // 修复：由于 MetadataManager 是单例，this 始终有效，但为保持代码严谨性仍进行常规检查
+    QThreadPool::globalInstance()->start([this, dirPath]() {
+        AmMetaJson json(dirPath);
+        if (json.load()) {
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+            for (auto& pair : json.items()) {
+                QString fullPath = QString::fromStdWString(dirPath) + "/" + QString::fromStdWString(pair.first);
+                std::wstring wFullPath = QDir::toNativeSeparators(fullPath).toStdWString();
+
+                RuntimeMeta meta;
+                meta.rating = pair.second.rating;
+                meta.color = pair.second.color;
+                meta.pinned = pair.second.pinned;
+                meta.encrypted = pair.second.encrypted;
+                for (const auto& t : pair.second.tags) meta.tags << QString::fromStdWString(t);
+
+                m_cache[wFullPath] = std::move(meta);
+            }
+        }
+    });
+}
+
 void MetadataManager::setRating(const std::wstring& path, int rating) {
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);

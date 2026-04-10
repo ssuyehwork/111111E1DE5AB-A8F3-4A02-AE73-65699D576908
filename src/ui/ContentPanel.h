@@ -120,6 +120,11 @@ private:
     QStandardItemModel* m_model = nullptr;
     QSortFilterProxyModel* m_proxyModel = nullptr;
 
+    // 懒加载图标相关
+    QTimer* m_lazyIconTimer = nullptr;
+    QStringList m_iconPendingPaths;
+    QMap<QString, QPersistentModelIndex> m_pathToIndexMap;
+
     FilterState m_currentFilter;
 
     int m_zoomLevel = 64;

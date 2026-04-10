@@ -288,6 +288,13 @@ void MainWindow::initUi() {
         }
     });
 
+    // 2026-03-xx 性能预判：当侧边栏选中项改变时，提前预热目标文件夹的元数据
+    connect(m_navPanel, &NavPanel::directorySelected, this, [](const QString& path) {
+        if (path != "computer://") {
+            MetadataManager::instance().prefetchDirectory(path.toStdWString());
+        }
+    });
+
     // 物理还原：焦点切换监听逻辑，驱动 1px 翠绿高亮线
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget* old, QWidget* now) {
         Q_UNUSED(old);

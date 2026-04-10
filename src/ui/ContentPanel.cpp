@@ -39,6 +39,7 @@
 #include <QInputDialog>
 #include <QtConcurrent>
 #include <QThreadPool>
+#include <QTimer>
 #include <windows.h>
 #include <shellapi.h>
 #include "../meta/AmMetaJson.h"
@@ -175,6 +176,31 @@ ContentPanel::ContentPanel(QWidget* parent)
 
     m_zoomLevel = 96;
     m_isRecursive = false;
+
+    // 2026-03-xx 物理加速：初始化懒加载图标定时器
+    m_lazyIconTimer = new QTimer(this);
+    m_lazyIconTimer->setInterval(30); // 每 30ms 提取一批图标，确保不卡主线程
+    connect(m_lazyIconTimer, &QTimer::timeout, [this]() {
+        if (m_iconPendingPaths.isEmpty()) {
+            m_lazyIconTimer->stop();
+            return;
+        }
+
+        QFileIconProvider iconProvider;
+        // 每次处理 20 个项目，在流畅度与加载速度间取得平衡
+        int batchSize = qMin(20, (int)m_iconPendingPaths.size());
+        for (int i = 0; i < batchSize; ++i) {
+            QString path = m_iconPendingPaths.takeFirst();
+            if (m_pathToIndexMap.contains(path)) {
+                QPersistentModelIndex pIdx = m_pathToIndexMap.value(path);
+                if (pIdx.isValid()) {
+                    QIcon icon = iconProvider.icon(QFileInfo(path));
+                    m_model->setData(pIdx, icon, Qt::DecorationRole);
+                }
+                m_pathToIndexMap.remove(path);
+            }
+        }
+    });
 
     initUi();
 }
@@ -822,7 +848,11 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     m_isRecursive = recursive;
     if (m_btnLayers) m_btnLayers->setChecked(recursive);
 
-    // 2026-03-xx 物理加速：立即清理界面，防止旧数据残留感
+    // 2026-03-xx 极致优化：停止之前的图标懒加载任务，清理队列
+    m_lazyIconTimer->stop();
+    m_iconPendingPaths.clear();
+    m_pathToIndexMap.clear();
+
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
@@ -830,10 +860,8 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         m_currentPath = "computer://";
         updateLayersButtonState();
 
-        // 此电脑的加载相对较快，但仍存在网络驱动器阻塞风险，此处保留主线程加载但优化体验
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
-        
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
@@ -853,20 +881,22 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     m_currentPath = path;
     updateLayersButtonState();
     
-    // 2026-03-xx 核心重构：彻底异步化扫描。
-    // 修复：使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告。
-    QThreadPool::globalInstance()->start([this, path, recursive]() {
-        struct ScanResult {
-            struct ItemData {
-                QString name;
-                QString fullPath;
-                bool isDir;
-                QString suffix;
-                qint64 size;
-                QDateTime mtime;
-                RuntimeMeta meta;
-            };
-            QList<ItemData> items;
+    // 2026-03-xx 极致优化：分块加载方案。
+    // 修复：使用 QPointer 捕获 this，防止面板销毁后后台线程访问已释放内存 (Use-after-free)。
+    QPointer<ContentPanel> panelPtr(this);
+    QThreadPool::globalInstance()->start([panelPtr, path, recursive]() {
+        if (!panelPtr) return;
+        struct ItemData {
+            QString name;
+            QString fullPath;
+            bool isDir;
+            QString suffix;
+            qint64 size;
+            QDateTime mtime;
+            RuntimeMeta meta;
+        };
+
+        struct Stats {
             QMap<int, int> ratingCounts;
             QMap<QString, int> colorCounts;
             QMap<QString, int> tagCounts;
@@ -874,18 +904,53 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             QMap<QString, int> createDateCounts;
             QMap<QString, int> modifyDateCounts;
             int noTagCount = 0;
+        } globalStats;
+
+        QList<ItemData> currentBatch;
+        auto flushBatch = [&](const QList<ItemData>& batch) {
+            QMetaObject::invokeMethod(qApp, [panelPtr, path, batch]() {
+                if (!panelPtr || panelPtr->m_currentPath != path) return;
+
+                // 预取系统通用图标 (纳秒级操作，不卡顿)
+                static QIcon folderIcon = QFileIconProvider().icon(QFileIconProvider::Folder);
+                static QIcon fileIcon = QFileIconProvider().icon(QFileIconProvider::File);
+
+                for (const auto& data : batch) {
+                    // 先上通用图标，真实图标加入懒加载队列
+                    auto* nameItem = new QStandardItem(data.isDir ? folderIcon : fileIcon, data.name);
+                    nameItem->setData(data.fullPath, PathRole);
+                    nameItem->setData(data.isDir ? "folder" : "file", TypeRole);
+                    nameItem->setData(data.meta.rating, RatingRole);
+                    nameItem->setData(QString::fromStdWString(data.meta.color), ColorRole);
+                    nameItem->setData(data.meta.pinned, IsLockedRole);
+                    nameItem->setData(data.meta.encrypted, EncryptedRole);
+                    nameItem->setData(data.meta.tags, TagsRole);
+
+                    QList<QStandardItem*> row;
+                    row << nameItem;
+                    row << new QStandardItem(data.isDir ? "-" : QString::number(data.size / 1024) + " KB");
+                    row << new QStandardItem(data.isDir ? "文件夹" : data.suffix + " 文件");
+                    row << new QStandardItem(data.mtime.toString("yyyy-MM-dd HH:mm"));
+                    panelPtr->m_model->appendRow(row);
+
+                    // 登记懒加载图标任务
+                    panelPtr->m_iconPendingPaths << data.fullPath;
+                    panelPtr->m_pathToIndexMap[data.fullPath] = QPersistentModelIndex(nameItem->index());
+                }
+
+                panelPtr->applyFilters();
+                // 启动或保持懒加载定时器运行
+                if (!panelPtr->m_lazyIconTimer->isActive()) panelPtr->m_lazyIconTimer->start();
+            }, Qt::QueuedConnection);
         };
 
-        std::function<void(const QString&, bool, ScanResult&)> scanDir =
-            [&](const QString& p, bool rec, ScanResult& res) {
+        std::function<void(const QString&, bool)> scanDir = [&](const QString& p, bool rec) {
             QDir dir(p);
             if (!dir.exists()) return;
 
             QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
-            QFileIconProvider iconProvider;
             QDate today = QDate::currentDate();
             QDate yesterday = today.addDays(-1);
-
             auto dateKey = [&](const QDate& d) -> QString {
                 if (d == today) return "today";
                 if (d == yesterday) return "yesterday";
@@ -895,7 +960,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             for (const QFileInfo& info : entries) {
                 if (info.fileName().startsWith(".am_meta.json")) continue;
 
-                ScanResult::ItemData data;
+                ItemData data;
                 data.name = info.fileName();
                 data.fullPath = info.absoluteFilePath();
                 data.isDir = info.isDir();
@@ -904,57 +969,40 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
                 data.mtime = info.lastModified();
                 data.meta = MetadataManager::instance().getMeta(data.fullPath.toStdWString());
 
-                res.items.append(data);
+                currentBatch.append(data);
+                if (currentBatch.size() >= 100) {
+                    flushBatch(currentBatch);
+                    currentBatch.clear();
+                }
 
-                // 统计逻辑移入异步线程
-                res.ratingCounts[data.meta.rating]++;
-                res.colorCounts[QString::fromStdWString(data.meta.color)]++;
-                for (const auto& t : data.meta.tags) res.tagCounts[t]++;
-                if (data.meta.tags.isEmpty()) res.noTagCount++;
-                res.typeCounts[data.isDir ? "folder" : data.suffix]++;
-                res.createDateCounts[dateKey(info.birthTime().date())]++;
-                res.modifyDateCounts[dateKey(data.mtime.date())]++;
+                globalStats.ratingCounts[data.meta.rating]++;
+                globalStats.colorCounts[QString::fromStdWString(data.meta.color)]++;
+                for (const auto& t : data.meta.tags) globalStats.tagCounts[t]++;
+                if (data.meta.tags.isEmpty()) globalStats.noTagCount++;
+                globalStats.typeCounts[data.isDir ? "folder" : data.suffix]++;
+                globalStats.createDateCounts[dateKey(info.birthTime().date())]++;
+                globalStats.modifyDateCounts[dateKey(data.mtime.date())]++;
 
                 if (rec && data.isDir) {
-                    scanDir(data.fullPath, true, res);
+                    // 后台任务存活检查
+                    if (!panelPtr) return;
+                    scanDir(data.fullPath, true);
                 }
             }
         };
 
-        ScanResult result;
-        scanDir(path, recursive, result);
-        if (result.noTagCount > 0) result.tagCounts["__none__"] = result.noTagCount;
+        scanDir(path, recursive);
+        if (!panelPtr) return;
 
-        // 扫描完成后，切回主线程更新 UI
-        QMetaObject::invokeMethod(this, [this, path, result]() {
-            if (m_currentPath != path) return; // 丢弃过时扫描结果
+        if (!currentBatch.isEmpty()) flushBatch(currentBatch);
+        if (globalStats.noTagCount > 0) globalStats.tagCounts["__none__"] = globalStats.noTagCount;
 
-            m_model->setRowCount(0);
-            QFileIconProvider iconProvider;
-            for (const auto& data : result.items) {
-                // 2026-03-xx 线程安全修复：图标提取必须在主线程执行。
-                // 此时代码已切回 UI 线程，调用 iconProvider 是安全的。
-                QIcon icon = iconProvider.icon(QFileInfo(data.fullPath));
-                auto* nameItem = new QStandardItem(icon, data.name);
-                nameItem->setData(data.fullPath, PathRole);
-                nameItem->setData(data.isDir ? "folder" : "file", TypeRole);
-                nameItem->setData(data.meta.rating, RatingRole);
-                nameItem->setData(QString::fromStdWString(data.meta.color), ColorRole);
-                nameItem->setData(data.meta.pinned, IsLockedRole);
-                nameItem->setData(data.meta.encrypted, EncryptedRole);
-                nameItem->setData(data.meta.tags, TagsRole);
-
-                QList<QStandardItem*> row;
-                row << nameItem;
-                row << new QStandardItem(data.isDir ? "-" : QString::number(data.size / 1024) + " KB");
-                row << new QStandardItem(data.isDir ? "文件夹" : data.suffix + " 文件");
-                row << new QStandardItem(data.mtime.toString("yyyy-MM-dd HH:mm"));
-                m_model->appendRow(row);
+        // 最后发送全量统计结果供筛选面板使用
+        QMetaObject::invokeMethod(qApp, [panelPtr, path, globalStats]() {
+            if (panelPtr && panelPtr->m_currentPath == path) {
+                emit panelPtr->directoryStatsReady(globalStats.ratingCounts, globalStats.colorCounts, globalStats.tagCounts,
+                                                  globalStats.typeCounts, globalStats.createDateCounts, globalStats.modifyDateCounts);
             }
-
-            applyFilters();
-            emit directoryStatsReady(result.ratingCounts, result.colorCounts, result.tagCounts,
-                                     result.typeCounts, result.createDateCounts, result.modifyDateCounts);
         }, Qt::QueuedConnection);
     });
 }
