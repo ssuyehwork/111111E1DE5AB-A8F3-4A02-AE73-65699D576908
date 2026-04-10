@@ -51,6 +51,7 @@
 #include "../db/CategoryRepo.h"
 #include "../crypto/EncryptionManager.h"
 #include "CategoryLockDialog.h"
+#include "BatchRenameDialog.h"
 #include "UiHelper.h"
 
 namespace ArcMeta {
@@ -825,7 +826,7 @@ void ContentPanel::performPaste() {
 }
 
 void ContentPanel::performBatchRename() {
-    // 2026-03-xx 按照用户要求：填补批量重命名空壳，对接 BatchRenameEngine
+    // 2026-03-xx 按照用户要求：弹出深度集成的高级批量重命名对话框
     QModelIndexList indexes = getSelectedIndexes();
     std::vector<std::wstring> originalPaths;
     for (const auto& idx : indexes) {
@@ -835,25 +836,15 @@ void ContentPanel::performBatchRename() {
         }
     }
 
-    if (originalPaths.size() < 2) {
-        ToolTipOverlay::instance()->showText(QCursor::pos(), "请至少选择两个项目进行批量重命名", 2000, QColor("#E81123"));
+    if (originalPaths.empty()) {
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "请先选择需要重命名的项目", 2000, QColor("#E81123"));
         return;
     }
 
-    bool ok;
-    QString prefix = QInputDialog::getText(this, "批量重命名", "输入文件名前缀:", QLineEdit::Normal, "新名称", &ok);
-    if (!ok || prefix.isEmpty()) return;
-
-    // 构造规则：[前缀] + [三位补零序列]
-    std::vector<RenameRule> rules;
-    rules.push_back({ RenameComponentType::Text, prefix });
-    rules.push_back({ RenameComponentType::Sequence, "", 1, 1, 3 });
-
-    if (BatchRenameEngine::instance().execute(originalPaths, rules)) {
+    BatchRenameDialog dlg(originalPaths, this);
+    if (dlg.exec() == QDialog::Accepted) {
         loadDirectory(m_currentPath, m_isRecursive);
-        ToolTipOverlay::instance()->showText(QCursor::pos(), "批量重命名已完成", 1500, QColor("#2ecc71"));
-    } else {
-        ToolTipOverlay::instance()->showText(QCursor::pos(), "重命名过程中发生错误", 2000, QColor("#E81123"));
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "批量重命名操作已成功执行", 1500, QColor("#2ecc71"));
     }
 }
 

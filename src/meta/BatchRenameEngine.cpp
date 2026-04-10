@@ -32,11 +32,14 @@ QString BatchRenameEngine::processOne(const std::wstring& path, int index, const
                 break;
             case RenameComponentType::Sequence: {
                 int val = rule.start + (index * rule.step);
-                newName += QString("%1").arg(val, rule.padding, 10, QChar('0'));
+                newName += QString::number(val).rightJustified(rule.padding, '0');
                 break;
             }
             case RenameComponentType::Date:
                 newName += QDateTime::currentDateTime().toString(rule.value.isEmpty() ? "yyyyMMdd" : rule.value);
+                break;
+            case RenameComponentType::OriginalName:
+                newName += info.baseName();
                 break;
             case RenameComponentType::Metadata:
                 // 注入 ArcMeta 元数据标记（如评级星级）

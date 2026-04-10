@@ -13,6 +13,7 @@ enum class RenameComponentType {
     Text,           // 固定文本
     Sequence,       // 序列数字
     Date,           // 日期 (yyyyMMdd)
+    OriginalName,   // 原始文件名
     Metadata        // 元数据变量 (标签, 星级)
 };
 
