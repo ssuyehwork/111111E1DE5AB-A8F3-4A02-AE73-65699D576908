@@ -152,13 +152,17 @@ RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {
 
 void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
     std::wstring nDirPath = normalizePath(dirPath);
-    qDebug() << "[MetadataManager] 预加载目录元数据:" << QString::fromStdWString(nDirPath);
-    // 2026-03-xx 性能预判：在后台预读指定文件夹的 JSON 元数据，消除点击时的微小顿挫
-    // 修复：由于 MetadataManager 是单例，this 始终有效，但为保持代码严谨性仍进行常规检查
+    qDebug() << "[MetadataManager] 预加载目录元数据(访问即生成):" << QString::fromStdWString(nDirPath);
+
     QThreadPool::globalInstance()->start([this, nDirPath]() {
         AmMetaJson json(nDirPath);
-        if (json.load()) {
-            qDebug() << "[MetadataManager] 加载 JSON 成功:" << QString::fromStdWString(json.getMetaFilePath());
+
+        // 2026-04-10 按照用户铁律：访问即生成
+        // 强制调用 save()。如果文件不存在，它会创建一个包含默认 folder 节点的初始文件。
+        json.load();
+        json.save();
+
+        {
             std::unique_lock<std::shared_mutex> lock(m_mutex);
             
             // 1. 加载文件夹自身的元数据 (folder 节点)
@@ -172,7 +176,6 @@ void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
 
             // 2. 加载子项元数据 (items 节点)
             for (auto& pair : json.items()) {
-                // 修复：使用 QDir::filePath 拼接路径，解决根目录双斜杠 Bug
                 QString fullPath = QDir(QString::fromStdWString(nDirPath)).filePath(QString::fromStdWString(pair.first));
                 std::wstring wFullPath = normalizePath(fullPath.toStdWString());
                 
@@ -263,25 +266,19 @@ void MetadataManager::renameItem(const std::wstring& oldPath, const std::wstring
 }
 
 void MetadataManager::persistAsync(const std::wstring& path) {
-    qDebug() << "[MetadataManager] 请求异步持久化:" << QString::fromStdWString(path);
-    // 异步链式持久化逻辑
-    // 2026-03-xx 按照编译器建议：使用 QThreadPool::start 替代 QtConcurrent::run 以消除返回值丢弃警告
     QThreadPool::globalInstance()->start([this, path]() {
         RuntimeMeta meta = getMeta(path);
         
-        // 2026-03-xx 修复文件夹记录丢失：针对根目录文件夹进行路径健壮性处理
         QString qPath = QDir::cleanPath(QString::fromStdWString(path));
         qPath = QDir::toNativeSeparators(qPath);
-        qDebug() << "[MetadataManager] 正在持久化路径:" << qPath << "星级:" << meta.rating << "颜色:" << QString::fromStdWString(meta.color);
         QFileInfo info(qPath);
         
         std::wstring parentDir;
         std::wstring fileName;
 
         if (info.isRoot() || (qPath.length() <= 3 && qPath.endsWith(":\\"))) {
-            // 如果是根目录本身（如 G:\），其没有父目录，元数据存放在自身下
             parentDir = qPath.toStdWString();
-            fileName = L""; // 根目录级别的元数据存放在 folder 节点
+            fileName = L"";
         } else {
             parentDir = QDir::toNativeSeparators(info.absolutePath()).toStdWString();
             fileName = info.fileName().toStdWString();
@@ -289,12 +286,10 @@ void MetadataManager::persistAsync(const std::wstring& path) {
 
         std::wstring volSerial = getVolumeSerialNumber(path);
 
-        // 1. 同步到 JSON 文件
         AmMetaJson json(parentDir);
         json.load();
 
         if (info.isDir() && !fileName.empty()) {
-            // 如果是文件夹，更新其自身的 .am_meta.json (folder 节点)
             AmMetaJson selfJson(path);
             selfJson.load();
             auto& fMeta = selfJson.folder();
@@ -306,13 +301,10 @@ void MetadataManager::persistAsync(const std::wstring& path) {
             fMeta.tags.clear();
             for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
             selfJson.save();
-
-            // 2026-04-10 关键修复：文件夹自身也需要加入同步队列，以更新数据库的 folders 表
             SyncQueue::instance().enqueue(path);
         }
 
         if (fileName.empty()) {
-            // 针对根目录的情况，更新并保存当前的 json（即自身的 json）
             auto& fMeta = json.folder();
             fMeta.rating = meta.rating;
             fMeta.color = meta.color;
@@ -326,10 +318,8 @@ void MetadataManager::persistAsync(const std::wstring& path) {
             return;
         }
 
-        // 更新父目录 JSON 中的条目记录
         auto& itemMeta = json.items()[fileName];
-        itemMeta.volume = volSerial; // 2026-04-10 硬核修复：绑定卷序列号而非盘符
-        // 2026-04-10 修复：显式修正类型，防止文件夹被误认为文件
+        itemMeta.volume = volSerial;
         if (info.isDir()) {
             itemMeta.type = L"folder";
         } else {
@@ -344,7 +334,6 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         for (const auto& t : meta.tags) itemMeta.tags.push_back(t.toStdWString());
         json.save();
 
-        // 2. 触发 SyncQueue 同步到 DB (SyncQueue 会调用 ItemRepo)
         SyncQueue::instance().enqueue(parentDir);
     });
 }

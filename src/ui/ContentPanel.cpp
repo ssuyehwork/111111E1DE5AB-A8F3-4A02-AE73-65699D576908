@@ -913,6 +913,9 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         QMap<int, int> rc; QMap<QString, int> cc, tc, tyc, cdc, mdc;
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
+            // 2026-04-10 按照用户铁律：点击此电脑即生成
+            MetadataManager::instance().prefetchDirectory(drivePath.toStdWString());
+
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
             item->setData(drivePath, PathRole);
             item->setData("folder", TypeRole);
