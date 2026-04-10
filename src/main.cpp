@@ -65,7 +65,8 @@ int main(int argc, char *argv[]) {
     // 2026-03-xx 物理修复：为了彻底杜绝启动期间的死锁与“未响应”，改为在初始化彻底完成后再构造 MainWindow。
     // 这确保了 UI 线程在数据库高峰期保持绝对空闲，不产生任何锁竞争。
     // 2026-03-xx 修复：为 lambda 连接添加上下文对象 qApp，以解决 Qt::QueuedConnection 导致的重载匹配失败。
-    static ArcMeta::MainWindow* w = nullptr;
+    // 修复：移除 static 关键字，使变量具有“自动存储持续时间”，满足 Lambda 引用捕获的语法要求。
+    ArcMeta::MainWindow* w = nullptr;
     QObject::connect(&ArcMeta::CoreController::instance(), &ArcMeta::CoreController::initializationFinished, &a, [&w]() {
         qDebug() << "[Main] 后台就绪，正在主线程动态构造 MainWindow...";
         w = new ArcMeta::MainWindow();
