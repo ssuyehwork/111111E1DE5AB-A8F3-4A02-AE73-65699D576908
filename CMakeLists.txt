@@ -19,6 +19,14 @@ endif()
 # Qt 6 基础组件
 find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql Concurrent)
 
+# 2026-03-xx 按照用户要求：禁用 Vulkan 探测以消除日志报错，并清理构建路径矛盾
+set(QT_NO_VULKAN ON)
+
+# 路径严谨性核查：若检测到 VS 默认的 out 路径，主动输出警告提示
+if(CMAKE_BINARY_DIR MATCHES "/out/")
+    message(WARNING "⚠️ 检测到非法构建路径 [out]！请在 VS 工具栏切换至 [x64-release] 预设以符合《源码纯净》规范。")
+endif()
+
 # 2026-03-xx 按照用户要求：将可执行文件直接输出到指定项目子目录 ArcMeta 下，解决 \out 文件夹查找不便的问题
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/ArcMeta")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/ArcMeta")
