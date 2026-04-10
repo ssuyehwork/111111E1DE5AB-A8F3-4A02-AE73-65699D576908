@@ -894,10 +894,10 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     QThreadPool::globalInstance()->start([panelPtr, path, recursive]() {
         if (!panelPtr) return;
 
-        ScanStats globalStats;
-        QList<ScanItemData> currentBatch;
+        ContentPanel::ScanStats globalStats;
+        QList<ContentPanel::ScanItemData> currentBatch;
 
-        auto flushBatch = [panelPtr, path](const QList<ScanItemData>& batch) {
+        auto flushBatch = [panelPtr, path](const QList<ContentPanel::ScanItemData>& batch) {
             QMetaObject::invokeMethod(qApp, [panelPtr, path, batch]() {
                 if (!panelPtr || panelPtr->m_currentPath != path) return;
 
@@ -934,7 +934,9 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             }, Qt::QueuedConnection);
         };
 
-        std::function<void(const QString&, bool)> scanDir = [&](const QString& p, bool rec) {
+        // 修复：显式定义递归函数对象，避免嵌套 Lambda 的隐式捕获错误
+        std::function<void(const QString&, bool)> scanDir;
+        scanDir = [&](const QString& p, bool rec) {
             QDir dir(p);
             if (!dir.exists()) return;
 
@@ -950,7 +952,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             for (const QFileInfo& info : entries) {
                 if (info.fileName().startsWith(".am_meta.json")) continue;
 
-                ScanItemData data;
+                ContentPanel::ScanItemData data;
                 data.name = info.fileName();
                 data.fullPath = info.absoluteFilePath();
                 data.isDir = info.isDir();

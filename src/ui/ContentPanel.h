@@ -1,5 +1,9 @@
 #pragma once
 
+#include <QDateTime>
+#include <QMap>
+#include <QStringList>
+#include <QTimer>
 #include <QWidget>
 #include <QListView>
 #include <QTreeView>
@@ -10,40 +14,11 @@
 #include <QSortFilterProxyModel>
 #include <QVBoxLayout>
 #include <QStyledItemDelegate>
-#include <QMap>
-#include <QStringList>
-#include <QTimer>
 #include <QPersistentModelIndex>
 #include "FilterPanel.h"
 #include "../meta/MetadataManager.h"
 
 namespace ArcMeta {
-
-/**
- * @brief 内部传输结构，用于异步扫描结果
- */
-struct ScanItemData {
-    QString name;
-    QString fullPath;
-    bool isDir;
-    QString suffix;
-    qint64 size;
-    QDateTime mtime;
-    RuntimeMeta meta;
-};
-
-/**
- * @brief 统计结构
- */
-struct ScanStats {
-    QMap<int, int> ratingCounts;
-    QMap<QString, int> colorCounts;
-    QMap<QString, int> tagCounts;
-    QMap<QString, int> typeCounts;
-    QMap<QString, int> createDateCounts;
-    QMap<QString, int> modifyDateCounts;
-    int noTagCount = 0;
-};
 
 /**
  * @brief 自定义 Role 枚举，用于 QStandardItemModel 数据存取
@@ -66,6 +41,32 @@ class ContentPanel : public QFrame {
     Q_OBJECT
 
 public:
+    /**
+     * @brief 内部传输结构，用于异步扫描结果
+     */
+    struct ScanItemData {
+        QString name;
+        QString fullPath;
+        bool isDir;
+        QString suffix;
+        qint64 size;
+        QDateTime mtime;
+        RuntimeMeta meta;
+    };
+
+    /**
+     * @brief 统计结构
+     */
+    struct ScanStats {
+        QMap<int, int> ratingCounts;
+        QMap<QString, int> colorCounts;
+        QMap<QString, int> tagCounts;
+        QMap<QString, int> typeCounts;
+        QMap<QString, int> createDateCounts;
+        QMap<QString, int> modifyDateCounts;
+        int noTagCount = 0;
+    };
+
     enum ViewMode {
         GridView,
         ListView
