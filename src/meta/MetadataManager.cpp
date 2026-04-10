@@ -16,6 +16,17 @@
 
 namespace ArcMeta {
 
+/**
+ * @brief 内部辅助：标准化路径，确保 G: 统一为 G:\，并处理斜杠一致性
+ */
+static std::wstring normalizePath(const std::wstring& path) {
+    QString qp = QDir::toNativeSeparators(QDir::cleanPath(QString::fromStdWString(path)));
+    if (qp.length() == 2 && qp.endsWith(':')) {
+        qp += '\\';
+    }
+    return qp.toStdWString();
+}
+
 MetadataManager& MetadataManager::instance() {
     static MetadataManager inst;
     return inst;
@@ -136,57 +147,63 @@ void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
 }
 
 void MetadataManager::setRating(const std::wstring& path, int rating) {
+    std::wstring nPath = normalizePath(path);
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache[path].rating = rating;
+        m_cache[nPath].rating = rating;
     }
-    emit metaChanged(path);
-    persistAsync(path);
+    emit metaChanged(nPath);
+    persistAsync(nPath);
 }
 
 void MetadataManager::setColor(const std::wstring& path, const std::wstring& color) {
+    std::wstring nPath = normalizePath(path);
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache[path].color = color;
+        m_cache[nPath].color = color;
     }
-    emit metaChanged(path);
-    persistAsync(path);
+    emit metaChanged(nPath);
+    persistAsync(nPath);
 }
 
 void MetadataManager::setPinned(const std::wstring& path, bool pinned) {
+    std::wstring nPath = normalizePath(path);
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache[path].pinned = pinned;
+        m_cache[nPath].pinned = pinned;
     }
-    emit metaChanged(path);
-    persistAsync(path);
+    emit metaChanged(nPath);
+    persistAsync(nPath);
 }
 
 void MetadataManager::setTags(const std::wstring& path, const QStringList& tags) {
+    std::wstring nPath = normalizePath(path);
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache[path].tags = tags;
+        m_cache[nPath].tags = tags;
     }
-    emit metaChanged(path);
-    persistAsync(path);
+    emit metaChanged(nPath);
+    persistAsync(nPath);
 }
 
 void MetadataManager::setNote(const std::wstring& path, const std::wstring& note) {
+    std::wstring nPath = normalizePath(path);
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache[path].note = note;
+        m_cache[nPath].note = note;
     }
-    emit metaChanged(path);
-    persistAsync(path);
+    emit metaChanged(nPath);
+    persistAsync(nPath);
 }
 
 void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
+    std::wstring nPath = normalizePath(path);
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache[path].encrypted = encrypted;
+        m_cache[nPath].encrypted = encrypted;
     }
-    emit metaChanged(path);
-    persistAsync(path);
+    emit metaChanged(nPath);
+    persistAsync(nPath);
 }
 
 void MetadataManager::renameItem(const std::wstring& oldPath, const std::wstring& newPath) {
@@ -220,7 +237,7 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         if (info.isRoot() || (qPath.length() <= 3 && qPath.endsWith(":\\"))) {
             // 如果是根目录本身（如 G:\），其没有父目录，元数据存放在自身下
             parentDir = qPath.toStdWString();
-            fileName = L""; // 根目录级别的元数据通常存放在 folder 节点
+            fileName = L""; // 根目录级别的元数据存放在 folder 节点
         } else {
             parentDir = QDir::toNativeSeparators(info.absolutePath()).toStdWString();
             fileName = info.fileName().toStdWString();
@@ -230,7 +247,7 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         AmMetaJson json(parentDir);
         json.load();
 
-        if (info.isDir()) {
+        if (info.isDir() && !fileName.empty()) {
             // 如果是文件夹，更新其自身的 .am_meta.json (folder 节点)
             AmMetaJson selfJson(path);
             selfJson.load();
