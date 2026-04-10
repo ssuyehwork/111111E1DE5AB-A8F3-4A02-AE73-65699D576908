@@ -30,8 +30,15 @@ AmMetaJson::AmMetaJson(const std::wstring& folderPath) {
     }
     m_folderPath = qFolderPath.toStdWString();
     
+    // 2026-04-10 按照用户铁律：针对磁盘根目录使用专属文件名，避免覆盖
+    QString metaFileName = ".am_meta.json";
+    QFileInfo dirInfo(qFolderPath);
+    if (dirInfo.isRoot() || (qFolderPath.length() <= 3 && qFolderPath.endsWith(":\\"))) {
+        metaFileName = ".am_drive.json";
+    }
+
     // 使用 QDir::filePath 物理拼接，确保不会出现双斜杠或丢失斜杠
-    QString fullMetaPath = QDir(qFolderPath).filePath(".am_meta.json");
+    QString fullMetaPath = QDir(qFolderPath).filePath(metaFileName);
     m_filePath = QDir::toNativeSeparators(fullMetaPath).toStdWString();
 }
 
