@@ -76,9 +76,24 @@ void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
         AmMetaJson json(dirPath);
         if (json.load()) {
             std::unique_lock<std::shared_mutex> lock(m_mutex);
+            QString qDir = QDir::cleanPath(QString::fromStdWString(dirPath));
+            qDir = QDir::toNativeSeparators(qDir);
+            if (qDir.length() == 2 && qDir.endsWith(':')) qDir += '\\';
+
+            // 1. 加载文件夹自身的元数据 (folder 节点)
+            RuntimeMeta fMeta;
+            fMeta.rating = json.folder().rating;
+            fMeta.color = json.folder().color;
+            fMeta.pinned = json.folder().pinned;
+            fMeta.note = json.folder().note;
+            for (const auto& t : json.folder().tags) fMeta.tags << QString::fromStdWString(t);
+            m_cache[qDir.toStdWString()] = std::move(fMeta);
+
+            // 2. 加载子项元数据 (items 节点)
             for (auto& pair : json.items()) {
-                QString fullPath = QString::fromStdWString(dirPath) + "/" + QString::fromStdWString(pair.first);
-                std::wstring wFullPath = QDir::toNativeSeparators(fullPath).toStdWString();
+                // 修复：使用 QDir::filePath 拼接路径，解决根目录双斜杠 Bug
+                QString fullPath = QDir(qDir).filePath(QString::fromStdWString(pair.first));
+                std::wstring wFullPath = QDir::toNativeSeparators(QDir::cleanPath(fullPath)).toStdWString();
                 
                 RuntimeMeta meta;
                 meta.rating = pair.second.rating;
@@ -167,13 +182,14 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         RuntimeMeta meta = getMeta(path);
 
         // 2026-03-xx 修复文件夹记录丢失：针对根目录文件夹进行路径健壮性处理
-        QString qPath = QDir::toNativeSeparators(QString::fromStdWString(path));
+        QString qPath = QDir::cleanPath(QString::fromStdWString(path));
+        qPath = QDir::toNativeSeparators(qPath);
         QFileInfo info(qPath);
 
         std::wstring parentDir;
         std::wstring fileName;
 
-        if (info.isRoot()) {
+        if (info.isRoot() || (qPath.length() <= 3 && qPath.endsWith(":\\"))) {
             // 如果是根目录本身（如 G:\），其没有父目录，元数据存放在自身下
             parentDir = qPath.toStdWString();
             fileName = L""; // 根目录级别的元数据通常存放在 folder 节点

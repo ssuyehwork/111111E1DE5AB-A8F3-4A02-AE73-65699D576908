@@ -998,7 +998,8 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
 
                 ContentPanel::ScanItemData data;
                 data.name = info.fileName();
-                data.fullPath = info.absoluteFilePath();
+                // 修复：统一路径归一化，解决根目录斜杠导致的元数据匹配失败
+                data.fullPath = QDir::toNativeSeparators(QDir::cleanPath(info.absoluteFilePath()));
                 data.isDir = info.isDir();
                 data.suffix = info.suffix().toUpper();
                 data.size = info.size();

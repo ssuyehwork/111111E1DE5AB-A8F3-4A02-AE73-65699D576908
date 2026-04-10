@@ -19,15 +19,19 @@ namespace ArcMeta {
  * @brief 构造函数，确定目标元数据文件路径
  */
 AmMetaJson::AmMetaJson(const std::wstring& folderPath) {
-    // 2026-03-xx 按照用户要求修复文件夹记录丢失：强制路径标准化，解决根目录斜杠冲突
-    QString qFolderPath = QDir::toNativeSeparators(QDir::cleanPath(QString::fromStdWString(folderPath)));
-    m_folderPath = qFolderPath.toStdWString();
+    // 2026-03-xx 修复文件夹记录丢失：强制路径标准化，解决根目录斜杠冲突
+    QString qFolderPath = QDir::cleanPath(QString::fromStdWString(folderPath));
+    qFolderPath = QDir::toNativeSeparators(qFolderPath);
 
-    // 如果路径不以斜杠结尾（非根目录），补全斜杠
-    if (!qFolderPath.endsWith('\\')) {
+    // 针对磁盘根目录（如 G:）补全反斜杠，确保 QDir 识别正确
+    if (qFolderPath.length() == 2 && qFolderPath.endsWith(':')) {
         qFolderPath += '\\';
     }
-    m_filePath = (qFolderPath + ".am_meta.json").toStdWString();
+    m_folderPath = qFolderPath.toStdWString();
+
+    // 使用 QDir::filePath 物理拼接，确保不会出现双斜杠或丢失斜杠
+    QString fullMetaPath = QDir(qFolderPath).filePath(".am_meta.json");
+    m_filePath = QDir::toNativeSeparators(fullMetaPath).toStdWString();
 }
 
 /**
