@@ -38,8 +38,8 @@ file(GLOB_RECURSE SOURCES
 )
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-# 修复：清单文件从源码列表移除，改由下方的 target_link_options 嵌入以彻底解决 mt.exe 冲突
-add_executable(ArcMeta WIN32 ${SOURCES} "resources/resources.qrc")
+# 修复：使用 .rc 文件直接嵌入清单，这是解决 mt.exe 架构报错与路径冲突的终极稳健方案
+add_executable(ArcMeta WIN32 ${SOURCES} "ArcMeta.rc" "resources/resources.qrc")
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
@@ -65,7 +65,9 @@ set_target_properties(ArcMeta PROPERTIES
 
 # 3. 彻底禁用 CMake 自动清单处理：防止 mt.exe 在 build 目录下生成同名文件夹导致冲突
 if(MSVC)
-    set_target_properties(ArcMeta PROPERTIES MSVC_MANIFEST OFF)
-    # 通过链接器强制嵌入，并明确指定输入，完全接管清单行为
-    target_link_options(ArcMeta PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/ArcMeta.manifest")
+    # 禁用自动处理后，清单已通过上面的 ArcMeta.rc 资源文件直接编译进程序，无需再调用链接器参数
+    set_target_properties(ArcMeta PROPERTIES
+        MSVC_MANIFEST OFF
+        OUTPUT_NAME "ArcMeta"
+    )
 endif()
