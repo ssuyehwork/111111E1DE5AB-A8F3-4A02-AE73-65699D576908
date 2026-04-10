@@ -117,21 +117,32 @@ void NavPanel::initUi() {
     m_model->appendRow(desktopItem);
 
     // 2. 新增：此电脑入口 (使用系统原生图标)
-    // 对于此电脑这种虚拟路径，尝试用 Computer 专用图标，若失败则回退到系统驱动器图标
-    QIcon computerIcon = iconProvider.icon(QFileIconProvider::Computer);
-    QStandardItem* computerItem = new QStandardItem(computerIcon, "此电脑");
+    // 2026-03-xx 物理加速：先展示文字项，图标通过延时加载或在主线程空闲时补全，防止磁盘休眠导致启动假死
+    QStandardItem* computerItem = new QStandardItem("此电脑");
     computerItem->setData("computer://", Qt::UserRole + 1);
     m_model->appendRow(computerItem);
 
-    // 3. 磁盘列表
+    // 3. 磁盘列表 (逻辑异步预备：先填充基础文字路径)
     const auto drives = QDir::drives();
     for (const QFileInfo& drive : drives) {
         QString driveName = drive.absolutePath();
-        QStandardItem* driveItem = new QStandardItem(iconProvider.icon(drive), driveName);
+        QStandardItem* driveItem = new QStandardItem(driveName);
         driveItem->setData(driveName, Qt::UserRole + 1);
         driveItem->appendRow(new QStandardItem("Loading..."));
         m_model->appendRow(driveItem);
     }
+
+    // 2026-03-xx 线程安全修复：图标提取必须在主线程执行。
+    // 虽然 shell 接口可能缓慢，但 Qt 禁止在子线程操作 GUI 相关对象 (QIcon/QPixmap)。
+    // 为了平衡性能与安全，图标提取在主线程分批次（Idle 状态）补全。
+    QTimer::singleShot(0, [this, drives]() {
+        QFileIconProvider iconProvider;
+        m_model->item(1)->setIcon(iconProvider.icon(QFileIconProvider::Computer));
+        for (int i = 0; i < drives.size(); ++i) {
+            if (i + 2 < m_model->rowCount())
+                m_model->item(i + 2)->setIcon(iconProvider.icon(drives[i]));
+        }
+    });
 
     m_treeView->setModel(m_model);
     connect(m_treeView, &QTreeView::expanded, this, &NavPanel::onItemExpanded);

@@ -147,15 +147,13 @@ MainWindow::MainWindow(QWidget* parent)
     initUi();
     initTrayIcon();
 
-    // 启动时和顶级目录均显示“此电脑”（磁盘分区列表）
-    navigateTo("computer://");
-
-    // 2026-03-xx 按照用户要求：启动后将定焦到“此电脑”导航项，而非搜索框
-    // 使用 QTimer 确保在窗口完全显示后执行定焦，防止被其他组件抢占
-    QTimer::singleShot(100, [this]() {
+    // 2026-03-xx 性能优化：严禁在构造函数中执行任何可能导致阻塞的同步加载 (如 navigateTo)。
+    // 改为延迟 200ms 触发首次加载，确保 MainWindow 框架先瞬间弹出，提升用户感知的“秒开”响应速度。
+    QTimer::singleShot(200, [this]() {
+        qDebug() << "[Main] 执行延迟首次加载: 此电脑";
+        navigateTo("computer://");
         m_navPanel->selectPath("computer://");
     });
-
 }
 
 void MainWindow::initUi() {

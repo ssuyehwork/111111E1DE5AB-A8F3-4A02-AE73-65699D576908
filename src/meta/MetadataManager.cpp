@@ -22,15 +22,15 @@ MetadataManager& MetadataManager::instance() {
 MetadataManager::MetadataManager(QObject* parent) : QObject(parent) {}
 
 void MetadataManager::initFromDatabase() {
-    std::unique_lock<std::shared_mutex> lock(m_mutex);
-    m_cache.clear();
+    // 2026-03-xx 架构重构：采用“双缓冲”加载策略。
+    // 先在本地容器加载数据，仅在最终交换时持有写锁，彻底消除主线程查询时的长时间阻塞（死锁）。
+    std::unordered_map<std::wstring, RuntimeMeta> tempCache;
 
-    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属的独立数据库连接，彻底消除跨线程访问警告。
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     if (!db.isOpen()) return;
 
-    // 仅载入有元数据的项，减少内存占用
     QSqlQuery query(db);
+    // 仅载入有元数据的项，减少内存占用
     query.exec("SELECT path, rating, color, tags, pinned, encrypted FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1");
     
     while (query.next()) {
@@ -47,8 +47,16 @@ void MetadataManager::initFromDatabase() {
         meta.pinned = query.value(4).toInt() != 0;
         meta.encrypted = query.value(5).toInt() != 0;
 
-        m_cache[path] = std::move(meta);
+        tempCache[path] = std::move(meta);
     }
+
+    {
+        std::unique_lock<std::shared_mutex> lock(m_mutex);
+        m_cache = std::move(tempCache);
+    }
+
+    // 加载完成后，触发全局刷新信号，补全 UI 界面
+    emit metaChanged(L"__RELOAD_ALL__");
 }
 
 RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {

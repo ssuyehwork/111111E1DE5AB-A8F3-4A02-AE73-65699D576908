@@ -37,6 +37,7 @@
 #include <QLineEdit>
 #include <QTextBrowser>
 #include <QInputDialog>
+#include <QtConcurrent>
 #include <windows.h>
 #include <shellapi.h>
 #include "../meta/AmMetaJson.h"
@@ -820,22 +821,18 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
     m_isRecursive = recursive;
     if (m_btnLayers) m_btnLayers->setChecked(recursive);
 
+    // 2026-03-xx 物理加速：立即清理界面，防止旧数据残留感
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
 
     if (path.isEmpty() || path == "computer://") {
         m_currentPath = "computer://";
         updateLayersButtonState();
+
+        // 此电脑的加载相对较快，但仍存在网络驱动器阻塞风险，此处保留主线程加载但优化体验
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
         
-        QMap<int, int>     ratingCounts;
-        QMap<QString, int> colorCounts;
-        QMap<QString, int> tagCounts;
-        QMap<QString, int> typeCounts;
-        QMap<QString, int> createDateCounts;
-        QMap<QString, int> modifyDateCounts;
-
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
@@ -846,106 +843,122 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             item->setData(false, IsLockedRole);
 
             QList<QStandardItem*> row;
-            row << item;
-            row << new QStandardItem("-");
-            row << new QStandardItem("磁盘分区");
-            row << new QStandardItem("-");
+            row << item << new QStandardItem("-") << new QStandardItem("磁盘分区") << new QStandardItem("-");
             m_model->appendRow(row);
-
-            typeCounts["folder"]++;
         }
-        emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                                  createDateCounts, modifyDateCounts);
+        updateStatusBar();
         return;
     }
 
     m_currentPath = path;
     updateLayersButtonState();
     
-    QMap<int, int>     ratingCounts;
-    QMap<QString, int> colorCounts;
-    QMap<QString, int> tagCounts;
-    QMap<QString, int> typeCounts;
-    QMap<QString, int> createDateCounts;
-    QMap<QString, int> modifyDateCounts;
-    int noTagCount = 0;
+    // 2026-03-xx 核心重构：彻底异步化扫描。
+    // 使用 QtConcurrent 在子线程执行磁盘扫描与元数据检索，主线程保持 100% 响应。
+    QtConcurrent::run([this, path, recursive]() {
+        struct ScanResult {
+            struct ItemData {
+                QString name;
+                QString fullPath;
+                bool isDir;
+                QString suffix;
+                qint64 size;
+                QDateTime mtime;
+                RuntimeMeta meta;
+            };
+            QList<ItemData> items;
+            QMap<int, int> ratingCounts;
+            QMap<QString, int> colorCounts;
+            QMap<QString, int> tagCounts;
+            QMap<QString, int> typeCounts;
+            QMap<QString, int> createDateCounts;
+            QMap<QString, int> modifyDateCounts;
+            int noTagCount = 0;
+        };
 
-    addItemsFromDirectory(path, recursive, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
+        std::function<void(const QString&, bool, ScanResult&)> scanDir =
+            [&](const QString& p, bool rec, ScanResult& res) {
+            QDir dir(p);
+            if (!dir.exists()) return;
 
-    applyFilters();
+            QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
+            QFileIconProvider iconProvider;
+            QDate today = QDate::currentDate();
+            QDate yesterday = today.addDays(-1);
 
-    if (noTagCount > 0) tagCounts["__none__"] = noTagCount;
-    emit directoryStatsReady(ratingCounts, colorCounts, tagCounts, typeCounts,
-                              createDateCounts, modifyDateCounts);
+            auto dateKey = [&](const QDate& d) -> QString {
+                if (d == today) return "today";
+                if (d == yesterday) return "yesterday";
+                return d.toString("yyyy-MM-dd");
+            };
+
+            for (const QFileInfo& info : entries) {
+                if (info.fileName().startsWith(".am_meta.json")) continue;
+
+                ScanResult::ItemData data;
+                data.name = info.fileName();
+                data.fullPath = info.absoluteFilePath();
+                data.isDir = info.isDir();
+                data.suffix = info.suffix().toUpper();
+                data.size = info.size();
+                data.mtime = info.lastModified();
+                data.meta = MetadataManager::instance().getMeta(data.fullPath.toStdWString());
+
+                res.items.append(data);
+
+                // 统计逻辑移入异步线程
+                res.ratingCounts[data.meta.rating]++;
+                res.colorCounts[QString::fromStdWString(data.meta.color)]++;
+                for (const auto& t : data.meta.tags) res.tagCounts[t]++;
+                if (data.meta.tags.isEmpty()) res.noTagCount++;
+                res.typeCounts[data.isDir ? "folder" : data.suffix]++;
+                res.createDateCounts[dateKey(info.birthTime().date())]++;
+                res.modifyDateCounts[dateKey(data.mtime.date())]++;
+
+                if (rec && data.isDir) {
+                    scanDir(data.fullPath, true, res);
+                }
+            }
+        };
+
+        ScanResult result;
+        scanDir(path, recursive, result);
+        if (result.noTagCount > 0) result.tagCounts["__none__"] = result.noTagCount;
+
+        // 扫描完成后，切回主线程更新 UI
+        QMetaObject::invokeMethod(this, [this, path, result]() {
+            if (m_currentPath != path) return; // 丢弃过时扫描结果
+
+            m_model->setRowCount(0);
+            QFileIconProvider iconProvider;
+            for (const auto& data : result.items) {
+                // 2026-03-xx 线程安全修复：图标提取必须在主线程执行。
+                // 此时代码已切回 UI 线程，调用 iconProvider 是安全的。
+                QIcon icon = iconProvider.icon(QFileInfo(data.fullPath));
+                auto* nameItem = new QStandardItem(icon, data.name);
+                nameItem->setData(data.fullPath, PathRole);
+                nameItem->setData(data.isDir ? "folder" : "file", TypeRole);
+                nameItem->setData(data.meta.rating, RatingRole);
+                nameItem->setData(QString::fromStdWString(data.meta.color), ColorRole);
+                nameItem->setData(data.meta.pinned, IsLockedRole);
+                nameItem->setData(data.meta.encrypted, EncryptedRole);
+                nameItem->setData(data.meta.tags, TagsRole);
+
+                QList<QStandardItem*> row;
+                row << nameItem;
+                row << new QStandardItem(data.isDir ? "-" : QString::number(data.size / 1024) + " KB");
+                row << new QStandardItem(data.isDir ? "文件夹" : data.suffix + " 文件");
+                row << new QStandardItem(data.mtime.toString("yyyy-MM-dd HH:mm"));
+                m_model->appendRow(row);
+            }
+
+            applyFilters();
+            emit directoryStatsReady(result.ratingCounts, result.colorCounts, result.tagCounts,
+                                     result.typeCounts, result.createDateCounts, result.modifyDateCounts);
+        }, Qt::QueuedConnection);
+    });
 }
 
-void ContentPanel::addItemsFromDirectory(const QString& path, bool recursive,
-                                       QMap<int, int>& ratingCounts,
-                                       QMap<QString, int>& colorCounts,
-                                       QMap<QString, int>& tagCounts,
-                                       QMap<QString, int>& typeCounts,
-                                       QMap<QString, int>& createDateCounts,
-                                       QMap<QString, int>& modifyDateCounts,
-                                       int& noTagCount) 
-{
-    QDir dir(path);
-    if (!dir.exists()) return;
-
-    QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
-    QFileIconProvider iconProvider;
-
-    QDate today    = QDate::currentDate();
-    QDate yesterday = today.addDays(-1);
-
-    auto dateKey = [&](const QDate& d) -> QString {
-        if (d == today)     return "today";
-        if (d == yesterday) return "yesterday";
-        return d.toString("yyyy-MM-dd");
-    };
-
-    for (const QFileInfo& info : entries) {
-        QString fileName = info.fileName();
-        if (fileName == ".am_meta.json" || fileName == ".am_meta.json.tmp") continue;
-
-        QString fullPath = info.absoluteFilePath();
-        QList<QStandardItem*> row;
-        auto* nameItem = new QStandardItem(iconProvider.icon(info), fileName);
-        nameItem->setData(fullPath, PathRole);
-        nameItem->setData(info.isDir() ? "folder" : "file", TypeRole);
-
-        RuntimeMeta runtimeMeta = MetadataManager::instance().getMeta(fullPath.toStdWString());
-        
-        int     itemRating = runtimeMeta.rating;
-        QString itemColor  = QString::fromStdWString(runtimeMeta.color);
-        QStringList itemTags = runtimeMeta.tags;
-        bool    hasTags = !itemTags.isEmpty();
-
-        nameItem->setData(itemRating, RatingRole);
-        nameItem->setData(itemColor, ColorRole);
-        nameItem->setData(runtimeMeta.pinned, IsLockedRole);
-        nameItem->setData(runtimeMeta.encrypted, EncryptedRole);
-        nameItem->setData(itemTags, TagsRole);
-
-        for (const auto& t : itemTags) tagCounts[t]++;
-
-        ratingCounts[itemRating]++;
-        colorCounts[itemColor]++;
-        if (!hasTags) noTagCount++;
-        typeCounts[info.isDir() ? "folder" : info.suffix().toUpper()]++;
-        createDateCounts[dateKey(info.birthTime().date())]++;
-        modifyDateCounts[dateKey(info.lastModified().date())]++;
-
-        row << nameItem;
-        row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
-        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
-        row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
-        m_model->appendRow(row);
-
-        if (recursive && info.isDir()) {
-            addItemsFromDirectory(fullPath, true, ratingCounts, colorCounts, tagCounts, typeCounts, createDateCounts, modifyDateCounts, noTagCount);
-        }
-    }
-}
 
 
 
