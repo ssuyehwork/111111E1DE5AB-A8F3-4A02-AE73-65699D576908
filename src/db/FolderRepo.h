@@ -15,17 +15,17 @@ public:
     /**
      * @brief 保存或更新文件夹元数据
      */
-    static bool save(const std::wstring& path, const FolderMeta& meta);
+    static bool save(const std::wstring& volume, const std::wstring& path, const FolderMeta& meta);
 
     /**
      * @brief 获取文件夹元数据
      */
-    static bool get(const std::wstring& path, FolderMeta& meta);
+    static bool get(const std::wstring& volume, const std::wstring& path, FolderMeta& meta);
 
     /**
      * @brief 删除文件夹记录
      */
-    static bool remove(const std::wstring& path);
+    static bool remove(const std::wstring& volume, const std::wstring& path);
 };
 
 } // namespace ArcMeta

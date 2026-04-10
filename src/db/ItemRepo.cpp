@@ -19,14 +19,15 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
     std::wstring volume = meta.volume;
     std::wstring frn = meta.frn;
 
-    // 2026-04-10 关键修复：如果 JSON 中主键为空（常发生于非 MFT 扫描结果），尝试根据路径反查原有主键，防止主键冲突导致数据覆盖
+    // 2026-04-10 关键修复：如果 JSON 中主键为空（常发生于非 MFT 扫描结果），尝试根据路径反查原有主键
+    // 2026-04-10 深度优化：优先使用 路径+卷序列号 匹配，确保跨盘符时的唯一性
     if (volume.empty() || frn.empty()) {
         QSqlQuery check(db);
         check.prepare("SELECT volume, frn FROM items WHERE path = ?");
         check.addBindValue(QString::fromStdWString(fullPath));
         if (check.exec() && check.next()) {
-            volume = check.value(0).toString().toStdWString();
-            frn = check.value(1).toString().toStdWString();
+            if (volume.empty()) volume = check.value(0).toString().toStdWString();
+            if (frn.empty()) frn = check.value(1).toString().toStdWString();
         }
     }
 

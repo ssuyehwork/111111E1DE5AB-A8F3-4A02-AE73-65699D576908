@@ -2,6 +2,7 @@
 #include "AmMetaJson.h"
 #include "../db/Database.h"
 #include "../db/FolderRepo.h"
+#include <windows.h>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include "../db/ItemRepo.h"
@@ -70,6 +71,21 @@ void SyncQueue::workerThread() {
 }
 
 /**
+ * @brief 内部辅助：获取路径所在磁盘的卷序列号
+ */
+static std::wstring getVolumeSerial(const std::wstring& path) {
+    if (path.length() < 2) return L"UNKNOWN";
+    wchar_t root[4] = { path[0], L':', L'\\', L'\0' };
+    DWORD serialNumber = 0;
+    if (GetVolumeInformationW(root, nullptr, 0, &serialNumber, nullptr, nullptr, nullptr, 0)) {
+        wchar_t buf[16];
+        swprintf(buf, 16, L"%08X", serialNumber);
+        return buf;
+    }
+    return L"UNKNOWN";
+}
+
+/**
  * @brief 核心业务逻辑：从 JSON 同步数据到 SQLite 事务
  */
 bool SyncQueue::processBatch() {
@@ -99,9 +115,11 @@ bool SyncQueue::processBatch() {
                 continue;
             }
 
+            std::wstring volSerial = getVolumeSerial(path);
+
             // 1. 使用 Repository 同步文件夹 (更新 folders 表)
-            if (FolderRepo::save(path, meta.folder())) {
-                qDebug() << "[SyncQueue] 同步到 folders 表成功:" << QString::fromStdWString(path);
+            if (FolderRepo::save(volSerial, path, meta.folder())) {
+                qDebug() << "[SyncQueue] 同步到 folders 表成功:" << QString::fromStdWString(path) << "卷序列号:" << QString::fromStdWString(volSerial);
             } else {
                 qCritical() << "[SyncQueue] 同步到 folders 表失败:" << QString::fromStdWString(path);
             }

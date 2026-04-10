@@ -70,7 +70,7 @@ QSqlDatabase Database::getThreadDatabase() {
 
 void Database::createTables() {
     QSqlQuery q(m_impl->db);
-    q.exec("CREATE TABLE IF NOT EXISTS folders (path TEXT PRIMARY KEY, rating INTEGER DEFAULT 0, color TEXT DEFAULT '', tags TEXT DEFAULT '', pinned INTEGER DEFAULT 0, note TEXT DEFAULT '', sort_by TEXT DEFAULT 'name', sort_order TEXT DEFAULT 'asc', encrypted INTEGER DEFAULT 0, encrypt_salt TEXT DEFAULT '', encrypt_iv TEXT DEFAULT '', encrypt_verify_hash TEXT DEFAULT '', last_sync REAL)");
+    q.exec("CREATE TABLE IF NOT EXISTS folders (volume TEXT, path TEXT, rating INTEGER DEFAULT 0, color TEXT DEFAULT '', tags TEXT DEFAULT '', pinned INTEGER DEFAULT 0, note TEXT DEFAULT '', sort_by TEXT DEFAULT 'name', sort_order TEXT DEFAULT 'asc', encrypted INTEGER DEFAULT 0, encrypt_salt TEXT DEFAULT '', encrypt_iv TEXT DEFAULT '', encrypt_verify_hash TEXT DEFAULT '', last_sync REAL, PRIMARY KEY (volume, path))");
     q.exec("CREATE TABLE IF NOT EXISTS items (volume TEXT NOT NULL, frn TEXT NOT NULL, path TEXT, parent_path TEXT, type TEXT, rating INTEGER DEFAULT 0, color TEXT DEFAULT '', tags TEXT DEFAULT '', pinned INTEGER DEFAULT 0, note TEXT DEFAULT '', encrypted INTEGER DEFAULT 0, encrypt_salt TEXT DEFAULT '', encrypt_iv TEXT DEFAULT '', encrypt_verify_hash TEXT DEFAULT '', original_name TEXT DEFAULT '', ctime REAL DEFAULT 0, mtime REAL DEFAULT 0, atime REAL DEFAULT 0, deleted INTEGER DEFAULT 0, PRIMARY KEY (volume, frn))");
     q.exec("CREATE TABLE IF NOT EXISTS tags (tag TEXT PRIMARY KEY, item_count INTEGER DEFAULT 0)");
     q.exec("CREATE TABLE IF NOT EXISTS favorites (path TEXT PRIMARY KEY, type TEXT, name TEXT, sort_order INTEGER DEFAULT 0, added_at REAL)");
@@ -81,6 +81,7 @@ void Database::createTables() {
     // 紧急补丁：由于 CREATE TABLE IF NOT EXISTS 不会修改已存在的表，
     // 显式检查并添加缺失的字段，防止查询挂掉。
     q.exec("ALTER TABLE categories ADD COLUMN encrypt_hint TEXT DEFAULT ''"); 
+    q.exec("ALTER TABLE folders ADD COLUMN volume TEXT DEFAULT ''");
     q.exec("ALTER TABLE folders ADD COLUMN encrypted INTEGER DEFAULT 0");
     q.exec("ALTER TABLE folders ADD COLUMN encrypt_salt TEXT DEFAULT ''");
     q.exec("ALTER TABLE folders ADD COLUMN encrypt_iv TEXT DEFAULT ''");

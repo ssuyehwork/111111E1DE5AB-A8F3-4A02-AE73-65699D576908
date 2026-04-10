@@ -7,12 +7,13 @@
 
 namespace ArcMeta {
 
-bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
+bool FolderRepo::save(const std::wstring& volume, const std::wstring& path, const FolderMeta& meta) {
     // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，确保在后台同步任务中正确持久化。
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
 
-    q.prepare("INSERT OR REPLACE INTO folders (path, rating, color, tags, pinned, note, sort_by, sort_order, encrypted, encrypt_salt, encrypt_iv, encrypt_verify_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    q.prepare("INSERT OR REPLACE INTO folders (volume, path, rating, color, tags, pinned, note, sort_by, sort_order, encrypted, encrypt_salt, encrypt_iv, encrypt_verify_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(path));
     q.addBindValue(meta.rating);
     q.addBindValue(QString::fromStdWString(meta.color));
@@ -33,10 +34,11 @@ bool FolderRepo::save(const std::wstring& path, const FolderMeta& meta) {
     return q.exec();
 }
 
-bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
+bool FolderRepo::get(const std::wstring& volume, const std::wstring& path, FolderMeta& meta) {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
-    q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order, encrypted, encrypt_salt, encrypt_iv, encrypt_verify_hash FROM folders WHERE path = ?");
+    q.prepare("SELECT rating, color, tags, pinned, note, sort_by, sort_order, encrypted, encrypt_salt, encrypt_iv, encrypt_verify_hash FROM folders WHERE volume = ? AND path = ?");
+    q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(path));
     
     if (q.exec() && q.next()) {
@@ -62,10 +64,11 @@ bool FolderRepo::get(const std::wstring& path, FolderMeta& meta) {
     return false;
 }
 
-bool FolderRepo::remove(const std::wstring& path) {
+bool FolderRepo::remove(const std::wstring& volume, const std::wstring& path) {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
-    q.prepare("DELETE FROM folders WHERE path = ?");
+    q.prepare("DELETE FROM folders WHERE volume = ? AND path = ?");
+    q.addBindValue(QString::fromStdWString(volume));
     q.addBindValue(QString::fromStdWString(path));
     return q.exec();
 }
