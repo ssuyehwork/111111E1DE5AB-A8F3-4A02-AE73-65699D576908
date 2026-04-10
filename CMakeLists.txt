@@ -31,38 +31,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC OFF)
 set(CMAKE_AUTORCC ON)
 
-# 搜集源文件
+# 搜集源文件 (GLOB_RECURSE 已包含 src 目录下所有 cpp/h，无需重复手动列举)
 file(GLOB_RECURSE SOURCES 
     "src/*.cpp"
     "src/*.h"
 )
-# 修复：显式包含新添加的文件，防止 CMake 缓存导致 GLOB 滞后
-list(APPEND SOURCES 
-    "src/ui/BreadcrumbBar.h"
-    "src/ui/BreadcrumbBar.cpp"
-    "src/ui/CategoryModel.cpp"
-    "src/ui/CategoryModel.h"
-    "src/ui/CategoryDelegate.h"
-    "src/ui/DropTreeView.cpp"
-    "src/ui/DropTreeView.h"
-    "src/core/CoreController.h"
-    "src/core/CoreController.cpp"
-    "src/meta/MetadataManager.h"
-    "src/meta/MetadataManager.cpp"
-    "src/ui/FramelessDialog.h"
-    "src/ui/FramelessDialog.cpp"
-    "src/ui/DropListView.h"
-    "src/ui/DropListView.cpp"
-    "src/ui/TreeItemDelegate.h"
-    "src/ui/CategoryLockDialog.h"
-    "src/ui/CategoryLockDialog.cpp"
-    "src/ui/CategorySetPasswordDialog.h"
-    "src/ui/CategorySetPasswordDialog.cpp"
-)
 
 # 可执行文件 (添加 WIN32 属性以消除控制台黑框)
-# 修复：使用绝对路径显式引用 Manifest，防止嵌入工具定位失败
-add_executable(ArcMeta WIN32 ${SOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/ArcMeta.manifest" "resources/resources.qrc")
+# 修复：清单文件从源码列表移除，改由下方的 target_link_options 嵌入以彻底解决 mt.exe 冲突
+add_executable(ArcMeta WIN32 ${SOURCES} "resources/resources.qrc")
 
 # 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
 target_link_libraries(ArcMeta PRIVATE
@@ -75,4 +52,18 @@ target_link_libraries(ArcMeta PRIVATE
     bcrypt
 )
 
-# 声明管理员权限 Manifest (现代 CMake 方式通过直接将 ArcMeta.manifest 加入 add_executable 处理)
+# --- 深度修复 mt.exe 报错与路径冲突逻辑 ---
+
+# 1. 禁用增量链接：解决 Release/RelWithDebInfo 模式下 mt.exe 合并 ilk 导致的锁定错误
+set_target_properties(ArcMeta PROPERTIES LINK_FLAGS "/INCREMENTAL:NO")
+
+# 2. 强制定向输出：不仅是运行时，PDB 等调试符号也一并重定向至 bin，防止路径残留
+set_target_properties(ArcMeta PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
+    PDB_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
+)
+
+# 3. 链接器直接嵌入清单：通过链接期参数嵌入 ArcMeta.manifest，彻底跳过不稳定的 mt.exe 独立步骤
+if(MSVC)
+    target_link_options(ArcMeta PRIVATE "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/ArcMeta.manifest")
+endif()
