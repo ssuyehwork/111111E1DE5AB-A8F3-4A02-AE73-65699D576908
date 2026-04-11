@@ -105,49 +105,46 @@ bool SyncQueue::processBatch() {
     if (!db.isOpen()) return false;
 
     try {
-        db.transaction();
-
-        for (const auto& path : batch) {
-            qDebug() << "[SyncQueue] 正在从 JSON 同步目录到数据库:" << QString::fromStdWString(path);
-            AmMetaJson meta(path);
-            if (!meta.load()) {
-                qWarning() << "[SyncQueue] 加载 JSON 失败:" << QString::fromStdWString(path);
-                continue;
-            }
-
-            std::wstring volSerial = getVolumeSerial(path);
+        // 2026-05-20 性能优化：微事务分片处理，每 50 个路径提交一次事务
+        const size_t chunkSize = 50;
+        for (size_t i = 0; i < batch.size(); i += chunkSize) {
+            db.transaction();
             
-            // 2026-04-10 深度优化：存储相对路径，实现真正的硬件级绑定，忽略盘符变化
-            std::wstring relPath = path;
-            if (path.length() >= 3 && path[1] == L':' && path[2] == L'\\') {
-                relPath = path.substr(2);
-            }
+            size_t end = std::min(i + chunkSize, batch.size());
+            for (size_t j = i; j < end; ++j) {
+                const auto& path = batch[j];
+                qDebug() << "[SyncQueue] 正在从 JSON 同步目录到数据库:" << QString::fromStdWString(path);
+                AmMetaJson meta(path);
+                if (!meta.load()) {
+                    qWarning() << "[SyncQueue] 加载 JSON 失败:" << QString::fromStdWString(path);
+                    continue;
+                }
 
-            // 1. 使用 Repository 同步文件夹 (更新 folders 表)
-            if (FolderRepo::save(volSerial, relPath, meta.folder())) {
-                qDebug() << "[SyncQueue] 同步到 folders 表成功:" << QString::fromStdWString(relPath) << "卷序列号:" << QString::fromStdWString(volSerial);
-            } else {
-                qCritical() << "[SyncQueue] 同步到 folders 表失败:" << QString::fromStdWString(path);
-            }
+                std::wstring volSerial = getVolumeSerial(path);
+                std::wstring relPath = path;
+                if (path.length() >= 3 && path[1] == L':' && path[2] == L'\\') {
+                    relPath = path.substr(2);
+                }
 
-            // 2. 使用 Repository 同步所有条目 (更新 items 表)
-            int itemCount = 0;
-            for (const auto& [name, iMeta] : meta.items()) {
-                if (ItemRepo::save(path, name, iMeta)) {
-                    itemCount++;
+                // 1. 同步文件夹
+                FolderRepo::save(volSerial, relPath, meta.folder());
+
+                // 2. 同步子条目
+                for (const auto& [name, iMeta] : meta.items()) {
+                    ItemRepo::save(path, name, iMeta);
                 }
             }
-            qDebug() << "[SyncQueue] 已同步" << itemCount << "个子条目到 items 表";
-        }
 
-        if (db.commit()) {
-            return true;
-        } else {
-            db.rollback();
-            return false;
+            db.commit();
+
+            // 关键优化点：分片间隙主动让出写锁，确保主线程交互优先
+            if (end < batch.size()) {
+                QThread::msleep(5);
+            }
         }
+        return true;
     } catch (...) {
-        db.rollback();
+        if (db.isOpen()) db.rollback();
         return false;
     }
 }

@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QMap>
+#include <deque>
 #include <QStringList>
 #include <QTimer>
 #include <QWidget>
@@ -158,6 +159,10 @@ private:
     QTimer* m_lazyIconTimer = nullptr;
     QStringList m_iconPendingPaths;
     QMap<QString, QPersistentModelIndex> m_pathToIndexMap;
+
+    // 2026-05-20 按照白皮书优化：双重缓冲 60FPS 平滑消费
+    QTimer* m_smoothConsumeTimer = nullptr;
+    std::deque<ScanItemData> m_uiPendingQueue;
 
     FilterState m_currentFilter;
 

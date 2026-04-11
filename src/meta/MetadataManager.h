@@ -76,10 +76,18 @@ private:
     std::unordered_map<std::wstring, RuntimeMeta> m_cache;
     mutable std::shared_mutex m_mutex;
 
+    // 2026-05-20 性能优化：延迟持久化防抖
+    std::unordered_map<std::wstring, QTimer*> m_debounceTimers;
+
     /**
      * @brief 异步持久化：刷入数据库和 JSON
      */
     void persistAsync(const std::wstring& path);
+
+    /**
+     * @brief 内部辅助：防抖持久化
+     */
+    void debouncePersist(const std::wstring& path);
 };
 
 } // namespace ArcMeta

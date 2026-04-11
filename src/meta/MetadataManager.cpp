@@ -208,7 +208,7 @@ void MetadataManager::setRating(const std::wstring& path, int rating) {
         m_cache[nPath].rating = rating;
     }
     emit metaChanged(nPath);
-    persistAsync(nPath);
+    debouncePersist(nPath);
 }
 
 void MetadataManager::setColor(const std::wstring& path, const std::wstring& color) {
@@ -218,7 +218,7 @@ void MetadataManager::setColor(const std::wstring& path, const std::wstring& col
         m_cache[nPath].color = color;
     }
     emit metaChanged(nPath);
-    persistAsync(nPath);
+    debouncePersist(nPath);
 }
 
 void MetadataManager::setPinned(const std::wstring& path, bool pinned) {
@@ -228,7 +228,7 @@ void MetadataManager::setPinned(const std::wstring& path, bool pinned) {
         m_cache[nPath].pinned = pinned;
     }
     emit metaChanged(nPath);
-    persistAsync(nPath);
+    debouncePersist(nPath);
 }
 
 void MetadataManager::setTags(const std::wstring& path, const QStringList& tags) {
@@ -238,7 +238,7 @@ void MetadataManager::setTags(const std::wstring& path, const QStringList& tags)
         m_cache[nPath].tags = tags;
     }
     emit metaChanged(nPath);
-    persistAsync(nPath);
+    debouncePersist(nPath);
 }
 
 void MetadataManager::setNote(const std::wstring& path, const std::wstring& note) {
@@ -248,7 +248,7 @@ void MetadataManager::setNote(const std::wstring& path, const std::wstring& note
         m_cache[nPath].note = note;
     }
     emit metaChanged(nPath);
-    persistAsync(nPath);
+    debouncePersist(nPath);
 }
 
 void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
@@ -258,7 +258,25 @@ void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
         m_cache[nPath].encrypted = encrypted;
     }
     emit metaChanged(nPath);
-    persistAsync(nPath);
+    debouncePersist(nPath);
+}
+
+void MetadataManager::debouncePersist(const std::wstring& nPath) {
+    // 2026-05-20 性能优化：引入 2 秒防抖延迟持久化，合并频繁修改
+    QMetaObject::invokeMethod(this, [this, nPath]() {
+        if (!m_debounceTimers.count(nPath)) {
+            QTimer* t = new QTimer(this);
+            t->setSingleShot(true);
+            t->setInterval(2000);
+            connect(t, &QTimer::timeout, [this, nPath]() {
+                persistAsync(nPath);
+                m_debounceTimers[nPath]->deleteLater();
+                m_debounceTimers.erase(nPath);
+            });
+            m_debounceTimers[nPath] = t;
+        }
+        m_debounceTimers[nPath]->start();
+    }, Qt::QueuedConnection);
 }
 
 void MetadataManager::renameItem(const std::wstring& oldPath, const std::wstring& newPath) {

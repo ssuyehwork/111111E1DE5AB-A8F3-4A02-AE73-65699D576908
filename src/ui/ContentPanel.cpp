@@ -181,6 +181,54 @@ ContentPanel::ContentPanel(QWidget* parent)
     m_zoomLevel = 96;
     m_isRecursive = false;
 
+    // 2026-05-20 性能优化白皮书：平滑消费定时器 (60FPS)
+    m_smoothConsumeTimer = new QTimer(this);
+    m_smoothConsumeTimer->setInterval(16); // 16ms = 60FPS
+    connect(m_smoothConsumeTimer, &QTimer::timeout, [this]() {
+        if (m_uiPendingQueue.empty()) {
+            m_smoothConsumeTimer->stop();
+            // 扫描结束后，恢复全量排序并执行单次排序
+            m_proxyModel->setDynamicSortFilter(true);
+            m_proxyModel->sort(0, m_proxyModel->sortOrder());
+            return;
+        }
+
+        // 每一帧仅向 Model 插入 50 个条目，预留交互预算
+        int count = 0;
+        static QIcon folderIcon = QFileIconProvider().icon(QFileIconProvider::Folder);
+        static QIcon fileIcon = QFileIconProvider().icon(QFileIconProvider::File);
+
+        while (!m_uiPendingQueue.empty() && count < 50) {
+            ScanItemData data = m_uiPendingQueue.front();
+            m_uiPendingQueue.pop_front();
+
+            auto* nameItem = new QStandardItem(data.isDir ? folderIcon : fileIcon, data.name);
+            nameItem->setData(data.fullPath, PathRole);
+            nameItem->setData(data.isDir ? "folder" : "file", TypeRole);
+            nameItem->setData(data.meta.rating, RatingRole);
+            nameItem->setData(QString::fromStdWString(data.meta.color), ColorRole);
+            nameItem->setData(data.meta.pinned, PinnedRole);
+            nameItem->setData(data.meta.pinned, IsLockedRole);
+            nameItem->setData(data.meta.encrypted, EncryptedRole);
+            nameItem->setData(data.meta.tags, TagsRole);
+            nameItem->setData(data.isEmpty, IsEmptyRole);
+
+            QList<QStandardItem*> row;
+            row << nameItem;
+            row << new QStandardItem(data.isDir ? "-" : QString::number(data.size / 1024) + " KB");
+            row << new QStandardItem(data.isDir ? (data.isEmpty ? "文件夹 (空)" : "文件夹") : data.suffix + " 文件");
+            row << new QStandardItem(data.mtime.toString("yyyy-MM-dd HH:mm"));
+            m_model->appendRow(row);
+
+            m_iconPendingPaths << data.fullPath;
+            m_pathToIndexMap[data.fullPath] = QPersistentModelIndex(nameItem->index());
+            count++;
+        }
+
+        applyFilters();
+        if (!m_lazyIconTimer->isActive()) m_lazyIconTimer->start();
+    });
+
     // 2026-03-xx 物理加速：初始化懒加载图标定时器
     m_lazyIconTimer = new QTimer(this);
     m_lazyIconTimer->setInterval(30); // 每 30ms 提取一批图标，确保不卡主线程
@@ -898,8 +946,13 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
 
     // 2026-03-xx 极致优化：停止之前的图标懒加载任务，清理队列
     m_lazyIconTimer->stop();
+    m_smoothConsumeTimer->stop();
     m_iconPendingPaths.clear();
     m_pathToIndexMap.clear();
+    m_uiPendingQueue.clear();
+
+    // 扫描任务期间暂时封印动态排序
+    m_proxyModel->setDynamicSortFilter(false);
 
     m_model->clear();
     m_model->setHorizontalHeaderLabels({"名称", "大小", "类型", "修改时间"});
@@ -955,38 +1008,15 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             QMetaObject::invokeMethod(qApp, [panelPtr, path, batch]() {
                 if (!panelPtr || panelPtr->m_currentPath != path) return;
                 
-                // 预取系统通用图标 (纳秒级操作，不卡顿)
-                static QIcon folderIcon = QFileIconProvider().icon(QFileIconProvider::Folder);
-                static QIcon fileIcon = QFileIconProvider().icon(QFileIconProvider::File);
-
+                // 将数据压入待处理队列
                 for (const auto& data : batch) {
-                    // 先上通用图标，真实图标加入懒加载队列
-                    auto* nameItem = new QStandardItem(data.isDir ? folderIcon : fileIcon, data.name);
-                    nameItem->setData(data.fullPath, PathRole);
-                    nameItem->setData(data.isDir ? "folder" : "file", TypeRole);
-                    nameItem->setData(data.meta.rating, RatingRole);
-                    nameItem->setData(QString::fromStdWString(data.meta.color), ColorRole);
-                    nameItem->setData(data.meta.pinned, PinnedRole);
-                    nameItem->setData(data.meta.pinned, IsLockedRole);
-                    nameItem->setData(data.meta.encrypted, EncryptedRole);
-                    nameItem->setData(data.meta.tags, TagsRole);
-                    nameItem->setData(data.isEmpty, IsEmptyRole);
-
-                    QList<QStandardItem*> row;
-                    row << nameItem;
-                    row << new QStandardItem(data.isDir ? "-" : QString::number(data.size / 1024) + " KB");
-                    row << new QStandardItem(data.isDir ? (data.isEmpty ? "文件夹 (空)" : "文件夹") : data.suffix + " 文件");
-                    row << new QStandardItem(data.mtime.toString("yyyy-MM-dd HH:mm"));
-                    panelPtr->m_model->appendRow(row);
-
-                    // 登记懒加载图标任务
-                    panelPtr->m_iconPendingPaths << data.fullPath;
-                    panelPtr->m_pathToIndexMap[data.fullPath] = QPersistentModelIndex(nameItem->index());
+                    panelPtr->m_uiPendingQueue.push_back(data);
                 }
-                
-                panelPtr->applyFilters();
-                // 启动或保持懒加载定时器运行
-                if (!panelPtr->m_lazyIconTimer->isActive()) panelPtr->m_lazyIconTimer->start();
+
+                // 启动平滑消费定时器
+                if (!panelPtr->m_smoothConsumeTimer->isActive()) {
+                    panelPtr->m_smoothConsumeTimer->start();
+                }
             }, Qt::QueuedConnection);
         };
 
@@ -1008,6 +1038,9 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             for (const QFileInfo& info : entries) {
                 if (info.fileName().startsWith(".am_meta.json")) continue;
 
+                // 检查后台任务存活
+                if (!panelPtr) return;
+
                 ContentPanel::ScanItemData data;
                 data.name = info.fileName();
                 // 修复：统一路径归一化，解决根目录斜杠导致的元数据匹配失败
@@ -1024,7 +1057,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
                 }
 
                 currentBatch.append(data);
-                if (currentBatch.size() >= 100) {
+                if (currentBatch.size() >= 500) { // 提高后台批次大小，由定时器限流 UI 插入
                     flushBatch(currentBatch);
                     currentBatch.clear();
                 }

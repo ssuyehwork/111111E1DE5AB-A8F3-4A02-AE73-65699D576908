@@ -74,6 +74,9 @@ bool AmMetaJson::load() {
     QByteArray fileData = file.readAll();
     file.close();
 
+    // 2026-05-20 性能优化：记录原始数据哈希用于脏检查
+    m_lastHash = fileData;
+
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(fileData, &parseError);
 
@@ -108,8 +111,7 @@ bool AmMetaJson::load() {
 /**
  * @brief 安全写入元数据文件
  */
-bool AmMetaJson::save() const {
-    qDebug() << "[AmMetaJson] 正在保存到文件:" << QString::fromStdWString(m_filePath);
+bool AmMetaJson::save(bool force) const {
     // 1. 构建 JSON 根对象
     QJsonObject root;
     root["version"] = "1";
@@ -126,6 +128,15 @@ bool AmMetaJson::save() const {
 
     QJsonDocument doc(root);
     QByteArray jsonData = doc.toJson(QJsonDocument::Indented);
+
+    // 2026-05-20 性能优化：脏检查拦截冗余 IO
+    if (!force && !m_lastHash.isEmpty() && jsonData == m_lastHash) {
+        // 数据无变动，跳过物理磁盘写入
+        return true;
+    }
+    m_lastHash = jsonData;
+
+    qDebug() << "[AmMetaJson] 正在保存到文件:" << QString::fromStdWString(m_filePath);
 
     // 2. 写入临时文件 .am_meta.json.tmp
     QString tmpPath = toQString(m_filePath) + ".tmp";

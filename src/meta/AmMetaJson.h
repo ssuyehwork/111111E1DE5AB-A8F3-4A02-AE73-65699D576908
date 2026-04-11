@@ -80,8 +80,9 @@ public:
     /**
      * @brief 安全保存到 .am_meta.json 文件
      * 遵循：写临时文件 -> 校验 -> 原子替换 -> 设置隐藏属性 流程
+     * @param force 强制写入，跳过脏检查 (2026-05-20 性能优化)
      */
-    bool save() const;
+    bool save(bool force = false) const;
 
     // 数据访问接口
     FolderMeta& folder() { return m_folder; }
@@ -109,6 +110,9 @@ private:
     
     FolderMeta m_folder;
     std::map<std::wstring, ItemMeta> m_items;
+
+    // 2026-05-20 性能优化：内容脏检查
+    mutable QByteArray m_lastHash;
 
     // 内部转换辅助
     static QJsonObject folderToEntry(const FolderMeta& meta);

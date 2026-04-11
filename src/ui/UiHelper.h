@@ -7,6 +7,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QMap>
+#include <QCache>
 #include <QSettings>
 #include "../../SvgIcons.h"
 
@@ -29,6 +30,11 @@ public:
      * @brief 获取带颜色的 SVG Pixmap (返回 QPixmap)
      */
     static QPixmap getPixmap(const QString& key, const QSize& size, const QColor& color) {
+        static QCache<QString, QPixmap> s_renderCache(500); // 缓存 500 个图标
+
+        QString cKey = QString("%1_%2_%3_%4").arg(key).arg(size.width()).arg(size.height()).arg(color.rgba());
+        if (s_renderCache.contains(cKey)) return *s_renderCache.object(cKey);
+
         if (!SvgIcons::icons.contains(key)) return QPixmap();
 
         QString svgData = SvgIcons::icons[key];
@@ -49,6 +55,7 @@ public:
         QSvgRenderer renderer(svgData.toUtf8());
         renderer.render(&painter);
         
+        s_renderCache.insert(cKey, new QPixmap(pixmap));
         return pixmap;
     }
 
