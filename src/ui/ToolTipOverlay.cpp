@@ -41,6 +41,12 @@ void ToolTipOverlay::showText(const QPoint& globalPos, const QString& text, int 
     }
 
     if (text.isEmpty()) { hide(); return; }
+
+    // 2026-05-20 性能优化：内容脏检查，防止鼠标在按钮内部微动导致的重复渲染卡顿
+    if (isVisible() && m_text == text && m_currentBorderColor == borderColor) {
+        move(globalPos + QPoint(15, 15));
+        return;
+    }
     
     if (timeout > 0) {
         timeout = qBound(500, timeout, 60000); 
@@ -103,7 +109,6 @@ void ToolTipOverlay::showText(const QPoint& globalPos, const QString& text, int 
     
     move(pos);
     show();
-    raise();
     update();
 
     if (timeout > 0) {

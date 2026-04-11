@@ -371,12 +371,13 @@ void ContentPanel::updateGridSize() {
 
 bool ContentPanel::eventFilter(QObject* obj, QEvent* event) {
     // 2026-03-xx 按照宪法要求：物理拦截 Hover 事件以触发 ToolTipOverlay
-    if (event->type() == QEvent::HoverEnter) {
+    // 2026-05-20 性能优化：同时支持 Enter/Leave 事件，确保响应灵敏
+    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::Enter) {
         QString text = obj->property("tooltipText").toString();
         if (!text.isEmpty()) {
             ToolTipOverlay::instance()->showText(QCursor::pos(), text);
         }
-    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
+    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::Leave || event->type() == QEvent::MouseButtonPress) {
         ToolTipOverlay::hideTip();
     }
 

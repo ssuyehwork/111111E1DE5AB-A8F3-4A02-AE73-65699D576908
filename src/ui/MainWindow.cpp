@@ -397,6 +397,9 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
         return;
     }
 
+    // 2026-05-20 极致性能：MainWindow 自身也需支持悬停识别，确保自定义标题栏操作灵敏
+    setAttribute(Qt::WA_Hover);
+
     // 2. Ctrl+F: 聚焦搜索过滤框
     if (event->key() == Qt::Key_F && (event->modifiers() & Qt::ControlModifier)) {
         m_searchEdit->setFocus(Qt::ShortcutFocusReason);
@@ -410,13 +413,14 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
 
 // 2026-03-xx 按照用户要求：物理拦截事件以实现自定义 ToolTipOverlay 的显隐控制
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
-    if (event->type() == QEvent::HoverEnter) {
+    // 2026-05-20 性能优化：同时支持 Enter/Leave 与 Hover 事件，确保标题栏按钮响应“零延迟”
+    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::Enter) {
         QString text = watched->property("tooltipText").toString();
         if (!text.isEmpty()) {
             // 物理级别禁绝原生 ToolTip，强制调用 ToolTipOverlay
             ToolTipOverlay::instance()->showText(QCursor::pos(), text);
         }
-    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::MouseButtonPress) {
+    } else if (event->type() == QEvent::HoverLeave || event->type() == QEvent::Leave || event->type() == QEvent::MouseButtonPress) {
         ToolTipOverlay::hideTip();
     }
 
@@ -426,6 +430,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
 void MainWindow::initToolbar() {
     auto createBtn = [this](const QString& iconKey, const QString& tip) {
         QPushButton* btn = new QPushButton(this);
+        btn->setAttribute(Qt::WA_Hover); // 2026-05-20 性能优化：必须开启 Hover 属性以触发悬停事件
         btn->setFixedSize(32, 28); // 极致精简宽度
         
         QIcon icon = UiHelper::getIcon(iconKey, QColor("#EEEEEE"));
@@ -650,6 +655,7 @@ void MainWindow::setupCustomTitleBarButtons() {
 
     auto createTitleBtn = [this](const QString& iconKey, const QString& hoverColor = "rgba(255, 255, 255, 0.1)") {
         QPushButton* btn = new QPushButton(this);
+        btn->setAttribute(Qt::WA_Hover); // 2026-05-20 性能优化：必须开启 Hover 属性以触发悬停事件
         btn->setFixedSize(24, 24); // 固定 24x24px
         
         // 使用 UiHelper 全局辅助类
