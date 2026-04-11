@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<bridgedata version='1'>
+	<labels version='1'>
+		<item key='旧版本-3' label='已批准'/>
+	</labels>
+	<ratings version='1'>
+		<item key='Buk_20260331_121630' rating='2'/>
+		<item key='旧版本-3' rating='1'/>
+	</ratings>
+</bridgedata>
