@@ -5,6 +5,7 @@
 #include "../meta/MetadataManager.h"
 #include <QtConcurrent>
 #include <QThreadPool>
+#include <QDateTime>
 #include <QDebug>
 
 namespace ArcMeta {
@@ -42,8 +43,15 @@ void CoreController::startSystem() {
         // 3. 执行增量同步 (基于分布式 JSON 对齐元数据)
         setStatus("正在校验增量数据...", true);
         qint64 incrementalStart = QDateTime::currentMSecsSinceEpoch();
-        SyncEngine::instance().runIncrementalSync();
-        qDebug() << "[Core] [Step 3/3] 增量同步完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - incrementalStart) << "ms";
+
+        // 2026-05-20 性能优化：增量同步移出关键初始化路径，允许后台静默执行
+        // 并显式设置线程池优先级，确保不干扰 UI 响应
+        QtConcurrent::run(QThreadPool::globalInstance(), []() {
+            QThread::currentThread()->setPriority(QThread::LowPriority);
+            SyncEngine::instance().runIncrementalSync();
+        });
+
+        qDebug() << "[Core] [Step 3/3] 增量同步已异步挂起";
 
         setStatus("系统就绪", false);
         qDebug() << "[Core] !!! 所有初始化任务已就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms，正在发射信号...";

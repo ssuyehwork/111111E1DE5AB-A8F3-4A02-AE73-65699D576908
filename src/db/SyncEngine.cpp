@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <filesystem>
 #include <map>
+#include <QtConcurrent>
 
 namespace ArcMeta {
 
@@ -23,22 +24,20 @@ SyncEngine& SyncEngine::instance() {
 
 /**
  * @brief 增量同步：只处理 mtime > last_sync_time 的 .am_meta.json
+ * 2026-05-20 性能回归：禁止启动时全盘扫描，仅处理数据库中已知的活跃目录以保证“秒开”。
  */
 void SyncEngine::runIncrementalSync() {
     double lastSyncTime = 0;
-    
-    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，消除异步任务中的跨线程数据库警告。
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     if (!db.isOpen()) return;
 
-    // 获取上次同步时间
     QSqlQuery st(db);
     st.exec("SELECT value FROM sync_state WHERE key = 'last_sync_time'");
     if (st.next()) {
         lastSyncTime = st.value(0).toDouble();
     }
 
-    // 执行全表增量扫描逻辑
+    // 2026-05-20 核心逻辑：只对 folders 表中已记录的路径进行增量对齐
     QSqlQuery query(db);
     query.exec("SELECT path FROM folders");
     
@@ -51,15 +50,16 @@ void SyncEngine::runIncrementalSync() {
         if (info.exists() && info.lastModified().toMSecsSinceEpoch() > lastSyncTime) {
             SyncQueue::instance().enqueue(path);
             count++;
-            
-            // 2026-03-xx 物理防御：增量同步批处理限流
-            // 每处理 50 个文件夹强制挂起 10ms，防止瞬间撑爆同步队列导致 IO 风暴或 CPU 抢占
-            if (count % 50 == 0) {
-                QThread::msleep(10);
-            }
         }
     }
-    qDebug() << "[Sync] 增量扫描完成，共识别出" << count << "个变动文件夹";
+
+    // 更新同步时间
+    QSqlQuery updateSync(db);
+    updateSync.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
+    updateSync.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
+    updateSync.exec();
+
+    qDebug() << "[Sync] 增量扫描完成，已对齐" << count << "个活跃文件夹的元数据";
 }
 
 /**

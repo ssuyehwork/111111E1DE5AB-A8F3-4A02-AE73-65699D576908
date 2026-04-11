@@ -8,6 +8,7 @@
 #include <QPixmap>
 #include <QMap>
 #include <QCache>
+#include <QMutex>
 #include <QSettings>
 #include "../../SvgIcons.h"
 
@@ -31,9 +32,13 @@ public:
      */
     static QPixmap getPixmap(const QString& key, const QSize& size, const QColor& color) {
         static QCache<QString, QPixmap> s_renderCache(500); // 缓存 500 个图标
+        static QMutex s_cacheMutex; // 2026-05-20 修复：QCache 并非线程安全，必须加锁保护
 
         QString cKey = QString("%1_%2_%3_%4").arg(key).arg(size.width()).arg(size.height()).arg(color.rgba());
-        if (s_renderCache.contains(cKey)) return *s_renderCache.object(cKey);
+        {
+            QMutexLocker locker(&s_cacheMutex);
+            if (s_renderCache.contains(cKey)) return *s_renderCache.object(cKey);
+        }
 
         if (!SvgIcons::icons.contains(key)) return QPixmap();
 
@@ -55,7 +60,10 @@ public:
         QSvgRenderer renderer(svgData.toUtf8());
         renderer.render(&painter);
         
-        s_renderCache.insert(cKey, new QPixmap(pixmap));
+        {
+            QMutexLocker locker(&s_cacheMutex);
+            s_renderCache.insert(cKey, new QPixmap(pixmap));
+        }
         return pixmap;
     }
 
