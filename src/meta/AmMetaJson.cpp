@@ -134,7 +134,6 @@ bool AmMetaJson::save(bool force) const {
         // 数据无变动，跳过物理磁盘写入
         return true;
     }
-    m_lastHash = jsonData;
 
     qDebug() << "[AmMetaJson] 正在保存到文件:" << QString::fromStdWString(m_filePath);
 
@@ -179,6 +178,9 @@ bool AmMetaJson::save(bool force) const {
     }
 
     qDebug() << "[AmMetaJson] 保存成功";
+
+    // 写入成功后更新哈希值（2026-05-20 修复：防止因写入失败导致的哈希误判）
+    m_lastHash = jsonData;
 
     // 5. 设置隐藏属性（关键红线要求）
     SetFileAttributesW(m_filePath.c_str(), FILE_ATTRIBUTE_HIDDEN);

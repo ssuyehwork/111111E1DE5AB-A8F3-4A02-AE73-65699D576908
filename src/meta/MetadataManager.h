@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QTimer>
 #include <QStringList>
 #include <unordered_map>
 #include <shared_mutex>

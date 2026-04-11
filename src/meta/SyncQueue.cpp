@@ -3,10 +3,12 @@
 #include "../db/Database.h"
 #include "../db/FolderRepo.h"
 #include <windows.h>
+#include <QThread>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include "../db/ItemRepo.h"
 #include <vector>
+#include <algorithm>
 #include <QString>
 #include <QDateTime>
 
@@ -110,7 +112,7 @@ bool SyncQueue::processBatch() {
         for (size_t i = 0; i < batch.size(); i += chunkSize) {
             db.transaction();
             
-            size_t end = std::min(i + chunkSize, batch.size());
+            size_t end = (std::min)(i + chunkSize, batch.size());
             for (size_t j = i; j < end; ++j) {
                 const auto& path = batch[j];
                 qDebug() << "[SyncQueue] 正在从 JSON 同步目录到数据库:" << QString::fromStdWString(path);
