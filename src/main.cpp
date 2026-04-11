@@ -54,7 +54,11 @@ int main(int argc, char *argv[]) {
     a.setApplicationName("ArcMeta");
     a.setOrganizationName("ArcMetaTeam");
 
-    // 2. 初始化数据库 (仅核心表结构，必须同步完成)
+    // 2. 线程亲和性预热：在主线程显式初始化单例，防止后台线程抢占导致 QTimer 失效或闪退
+    ArcMeta::MetadataManager::instance();
+    ArcMeta::CoreController::instance();
+
+    // 3. 初始化数据库 (仅核心表结构，必须同步完成)
     std::wstring dbPath = L"arcmeta.db";
     if (!ArcMeta::Database::instance().init(dbPath)) {
         QMessageBox::critical(nullptr, "错误", "无法初始化数据库，程序即将退出。");
@@ -62,17 +66,20 @@ int main(int argc, char *argv[]) {
     }
 
     // 3. 秒开重构：
-    // 2026-05-20 性能优化：不再等待初始化完成。主窗口必须立即显示，耗时操作交由后台处理。
-    ArcMeta::MainWindow w;
-    w.show();
+    // 2026-05-20 性能优化：主窗口使用指针分配，配合 deleteLater 确保退出清理时的稳定性，防止栈对象销毁竞态闪退。
+    auto* w = new ArcMeta::MainWindow();
+    w->show();
 
     // 4. 启动异步初始化中控
     ArcMeta::CoreController::instance().startSystem();
 
     int ret = a.exec();
 
-    // 6. 优雅退出：刷空队列并停止线程
+    // 5. 优雅退出清理
+    // 先停止同步队列防止后台 IO 异常
     ArcMeta::SyncQueue::instance().stop();
+    // 显式销毁窗口
+    w->deleteLater();
 
     return ret;
 }

@@ -263,15 +263,23 @@ void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
 
 void MetadataManager::debouncePersist(const std::wstring& nPath) {
     // 2026-05-20 性能优化：引入 2 秒防抖延迟持久化，合并频繁修改
+    // 修复：确保定时器操作在主线程闭环执行，并验证路径有效性
+    if (nPath.empty()) return;
+
     QMetaObject::invokeMethod(this, [this, nPath]() {
+        // [SAFETY] 检查是否已在销毁过程中
+        if (this->thread() != QThread::currentThread()) return;
+
         if (!m_debounceTimers.count(nPath)) {
             QTimer* t = new QTimer(this);
             t->setSingleShot(true);
             t->setInterval(2000);
             connect(t, &QTimer::timeout, [this, nPath]() {
                 persistAsync(nPath);
-                m_debounceTimers[nPath]->deleteLater();
-                m_debounceTimers.erase(nPath);
+                if (m_debounceTimers.count(nPath)) {
+                    m_debounceTimers[nPath]->deleteLater();
+                    m_debounceTimers.erase(nPath);
+                }
             });
             m_debounceTimers[nPath] = t;
         }

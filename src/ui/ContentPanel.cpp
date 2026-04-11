@@ -1006,6 +1006,9 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         QList<ContentPanel::ScanItemData> currentBatch;
 
         auto flushBatch = [panelPtr, path](const QList<ContentPanel::ScanItemData>& batch) {
+            // [STABILITY] 检查 qApp 存活状态，防止程序退出时异步回调崩溃
+            if (!qApp) return;
+
             QMetaObject::invokeMethod(qApp, [panelPtr, path, batch]() {
                 if (!panelPtr || panelPtr->m_currentPath != path) return;
                 
