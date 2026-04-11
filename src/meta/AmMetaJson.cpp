@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QDir>
+#include <QCoreApplication>
 #include <string>
 #include <map>
 #include <vector>
@@ -20,8 +21,20 @@ namespace ArcMeta {
  * @brief 构造函数，确定目标元数据文件路径
  */
 AmMetaJson::AmMetaJson(const std::wstring& folderPath) {
+    QString qFolderPath = QString::fromStdWString(folderPath);
+
+    // 2026-04-12 按照用户最新铁律：引入虚拟路径 computer:// 用于集中管理所有硬盘
+    if (qFolderPath == "computer://") {
+        m_folderPath = qFolderPath.toStdWString();
+        // .am_drive.json 必须被创建到程序根目录下
+        QString appDir = QCoreApplication::applicationDirPath();
+        QString fullMetaPath = QDir(appDir).filePath(".am_drive.json");
+        m_filePath = QDir::toNativeSeparators(fullMetaPath).toStdWString();
+        return;
+    }
+
     // 2026-03-xx 修复文件夹记录丢失：强制路径标准化，解决根目录斜杠冲突
-    QString qFolderPath = QDir::cleanPath(QString::fromStdWString(folderPath));
+    qFolderPath = QDir::cleanPath(qFolderPath);
     qFolderPath = QDir::toNativeSeparators(qFolderPath);
     
     // 针对磁盘根目录（如 G:）补全反斜杠，确保 QDir 识别正确
@@ -30,12 +43,9 @@ AmMetaJson::AmMetaJson(const std::wstring& folderPath) {
     }
     m_folderPath = qFolderPath.toStdWString();
     
-    // 2026-04-10 按照用户铁律：针对磁盘根目录使用专属文件名，避免覆盖
+    // 2026-04-12 按照用户最新要求：磁盘根目录不再单独生成 .am_drive.json
+    // 所有文件夹（包括磁盘根目录）内部的元数据统一使用 .am_meta.json
     QString metaFileName = ".am_meta.json";
-    QFileInfo dirInfo(qFolderPath);
-    if (dirInfo.isRoot() || (qFolderPath.length() <= 3 && qFolderPath.endsWith(":\\"))) {
-        metaFileName = ".am_drive.json";
-    }
 
     // 使用 QDir::filePath 物理拼接，确保不会出现双斜杠或丢失斜杠
     QString fullMetaPath = QDir(qFolderPath).filePath(metaFileName);

@@ -908,20 +908,26 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
         m_currentPath = "computer://";
         updateLayersButtonState();
         
+        // 2026-04-12 按照用户最新铁律：点击此电脑即预加载集中式磁盘元数据文件
+        MetadataManager::instance().prefetchDirectory(L"computer://");
+
         QFileIconProvider iconProvider;
         const auto drives = QDir::drives();
         QMap<int, int> rc; QMap<QString, int> cc, tc, tyc, cdc, mdc;
         for (const QFileInfo& drive : drives) {
             QString drivePath = drive.absolutePath();
-            // 2026-04-10 按照用户铁律：点击此电脑即生成
+            // 2026-04-10 按照用户铁律：进入磁盘即预加载该磁盘内容的元数据
             MetadataManager::instance().prefetchDirectory(drivePath.toStdWString());
 
             auto* item = new QStandardItem(iconProvider.icon(drive), drivePath);
             item->setData(drivePath, PathRole);
             item->setData("folder", TypeRole);
-            item->setData(0, RatingRole);
-            item->setData("", ColorRole);
-            item->setData(false, IsLockedRole);
+
+            // 2026-04-12 按照用户最新铁律：从 MetadataManager 获取集中管理的磁盘元数据
+            RuntimeMeta rm = MetadataManager::instance().getMeta(drivePath.toStdWString());
+            item->setData(rm.rating, RatingRole);
+            item->setData(QString::fromStdWString(rm.color), ColorRole);
+            item->setData(rm.pinned, IsLockedRole);
 
             QList<QStandardItem*> row;
             row << item << new QStandardItem("-") << new QStandardItem("磁盘分区") << new QStandardItem("-");

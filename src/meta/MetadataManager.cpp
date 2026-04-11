@@ -151,14 +151,15 @@ RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {
 }
 
 void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
-    std::wstring nDirPath = normalizePath(dirPath);
+    // 2026-04-12 按照用户最新铁律：支持虚拟路径 computer://
+    std::wstring nDirPath = (dirPath == L"computer://") ? dirPath : normalizePath(dirPath);
     qDebug() << "[MetadataManager] 预加载目录元数据(访问即生成):" << QString::fromStdWString(nDirPath);
     
     QThreadPool::globalInstance()->start([this, nDirPath]() {
         AmMetaJson json(nDirPath);
         
         // 2026-04-10 按照用户铁律：访问即生成
-        // 强制调用 save()。如果文件不存在，它会创建一个包含默认 folder 节点的初始文件。
+        // 强制调用 save()。如果文件不存在，它会创建一个初始文件。
         json.load();
         json.save();
 
@@ -176,7 +177,14 @@ void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
 
             // 2. 加载子项元数据 (items 节点)
             for (auto& pair : json.items()) {
-                QString fullPath = QDir(QString::fromStdWString(nDirPath)).filePath(QString::fromStdWString(pair.first));
+                QString fullPath;
+                if (nDirPath == L"computer://") {
+                    // 对于集中式驱动器配置，将 "C:" 还原为 "C:\" 路径作为缓存 Key
+                    fullPath = QString::fromStdWString(pair.first);
+                    if (!fullPath.endsWith('\\')) fullPath += '\\';
+                } else {
+                    fullPath = QDir(QString::fromStdWString(nDirPath)).filePath(QString::fromStdWString(pair.first));
+                }
                 std::wstring wFullPath = normalizePath(fullPath.toStdWString());
                 
                 RuntimeMeta meta;
@@ -276,9 +284,13 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         std::wstring parentDir;
         std::wstring fileName;
 
+        // 2026-04-12 按照用户最新铁律：磁盘根目录自身元数据保存到 computer:// 对应的 .am_drive.json 中
         if (info.isRoot() || (qPath.length() <= 3 && qPath.endsWith(":\\"))) {
-            parentDir = qPath.toStdWString();
-            fileName = L""; 
+            parentDir = L"computer://";
+            // 移除末尾的反斜杠，例如 G:\ -> G:
+            QString driveName = qPath;
+            if (driveName.endsWith('\\')) driveName.chop(1);
+            fileName = driveName.toStdWString();
         } else {
             parentDir = QDir::toNativeSeparators(info.absolutePath()).toStdWString();
             fileName = info.fileName().toStdWString();
