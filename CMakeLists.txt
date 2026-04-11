@@ -36,22 +36,17 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/ArcMeta")
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC OFF)
 set(CMAKE_AUTORCC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # 搜集源文件
 # 2026-03-xx 按照用户要求：使用递归搜集源码，并包含资源文件与清单资源文件以确保编译完整性
+# 2026-04-12 物理优化：回归标准 GLOB 模式，由 AUTOMOC 自动处理依赖，消除 LNK2019 外部符号冲突
 file(GLOB_RECURSE SOURCES 
     "src/*.cpp"
     "src/*.h"
+    "ArcMeta.rc"
+    "resources/resources.qrc"
 )
-
-# 2026-04-10 修复：显式包含新增加的文件以确保构建系统捕获，解决 LNK2019 外部符号无法解析错误
-list(APPEND SOURCES 
-    "src/ui/BatchRenameDialog.cpp"
-    "src/ui/BatchRenameDialog.h"
-    "src/ui/RuleRow.cpp"
-    "src/ui/RuleRow.h"
-)
-list(REMOVE_DUPLICATES SOURCES)
 
 # 修复：将 .rc 资源文件加入源码列表，确保图标和清单正确嵌入
 list(APPEND SOURCES 
