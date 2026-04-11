@@ -1316,12 +1316,12 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     bool isEmptyFolder = (index.data(TypeRole).toString() == "folder" && index.data(IsEmptyRole).toBool());
 
     if (isEmptyFolder) {
-        // 2026-04-12 按照用户要求：空文件夹卡片底部显示红色背景，提供强烈视觉识别
-        QColor emptyColor("#E24B4A");
+        // 2026-04-12 按照用户要求：空文件夹卡片底部显示白色背景 (#FFFFFF)，提供强烈反差识别
+        QColor emptyColor("#FFFFFF");
         painter->setPen(Qt::NoPen);
         painter->setBrush(emptyColor);
         painter->drawRoundedRect(nameRect, 2, 2);
-        painter->setPen(Qt::white);
+        painter->setPen(Qt::black);
     } else if (!colorName.isEmpty()) {
         QColor dotC(colorName);
         if (!dotC.isValid()) {
