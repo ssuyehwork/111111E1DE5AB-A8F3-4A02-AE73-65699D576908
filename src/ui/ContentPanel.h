@@ -31,7 +31,8 @@ enum ItemRole {
     PathRole,
     IsLockedRole,
     TagsRole,
-    TypeRole
+    TypeRole,
+    IsEmptyRole
 };
 
 /**
@@ -53,6 +54,7 @@ public:
         qint64 size;
         QDateTime mtime;
         RuntimeMeta meta;
+        bool isEmpty = false;
     };
 
     /**

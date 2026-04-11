@@ -970,11 +970,12 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
                     nameItem->setData(data.meta.pinned, IsLockedRole);
                     nameItem->setData(data.meta.encrypted, EncryptedRole);
                     nameItem->setData(data.meta.tags, TagsRole);
+                    nameItem->setData(data.isEmpty, IsEmptyRole);
 
                     QList<QStandardItem*> row;
                     row << nameItem;
                     row << new QStandardItem(data.isDir ? "-" : QString::number(data.size / 1024) + " KB");
-                    row << new QStandardItem(data.isDir ? "文件夹" : data.suffix + " 文件");
+                    row << new QStandardItem(data.isDir ? (data.isEmpty ? "文件夹 (空)" : "文件夹") : data.suffix + " 文件");
                     row << new QStandardItem(data.mtime.toString("yyyy-MM-dd HH:mm"));
                     panelPtr->m_model->appendRow(row);
 
@@ -1016,6 +1017,11 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
                 data.size = info.size();
                 data.mtime = info.lastModified();
                 data.meta = MetadataManager::instance().getMeta(data.fullPath.toStdWString());
+
+                // 2026-04-12 按照用户要求：探测空文件夹
+                if (data.isDir) {
+                    data.isEmpty = QDir(data.fullPath).isEmpty();
+                }
 
                 currentBatch.append(data);
                 if (currentBatch.size() >= 100) {
@@ -1155,9 +1161,13 @@ void ContentPanel::loadPaths(const QStringList& paths) {
         nameItem->setData(rm.pinned, IsLockedRole);
         nameItem->setData(rm.tags, TagsRole);
 
+        bool isEmpty = false;
+        if (info.isDir()) isEmpty = QDir(path).isEmpty();
+        nameItem->setData(isEmpty, IsEmptyRole);
+
         row << nameItem;
         row << new QStandardItem(info.isDir() ? "-" : QString::number(info.size() / 1024) + " KB");
-        row << new QStandardItem(info.isDir() ? "文件夹" : info.suffix().toUpper() + " 文件");
+        row << new QStandardItem(info.isDir() ? (isEmpty ? "文件夹 (空)" : "文件夹") : info.suffix().toUpper() + " 文件");
         row << new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm"));
         m_model->appendRow(row);
 
@@ -1303,7 +1313,16 @@ void GridItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QRect nameRect(cardRect.left() + 6, nameY, cardRect.width() - 12, nameH);
     
     QString colorName = index.data(ColorRole).toString();
-    if (!colorName.isEmpty()) {
+    bool isEmptyFolder = (index.data(TypeRole).toString() == "folder" && index.data(IsEmptyRole).toBool());
+
+    if (isEmptyFolder) {
+        // 2026-04-12 按照用户要求：空文件夹卡片底部显示红色背景，提供强烈视觉识别
+        QColor emptyColor("#E24B4A");
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(emptyColor);
+        painter->drawRoundedRect(nameRect, 2, 2);
+        painter->setPen(Qt::white);
+    } else if (!colorName.isEmpty()) {
         QColor dotC(colorName);
         if (!dotC.isValid()) {
             if (colorName.contains("red") || colorName.contains("红")) dotC = QColor("#E24B4A");
