@@ -927,7 +927,8 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             RuntimeMeta rm = MetadataManager::instance().getMeta(drivePath.toStdWString());
             item->setData(rm.rating, RatingRole);
             item->setData(QString::fromStdWString(rm.color), ColorRole);
-            item->setData(rm.pinned, IsLockedRole);
+            item->setData(rm.pinned, PinnedRole); // 逻辑还原：使用 PinnedRole 存储原始置顶状态
+            item->setData(rm.pinned, IsLockedRole); // 视觉还原：IsLockedRole 负责 UI 渲染
 
             QList<QStandardItem*> row;
             row << item << new QStandardItem("-") << new QStandardItem("磁盘分区") << new QStandardItem("-");
@@ -965,6 +966,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
                     nameItem->setData(data.isDir ? "folder" : "file", TypeRole);
                     nameItem->setData(data.meta.rating, RatingRole);
                     nameItem->setData(QString::fromStdWString(data.meta.color), ColorRole);
+                    nameItem->setData(data.meta.pinned, PinnedRole);
                     nameItem->setData(data.meta.pinned, IsLockedRole);
                     nameItem->setData(data.meta.encrypted, EncryptedRole);
                     nameItem->setData(data.meta.tags, TagsRole);
@@ -1149,6 +1151,7 @@ void ContentPanel::loadPaths(const QStringList& paths) {
         RuntimeMeta rm = MetadataManager::instance().getMeta(path.toStdWString());
         nameItem->setData(rm.rating, RatingRole);
         nameItem->setData(QString::fromStdWString(rm.color), ColorRole);
+        nameItem->setData(rm.pinned, PinnedRole);
         nameItem->setData(rm.pinned, IsLockedRole);
         nameItem->setData(rm.tags, TagsRole);
 

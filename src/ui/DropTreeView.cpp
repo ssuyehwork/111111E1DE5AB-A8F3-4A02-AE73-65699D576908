@@ -1,5 +1,6 @@
 #include "DropTreeView.h"
 #include "CategoryModel.h"
+#include "ContentPanel.h"
 #include <QDrag>
 #include <QPixmap>
 #include <QAbstractProxyModel>
@@ -91,13 +92,14 @@ void DropTreeView::startDrag(Qt::DropActions supportedActions) {
     for (const QModelIndex& idx : indexes) {
         if (idx.column() != 0) continue;
         
-        // 兼容性提取：NavPanel 使用 UserRole+1，ContentPanel 使用 PathRole (UserRole+5)
-        QString path = idx.data(Qt::UserRole + 1).toString(); // 尝试 NavPanel 角色
+        // 2026-03-xx 物理还原：兼容性提取逻辑
+        // NavPanel 使用 UserRole+1 (硬编码)，ContentPanel 使用 PathRole (枚举)
+        QString path = idx.data(Qt::UserRole + 1).toString();
         Logger::log(QString("[树形视图] 正在尝试提取 Role+1 (导航面板) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
         
         if (path.isEmpty() || !QFileInfo::exists(path)) {
-            path = idx.data(Qt::UserRole + 5).toString(); // 尝试 ContentPanel/PathRole 角色
-            Logger::log(QString("[树形视图] 正在尝试提取 Role+5 (内容面板) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
+            path = idx.data(PathRole).toString();
+            Logger::log(QString("[树形视图] 正在尝试提取 PathRole (内容面板) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
         }
         
         if (!path.isEmpty() && QFileInfo::exists(path)) {

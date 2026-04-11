@@ -699,16 +699,16 @@ void CategoryPanel::initUi() {
             itemName = index.data(CategoryModel::NameRole).toString();
         } else {
             Logger::log("[分类面板] 接收到路径但落点无效，正在尝试自动创建分类...");
-            // 物理还原：如果拖拽到空白处且有路径，则自动创建分类
+            // [PHYSICAL RESTORATION] 如果拖拽到空白处且有路径，则自动创建分类逻辑
             if (!paths.isEmpty()) {
                 QString firstPath = paths.first();
                 QFileInfo fileInfo(firstPath);
-                QString autoCatName = fileInfo.fileName(); // 提取文件夹/文件名作为分类名
+                QString autoCatName = fileInfo.fileName();
                 if (autoCatName.isEmpty()) autoCatName = "新分类";
 
                 Category cat;
                 cat.name = autoCatName.toStdWString();
-                cat.parentId = 0; // 默认为根分类
+                cat.parentId = 0;
                 cat.color = L"#3498db";
 
                 if (CategoryRepo::add(cat)) {
@@ -725,9 +725,8 @@ void CategoryPanel::initUi() {
         int count = 0;
         bool changed = false;
 
-        // 2026-03-xx 按照用户要求：实现全局数据库持久化收藏与归类逻辑
+        // [PHYSICAL RESTORATION] 1:1 恢复数据归类逻辑
         if (categoryId > 0) {
-            // 分支 A：拖拽至具体自定义分类项 (包括刚刚自动创建的)
             for (const QString& path : paths) {
                 if (CategoryRepo::addItemToCategory(categoryId, path.toStdWString())) {
                     count++;
@@ -736,15 +735,12 @@ void CategoryPanel::initUi() {
             changed = (count > 0);
             if (changed) {
                 ToolTipOverlay::instance()->showText(QCursor::pos(), 
-                    QString("<b style='color:#2ecc71;'>已自动创建并归类 %1 个项目到 [%2]</b>").arg(count).arg(itemName), 1500, QColor("#2ecc71"));
+                    QString("<b style='color:#2ecc71;'>已归类 %1 个项目到 [%2]</b>").arg(count).arg(itemName), 1500, QColor("#2ecc71"));
             }
         } 
         else if (itemType == "bookmark") {
-            // 分支 B：拖拽至系统预设的“收藏”项
             for (const QString& path : paths) {
-                // 2026-03-xx 物理强化：强制使用原生分隔符，确保数据库路径匹配成功
                 QString normPath = QDir::toNativeSeparators(path);
-                // 物理写入：更新 items 表的 pinned 状态
                 MetadataManager::instance().setPinned(normPath.toStdWString(), true);
                 count++;
             }
@@ -756,12 +752,10 @@ void CategoryPanel::initUi() {
         }
         
         if (changed) {
-            // [UX] 状态保持：刷新模型前后保存并恢复展开状态，防止“我的分类”自动折叠
             QSet<int> expandedIds;
             QStringList expandedNames;
             saveExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames);
 
-            // 物理联动：强制刷新模型以触发 CategoryRepo::getCounts/getSystemCounts 重新统计
             m_categoryModel->refresh();
 
             restoreExpandedState(m_categoryTree, QModelIndex(), expandedIds, expandedNames, m_unlockedIds);

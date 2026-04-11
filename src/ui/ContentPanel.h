@@ -26,6 +26,7 @@ namespace ArcMeta {
 enum ItemRole {
     RatingRole = Qt::UserRole + 1,
     ColorRole,
+    PinnedRole,
     EncryptedRole,
     PathRole,
     IsLockedRole,

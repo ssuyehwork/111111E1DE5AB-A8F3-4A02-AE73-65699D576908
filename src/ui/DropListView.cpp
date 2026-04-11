@@ -1,4 +1,5 @@
 #include "DropListView.h"
+#include "ContentPanel.h"
 #include <QDrag>
 #include <QPixmap>
 #include <QMimeData>
@@ -20,9 +21,9 @@ void DropListView::startDrag(Qt::DropActions supportedActions) {
     QMimeData* mimeData = model()->mimeData(indexes);
     QList<QUrl> urls;
     for (const QModelIndex& idx : indexes) {
-        // ContentPanel 网格视图主要使用 PathRole (UserRole+5)
-        QString path = idx.data(Qt::UserRole + 5).toString(); 
-        Logger::log(QString("[列表视图] 提取路径 (Role+5) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
+        // 2026-03-xx 物理对齐：使用标准 PathRole 枚举名，消除位移隐患
+        QString path = idx.data(PathRole).toString();
+        Logger::log(QString("[列表视图] 提取路径 (PathRole) 对于 %1 : %2").arg(idx.data().toString()).arg(path));
         
         if (!path.isEmpty() && QFileInfo::exists(path)) {
             urls << QUrl::fromLocalFile(path);
