@@ -28,6 +28,19 @@
 
 namespace ArcMeta {
 
+/**
+ * @brief 物理还原：获取高饱和度随机分类颜色，杜绝单一蓝色脑补
+ */
+static std::wstring getNewCategoryRandomColor() {
+    static const QStringList palette = {
+        "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEEAD",
+        "#D4A5A5", "#9B59B6", "#3498DB", "#E67E22", "#2ECC71",
+        "#E74C3C", "#F1C40F", "#1ABC9C", "#34495E", "#95A5A6",
+        "#FF551C", "#E91E63", "#00A650", "#378ADD"
+    };
+    return palette.at(QRandomGenerator::global()->bounded(palette.size())).toStdWString();
+}
+
 CategoryPanel::CategoryPanel(QWidget* parent)
     : QFrame(parent) {
     setObjectName("SidebarContainer");
@@ -181,7 +194,7 @@ void CategoryPanel::onCreateCategory() {
             Category cat;
             cat.name = text.toStdWString();
             cat.parentId = 0;
-            cat.color = L"#3498db";
+            cat.color = getNewCategoryRandomColor();
             
             QSet<int> expandedIds;
             QStringList expandedNames;
@@ -207,7 +220,7 @@ void CategoryPanel::onCreateSubCategory() {
             Category cat;
             cat.name = text.toStdWString();
             cat.parentId = id;
-            cat.color = L"#3498db";
+            cat.color = getNewCategoryRandomColor();
 
             QSet<int> expandedIds;
             QStringList expandedNames;
@@ -709,7 +722,7 @@ void CategoryPanel::initUi() {
                 Category cat;
                 cat.name = autoCatName.toStdWString();
                 cat.parentId = 0;
-                cat.color = L"#3498db";
+                cat.color = getNewCategoryRandomColor();
 
                 if (CategoryRepo::add(cat)) {
                     categoryId = cat.id;
