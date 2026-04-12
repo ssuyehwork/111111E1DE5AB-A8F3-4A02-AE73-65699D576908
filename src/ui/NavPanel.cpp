@@ -43,7 +43,11 @@ NavPanel::NavPanel(QWidget* parent)
  * @brief 初始化 UI 组件
  */
 void NavPanel::deferredInit() {
-    if (m_model && m_model->rowCount() > 0) return; // 避免重复初始化
+    qDebug() << "[NavPanel] deferredInit 开始执行";
+    if (m_model && m_model->rowCount() > 0) {
+        qDebug() << "[NavPanel] 模型已存在数据，跳过重复初始化";
+        return;
+    }
 
     QFileIconProvider iconProvider;
 
@@ -74,6 +78,7 @@ void NavPanel::deferredInit() {
     // 2026-03-xx 线程安全修复：图标提取必须在主线程执行。
     // 为了平衡性能与安全，图标提取在主线程分批次（Idle 状态）补全。
     QTimer::singleShot(0, [this, drives]() {
+        qDebug() << "[NavPanel] 开始异步提取磁盘图标...";
         QFileIconProvider iconProvider;
         if (m_model->rowCount() > 1) {
             m_model->item(1)->setIcon(iconProvider.icon(QFileIconProvider::Computer));
@@ -82,7 +87,9 @@ void NavPanel::deferredInit() {
             if (i + 2 < m_model->rowCount())
                 m_model->item(i + 2)->setIcon(iconProvider.icon(drives[i]));
         }
+        qDebug() << "[NavPanel] 磁盘图标提取完成";
     });
+    qDebug() << "[NavPanel] deferredInit 同步部分执行完毕";
 }
 
 void NavPanel::setFocusHighlight(bool visible) {

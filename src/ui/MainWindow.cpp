@@ -45,6 +45,10 @@ namespace ArcMeta {
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
+    // 2026-04-12 关键修复：显式初始化面板加载状态锁，防止未定义行为导致闪退
+    m_panelsInitialized = false;
+    qDebug() << "[Main] MainWindow 构造开始执行";
+
     // 2026-04-11 按照用户要求：在程序启动的最顶端预初始化 ToolTipOverlay
     // 配合 ToolTipOverlay 内部的 winId() 强行预热，消除初次显示延迟
     ToolTipOverlay::instance();
@@ -156,6 +160,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     initUi();
     initTrayIcon();
+    qDebug() << "[Main] MainWindow 构造函数 UI/托盘初始化完成";
 
     // 2026-03-xx 性能优化：严禁在构造函数中执行任何可能导致阻塞的同步加载 (如 navigateTo)。
     // 改为延迟 200ms 触发首次加载，确保 MainWindow 框架先瞬间弹出，提升用户感知的“秒开”响应速度。
@@ -546,12 +551,24 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
 void MainWindow::showEvent(QShowEvent* event) {
     QMainWindow::showEvent(event);
     // 2026-04-12 关键修复：延迟初始化面板数据（确保窗口先渲染，避免主线程卡死导致无法显示）
+    qDebug() << "[Main] showEvent 触发, m_panelsInitialized =" << m_panelsInitialized;
     if (!m_panelsInitialized) {
         m_panelsInitialized = true;
+        qDebug() << "[Main] 正在排期延迟加载任务 (QTimer::singleShot(0))...";
         QTimer::singleShot(0, [this]() {
-            if (m_categoryPanel) m_categoryPanel->deferredInit();
-            if (m_navPanel)      m_navPanel->deferredInit();
-            if (m_contentPanel)  m_contentPanel->deferredInit();
+            qDebug() << "[Main] 延迟加载任务开始执行";
+            if (m_categoryPanel) {
+                qDebug() << "[Main] 正在初始化 CategoryPanel...";
+                m_categoryPanel->deferredInit();
+            }
+            if (m_navPanel) {
+                qDebug() << "[Main] 正在初始化 NavPanel...";
+                m_navPanel->deferredInit();
+            }
+            if (m_contentPanel) {
+                qDebug() << "[Main] 正在初始化 ContentPanel...";
+                m_contentPanel->deferredInit();
+            }
             // MetaPanel 和 FilterPanel 暂时不需要延迟数据加载，因为它们通常随选中项动态刷新
             qDebug() << "[Main] 所有核心面板数据延迟初始化完成，UI 响应已恢复";
         });

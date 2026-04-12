@@ -301,8 +301,9 @@ ContentPanel::ContentPanel(QWidget* parent)
 }
 
 void ContentPanel::deferredInit() {
+    qDebug() << "[ContentPanel] deferredInit 开始执行";
     // 2026-04-12 按照用户要求：补全延迟初始化逻辑，此处可处理模型预热或首屏数据对齐
-    qDebug() << "[ContentPanel] 执行延迟初始化...";
+    qDebug() << "[ContentPanel] deferredInit 执行完毕";
 }
 
 void ContentPanel::setFocusHighlight(bool visible) {

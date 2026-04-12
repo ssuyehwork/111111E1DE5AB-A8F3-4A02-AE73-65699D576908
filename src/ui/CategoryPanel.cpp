@@ -57,10 +57,12 @@ CategoryPanel::CategoryPanel(QWidget* parent)
 }
 
 void CategoryPanel::deferredInit() {
+    qDebug() << "[CategoryPanel] deferredInit 开始执行";
     // 2026-04-12 关键修复：延迟执行数据库数据加载
     if (m_categoryModel) {
         m_categoryModel->deferredRefresh();
     }
+    qDebug() << "[CategoryPanel] deferredInit 执行完毕";
 }
 
 void CategoryPanel::setupContextMenu() {
