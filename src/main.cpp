@@ -52,6 +52,10 @@ int main(int argc, char *argv[]) {
     QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QApplication a(argc, argv);
 
+    // 2026-04-12 关键修复：禁用"最后一个窗口关闭时退出"的行为。
+    // 防止 LoadingWindow 关闭到 MainWindow 显示之间的真空期导致程序被 Qt 自动杀掉。
+    a.setQuitOnLastWindowClosed(false);
+
     // 2026-03-xx 按照用户要求：设置全局应用图标，确保任务栏及窗口显示 Logo
     a.setWindowIcon(QIcon(":/app_icon.png"));
 

@@ -570,6 +570,10 @@ void MainWindow::showEvent(QShowEvent* event) {
                 m_contentPanel->deferredInit();
             }
             // MetaPanel 和 FilterPanel 暂时不需要延迟数据加载，因为它们通常随选中项动态刷新
+
+            // 2026-04-12 关键修复：延迟初始化彻底完成后，重新开启"最后一个窗口关闭时退出"
+            // 确保后续正常的关闭动作能正确退出进程
+            qApp->setQuitOnLastWindowClosed(true);
             qDebug() << "[Main] 所有核心面板数据延迟初始化完成，UI 响应已恢复";
         });
     }
