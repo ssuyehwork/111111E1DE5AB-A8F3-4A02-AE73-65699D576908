@@ -545,13 +545,15 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
 
 void MainWindow::showEvent(QShowEvent* event) {
     QMainWindow::showEvent(event);
-    // 2026-04-12 关键修复：延迟初始化面板数据（避免主线程卡死）
-    static bool s_panelsInitialized = false;
-    if (!s_panelsInitialized) {
-        s_panelsInitialized = true;
+    // 2026-04-12 关键修复：延迟初始化面板数据（确保窗口先渲染，避免主线程卡死导致无法显示）
+    if (!m_panelsInitialized) {
+        m_panelsInitialized = true;
         QTimer::singleShot(0, [this]() {
             if (m_categoryPanel) m_categoryPanel->deferredInit();
-            qDebug() << "[Main] 面板数据延迟初始化完成";
+            if (m_navPanel)      m_navPanel->deferredInit();
+            if (m_contentPanel)  m_contentPanel->deferredInit();
+            // MetaPanel 和 FilterPanel 暂时不需要延迟数据加载，因为它们通常随选中项动态刷新
+            qDebug() << "[Main] 所有核心面板数据延迟初始化完成，UI 响应已恢复";
         });
     }
     

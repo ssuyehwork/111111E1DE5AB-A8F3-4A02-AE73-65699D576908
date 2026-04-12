@@ -20,6 +20,9 @@ public:
     explicit NavPanel(QWidget* parent = nullptr);
     ~NavPanel() override = default;
 
+    // 2026-04-12 关键修复：延迟初始化数据模型
+    void deferredInit();
+
     /**
      * @brief 物理还原：设置 1px 翠绿高亮线的显隐状态
      */

@@ -117,6 +117,7 @@ private:
 
     // 状态管理
     bool m_isPinned = false;
+    bool m_panelsInitialized = false; // 2026-04-12 状态锁：确保面板仅初始化一次
     QString m_currentPath;
     QStringList m_history;
     int m_historyIndex = -1;
