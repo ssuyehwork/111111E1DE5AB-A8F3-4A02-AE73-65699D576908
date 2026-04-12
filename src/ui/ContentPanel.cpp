@@ -71,7 +71,9 @@ public:
     
     void setSearchQuery(const QString& query) {
         m_searchQuery = query;
+        beginFilterChange();
         invalidateFilter();
+        endFilterChange();
     }
 
 protected:
