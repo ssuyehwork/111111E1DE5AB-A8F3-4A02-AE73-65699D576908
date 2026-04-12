@@ -34,26 +34,19 @@ class UiHelper {
 public:
     /**
      * @brief 判断是否为需要提取缩略图的图片/图形格式
-     * 2026-04-11 按照用户要求：全量覆盖所有常见及专业图片格式
      */
     static bool isGraphicsFile(const QString& ext) {
         static const QStringList graphicsExts = {
-            "png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tiff", "tif", // 基础位图
-            "psd", "psb", "ai", "eps", "pdf", "svg", "cdr"                   // 专业/矢量
+            "png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tiff", "tif",
+            "psd", "psb", "ai", "eps", "pdf", "svg", "cdr"
         };
         return graphicsExts.contains(ext.toLower());
     }
 
-    /**
-     * @brief 获取带颜色的 SVG 图标
-     */
     static QIcon getIcon(const QString& key, const QColor& color, int size = 18) {
         return QIcon(getPixmap(key, QSize(size, size), color));
     }
 
-    /**
-     * @brief 获取带颜色的 SVG Pixmap
-     */
     static QPixmap getPixmap(const QString& key, const QSize& size, const QColor& color) {
         static QCache<QString, QPixmap> s_renderCache(500);
         QString cKey = QString("%1_%2_%3_%4").arg(key).arg(size.width()).arg(size.height()).arg(color.rgba());
@@ -78,9 +71,6 @@ public:
         return pixmap;
     }
 
-    /**
-     * @brief 获取扩展名对应的颜色
-     */
     static QColor getExtensionColor(const QString& ext) {
         static QMap<QString, QColor> s_cache;
         QString upperExt = ext.toUpper();
@@ -104,30 +94,22 @@ public:
         return color;
     }
 
-    /**
-     * @brief 利用 Shell 提取文件高清缩略图
-     */
     static QPixmap getShellThumbnail(const QString& path, int size, bool forceMirror = false) {
 #ifdef Q_OS_WIN
         PIDLIST_ABSOLUTE pidl = nullptr;
         HRESULT hr = SHParseDisplayName(path.toStdWString().c_str(), nullptr, &pidl, 0, nullptr);
         if (FAILED(hr)) return QPixmap();
-
         IShellItem* pItem = nullptr;
         hr = SHCreateItemFromIDList(pidl, IID_IShellItem, (void**)&pItem);
         ILFree(pidl);
-
         if (SUCCEEDED(hr)) {
             IShellItemImageFactory* pFactory = nullptr;
             hr = pItem->QueryInterface(IID_IShellItemImageFactory, (void**)&pFactory);
             if (SUCCEEDED(hr)) {
                 SIZE nativeSize = { size, size };
                 HBITMAP hBitmap = nullptr;
-                // SIIGBF_THUMBNAILONLY: 仅提取高质量缩略图内容，不带图标装饰
-                // SIIGBF_RESIZETOFIT: 确保比例正确
                 hr = pFactory->GetImage(nativeSize, SIIGBF_THUMBNAILONLY | SIIGBF_RESIZETOFIT, &hBitmap);
                 if (SUCCEEDED(hr) && hBitmap) {
-                    // 2026-04-11 按照用户要求：引入分离适配机制，对取自缓存的缩略图单独进行翻转扶正
                     QImage img = QImage::fromHBITMAP(hBitmap);
                     if (forceMirror) {
                         img = img.flipped(Qt::Vertical);
@@ -143,7 +125,7 @@ public:
             pItem->Release();
         }
 #else
-        Q_UNUSED(path); Q_UNUSED(size);
+        Q_UNUSED(path); Q_UNUSED(size); Q_UNUSED(forceMirror);
 #endif
         return QPixmap();
     }
