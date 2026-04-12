@@ -22,6 +22,8 @@ public:
     explicit CategoryModel(Type type, QObject* parent = nullptr);
 
     void setUnlockedIds(const QSet<int>& ids);
+    // 2026-04-12 按照用户要求：补全缺失的延迟刷新接口
+    void deferredRefresh();
 
 public slots:
     void refresh();

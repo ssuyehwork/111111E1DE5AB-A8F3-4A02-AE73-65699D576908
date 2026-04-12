@@ -36,6 +36,7 @@ void CategoryModel::refresh() {
     for (const auto& p : countsVec) counts[p.first] = p.second;
     
     QMap<QString, int> systemCounts = CategoryRepo::getSystemCounts();
+    (void)systemCounts; // 显式抑制未使用警告
 
     if (m_type == System || m_type == Both) {
         auto addSystemItem = [&](const QString& name, const QString& type, const QString& icon, const QString& color = "#aaaaaa") {
