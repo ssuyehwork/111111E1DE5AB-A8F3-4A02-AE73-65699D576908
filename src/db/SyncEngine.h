@@ -31,11 +31,23 @@ public:
      */
     void rebuildTagStats();
 
+    /**
+     * @brief 2026-04-12 按照用户要求：定义扫描上下文结构体
+     */
+    struct ScanContext {
+        std::wstring volSerial;
+        unsigned int serialNumber; // DWORD
+        int maxDepth;
+        int scanDirCount = 0;
+        int skipDirCount = 0;
+        int totalFiles = 0;
+        std::function<bool(const std::wstring&)> shouldSkip;
+    };
+
 private:
     SyncEngine() = default;
     ~SyncEngine() = default;
 
-    struct ScanContext;
     void scanDirInternal(const std::wstring& path, int depth, ScanContext& ctx);
 
     void scanDirectory(const std::filesystem::path& root, std::vector<std::wstring>& metaFiles);

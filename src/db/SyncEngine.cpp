@@ -30,16 +30,6 @@ void SyncEngine::runIncrementalSync() {
     qDebug() << "[Sync] 增量同步已由实时监控接管";
 }
 
-struct ScanContext {
-    std::wstring volSerial;
-    DWORD serialNumber;
-    int maxDepth;
-    int scanDirCount = 0;
-    int skipDirCount = 0;
-    int totalFiles = 0;
-    std::function<bool(const std::wstring&)> shouldSkip;
-};
-
 static qint64 getPathMtime(const std::filesystem::path& p) {
     try {
         auto ftime = std::filesystem::last_write_time(p);
@@ -177,12 +167,15 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
         wchar_t root[4] = { volLetter[0], L':', L'\\', L'\0' };
         ctx.serialNumber = 0;
         ctx.volSerial = L"UNKNOWN";
-        if (GetVolumeInformationW(root, nullptr, 0, &ctx.serialNumber, nullptr, nullptr, nullptr, 0)) {
+        // 2026-04-12 关键修复：修正 GetVolumeInformationW 的 8 个完整参数传递
+        if (GetVolumeInformationW(root, nullptr, 0, (LPDWORD)&ctx.serialNumber, nullptr, nullptr, nullptr, 0)) {
             wchar_t buf[16];
-            swprintf(buf, 16, L"%08X", ctx.serialNumber);
+            // 2026-04-12 关键修复：使用 swprintf_s 确保缓冲区安全且参数配平
+            swprintf_s(buf, 16, L"%08X", ctx.serialNumber);
             ctx.volSerial = buf;
         }
 
+        // 2026-04-12 关键修复：明确调用类成员函数 scanDirInternal
         scanDirInternal(drivesToScan[i], 0, ctx);
 
         db.commit();
