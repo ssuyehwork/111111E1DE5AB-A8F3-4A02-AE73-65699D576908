@@ -4,6 +4,7 @@
 #include <windows.h>
 #include "../db/ItemRepo.h"
 #include "../db/FolderRepo.h"
+#include "../meta/MetadataDefs.h"
 #include <winioctl.h>
 #include <vector>
 #include <QSqlQuery>
@@ -139,8 +140,8 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
         std::wstring oldPath = ItemRepo::getPathByFrn(m_volume, frnStr);
 
         if (!newPath.empty() && oldPath != newPath) {
-            // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
-            // 仅需更新数据库路径与内存索引，不再在磁盘上搬运 .am_meta.json 记录。
+            // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑，基于稳定标识 FRN (inode) 实现实时路径追踪。
+            // 无论文件如何移动或改名，其元数据（星级、颜色等）均由于 FRN 主键绑定而保持不动，仅需更新路径索引。
             ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
 
             // 更新内存 MFT 索引 (同步维护反向索引)
@@ -149,7 +150,8 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
             entry.frn = pRecord->FileReferenceNumber;
             entry.parentFrn = pRecord->ParentFileReferenceNumber;
             entry.attributes = pRecord->FileAttributes;
-            entry.name = newPath.substr(newPath.find_last_of(L"\\/") + 1);
+            std::wstring fileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
+            entry.name = fileNameOnly;
             MftReader::instance().updateEntry(entry);
         }
     }

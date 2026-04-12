@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Database.h"
-#include "../meta/MetadataDefs.h"
+#include "../meta/AmMetaJson.h"
 #include <string>
 #include <vector>
 
@@ -13,6 +13,12 @@ namespace ArcMeta {
 class ItemRepo {
 public:
     static bool save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta);
+
+    /**
+     * @brief 2026-05-24 按照用户要求：仅保存/更新磁盘物理属性（Mtime等），不触碰用户元数据
+     */
+    static bool saveBasicInfo(const std::wstring& volume, const std::wstring& frn, const std::wstring& path, const std::wstring& parentPath, bool isDir, double mtime, double size);
+
     static bool removeByFrn(const std::wstring& volume, const std::wstring& frn);
     static bool markAsDeleted(const std::wstring& volume, const std::wstring& frn);
     

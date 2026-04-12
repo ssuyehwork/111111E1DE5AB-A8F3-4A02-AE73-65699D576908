@@ -31,11 +31,15 @@
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>
+#include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <Dbt.h>
 #endif
+
+#include "../db/SyncEngine.h"
 
 namespace ArcMeta {
 
@@ -486,16 +490,21 @@ void MainWindow::initUi() {
             QString path = idx.data(ItemRole::PathRole).toString(); 
             if(path.isEmpty()) continue;
             
+            QFileInfo info(path);
+            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
+            meta.load();
+
             if (rating != -1) {
-                // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
-                // 持久化由 MetadataManager 实时同步。
+                // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
+                // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
                 m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
-                MetadataManager::instance().setRating(path.toStdWString(), rating);
+                meta.items()[info.fileName().toStdWString()].rating = rating;
             }
             if (color != L"__NO_CHANGE__") {
                 m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
-                MetadataManager::instance().setColor(path.toStdWString(), color);
+                meta.items()[info.fileName().toStdWString()].color = color;
             }
+            meta.save();
         }
     });
 
@@ -519,6 +528,26 @@ void MainWindow::initUi() {
         }
     });
 }
+
+#ifdef Q_OS_WIN
+bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) {
+    Q_UNUSED(eventType);
+    Q_UNUSED(result);
+
+    MSG* msg = static_cast<MSG*>(message);
+    if (msg->message == WM_DEVICECHANGE) {
+        // 2026-05-24 按照用户要求：捕捉硬件变更，硬盘插入时触发 GLOB 扫描对账
+        if (msg->wParam == DBT_DEVICEARRIVAL || msg->wParam == DBT_DEVICEREMOVECOMPLETE) {
+            qDebug() << "[Main] 检测到磁盘硬件变更，触发全量 GLOB 对账对账...";
+            // 异步触发扫描，防止阻塞 UI
+            QtConcurrent::run([]() {
+                SyncEngine::instance().runFullScan();
+            });
+        }
+    }
+    return false;
+}
+#endif
 
 void MainWindow::showEvent(QShowEvent* event) {
     QMainWindow::showEvent(event);
@@ -826,6 +855,21 @@ void MainWindow::setupSplitters() {
     m_statusLeft = new QLabel("就绪中...", statusBar);
     m_statusLeft->setStyleSheet("font-size: 11px; color: #B0B0B0; background: transparent;");
 
+    // 2026-05-24 按照用户要求：在 UI 中添加手动“重新扫描”入口
+    QPushButton* btnRescan = new QPushButton(statusBar);
+    btnRescan->setFixedSize(20, 20);
+    btnRescan->setIcon(UiHelper::getIcon("layers", QColor("#B0B0B0"))); // 复用 layers 图标表示对账
+    btnRescan->setIconSize(QSize(14, 14));
+    btnRescan->setFlat(true);
+    btnRescan->setStyleSheet("QPushButton { border: none; background: transparent; } QPushButton:hover { background: rgba(255,255,255,0.1); border-radius: 2px; }");
+    btnRescan->setProperty("tooltipText", "手动全量扫描与对账");
+    btnRescan->installEventFilter(this);
+    connect(btnRescan, &QPushButton::clicked, []() {
+        QtConcurrent::run([]() {
+            SyncEngine::instance().runFullScan();
+        });
+    });
+
     // 绑定 CoreController 状态到状态栏
     auto updateStatus = [this](const QString& text) {
         m_statusLeft->setText(text);
@@ -849,7 +893,9 @@ void MainWindow::setupSplitters() {
     m_statusRight->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_statusRight->setStyleSheet("font-size: 11px; color: #B0B0B0; background: transparent;");
 
-    statusL->addWidget(m_statusLeft, 1);
+    statusL->addWidget(m_statusLeft);
+    statusL->addWidget(btnRescan);
+    statusL->addStretch(1);
     statusL->addWidget(m_statusCenter, 1);
     statusL->addWidget(m_statusRight, 1);
 

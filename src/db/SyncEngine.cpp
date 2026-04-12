@@ -1,5 +1,6 @@
 #include "SyncEngine.h"
 #include "Database.h"
+#include "ItemRepo.h"
 #include <windows.h>
 #include <QDateTime>
 #include <QThread>
@@ -8,10 +9,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlDatabase>
-#include <QJsonDocument>
-#include <QJsonArray>
 #include <filesystem>
 #include <map>
+#include <chrono>
 
 namespace ArcMeta {
 
@@ -25,20 +25,97 @@ SyncEngine& SyncEngine::instance() {
  */
 void SyncEngine::runIncrementalSync() {
     // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
-    // 在中心化数据库模式下，增量同步不再依赖 .am_meta.json 的 mtime。
-    // 该功能目前已在 MetadataManager 的实时持久化中完成。
-    qDebug() << "[Sync] 增量扫描已跳过（中心化模式无需扫描 JSON）";
+    // 在混合扫描架构下，增量同步主要由 FSWatcher (USN) 负责。
+    qDebug() << "[Sync] 增量同步已由实时监控接管";
 }
 
 /**
- * @brief 全量扫描
- * 2026-05-24 按照用户要求：彻底移除基于 JSON 的扫描逻辑。
+ * @brief 全量扫描 (GLOB 模式)
+ * 2026-05-24 按照用户要求：程序启动、热插拔或手动触发时执行，建立/对账物理文件索引
  */
 void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgress) {
-    // 在纯中心化模式下，全量扫描逻辑需要重构为“同步文件索引”。
-    // 考虑到移除 JSON 的首要目标，此处先行禁用原有的 JSON 搜集逻辑。
-    qDebug() << "[Sync] 全量扫描已跳过（中心化模式不再搜集 JSON 文件）";
-    if (onProgress) onProgress(100, 100);
+    qDebug() << "[Sync] >>> 开始全量 GLOB 扫描与对账 <<<";
+
+    std::vector<std::wstring> drivesToScan;
+    DWORD drives = GetLogicalDrives();
+    for (int i = 0; i < 26; ++i) {
+        if (drives & (1 << i)) {
+            wchar_t drivePath[] = { (wchar_t)(L'A' + i), L':', L'\\', L'\0' };
+            if (GetDriveTypeW(drivePath) == DRIVE_FIXED || GetDriveTypeW(drivePath) == DRIVE_REMOVABLE) {
+                drivesToScan.push_back(drivePath);
+            }
+        }
+    }
+
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    if (!db.isOpen()) return;
+
+    int totalDrives = (int)drivesToScan.size();
+    for (int i = 0; i < totalDrives; ++i) {
+        qDebug() << "[Sync] 正在扫描驱动器:" << QString::fromStdWString(drivesToScan[i]);
+
+        db.transaction();
+
+        try {
+            int count = 0;
+            std::wstring volLetter = drivesToScan[i].substr(0, 2);
+            wchar_t root[4] = { volLetter[0], L':', L'\\', L'\0' };
+            DWORD serialNumber = 0;
+            std::wstring volSerial = L"UNKNOWN";
+            if (GetVolumeInformationW(root, nullptr, 0, &serialNumber, nullptr, nullptr, nullptr, 0)) {
+                wchar_t buf[16];
+                swprintf(buf, 16, L"%08X", serialNumber);
+                volSerial = buf;
+            }
+
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(drivesToScan[i], std::filesystem::directory_options::skip_permission_denied)) {
+                std::wstring fullPath = entry.path().wstring();
+                std::wstring parentPath = entry.path().parent_path().wstring();
+
+                // 排除系统隐藏目录
+                if (fullPath.find(L"\\.") != std::wstring::npos || fullPath.find(L"$RECYCLE.BIN") != std::wstring::npos) {
+                    continue;
+                }
+
+                // 提取 FRN (Windows 特有)
+                HANDLE hFile = CreateFileW(fullPath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+                std::wstring frnStr = L"";
+                if (hFile != INVALID_HANDLE_VALUE) {
+                    BY_HANDLE_FILE_INFORMATION fileInfo;
+                    if (GetFileInformationByHandle(hFile, &fileInfo)) {
+                        unsigned __int64 frn = ((unsigned __int64)fileInfo.nFileIndexHigh << 32) | (unsigned __int64)fileInfo.nFileIndexLow;
+                        frnStr = QString::number(frn, 16).prepend("0x").toStdWString();
+                    }
+                    CloseHandle(hFile);
+                }
+
+                if (frnStr.empty()) continue;
+
+                auto ftime = std::filesystem::last_write_time(entry);
+                auto stime = std::chrono::time_point_cast<std::chrono::milliseconds>(ftime).time_since_epoch().count();
+
+                ItemRepo::saveBasicInfo(volSerial, frnStr, fullPath, parentPath, entry.is_directory(), (double)stime, (double)entry.file_size());
+
+                count++;
+                if (count % 500 == 0) {
+                    db.commit();
+                    db.transaction();
+                }
+            }
+        } catch (...) {}
+
+        db.commit();
+        if (onProgress) onProgress(i + 1, totalDrives);
+    }
+
+    // 更新同步时间
+    QSqlQuery updateSync(db);
+    updateSync.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
+    updateSync.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
+    updateSync.exec();
+
+    qDebug() << "[Sync] GLOB 扫描完成。";
+    rebuildTagStats();
 }
 
 /**
@@ -83,7 +160,7 @@ void SyncEngine::rebuildTagStats() {
  * @brief 递归扫描目录
  */
 void SyncEngine::scanDirectory(const std::filesystem::path& root, std::vector<std::wstring>& metaFiles) {
-    // 已废弃
+    // 2026-05-24 按照用户要求：基于 JSON 的扫描已废弃
     Q_UNUSED(root);
     Q_UNUSED(metaFiles);
 }

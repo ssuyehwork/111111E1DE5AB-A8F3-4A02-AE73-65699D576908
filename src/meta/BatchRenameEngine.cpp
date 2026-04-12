@@ -1,5 +1,6 @@
 #include "BatchRenameEngine.h"
 #include "MetadataManager.h"
+#include "AmMetaJson.h"
 #include <QFileInfo>
 #include <QDateTime>
 #include <filesystem>
@@ -68,7 +69,11 @@ bool BatchRenameEngine::execute(const std::vector<std::wstring>& originalPaths, 
         
         try {
             std::filesystem::rename(oldP, newP);
-            // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。重命名成功后，仅需更新数据库和内存缓存。
+            // 2026-03-xx 按照用户要求：物理重命名成功后，必须同步更新 .am_meta.json 中的键值
+            QString folderPath = QString::fromStdWString(oldP.parent_path().wstring());
+            QString oldName = QString::fromStdWString(oldP.filename().wstring());
+            QString newName = QString::fromStdWString(newP.filename().wstring());
+            AmMetaJson::renameItem(folderPath, oldName, newName);
             // 同步更新内存缓存
             MetadataManager::instance().renameItem(oldP.wstring(), newP.wstring());
         } catch (...) {

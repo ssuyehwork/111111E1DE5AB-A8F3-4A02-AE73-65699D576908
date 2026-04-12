@@ -3,6 +3,7 @@
 #include "RuleRow.h"
 #include "UiHelper.h"
 #include "../meta/BatchRenameEngine.h"
+#include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 #include <QHeaderView>
 #include <QFileDialog>
@@ -239,7 +240,7 @@ void BatchRenameDialog::onExecute() {
         if (ok) {
             successCount++;
             if (!m_rbCopy->isChecked()) {
-                // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
+                AmMetaJson::renameItem(oldInfo.absolutePath(), oldInfo.fileName(), QString::fromStdWString(newNames[i]));
                 MetadataManager::instance().renameItem(oldInfo.absoluteFilePath().toStdWString(), QDir(finalTargetDir).absoluteFilePath(QString::fromStdWString(newNames[i])).toStdWString());
             }
         }

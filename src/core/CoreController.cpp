@@ -19,24 +19,29 @@ CoreController::~CoreController() {}
 
 /**
  * @brief 启动系统初始化链条
- * 2026-03-xx 按照用户最新要求：彻底移除 MFT 引擎构建，仅加载数据库、配置及增量 JSON。
+ * 2026-05-24 按照用户要求：实现混合扫描架构，由实时监听、稳定标识及离线对账共同保障。
  */
 void CoreController::startSystem() {
     // 异步链式初始化
     QThreadPool::globalInstance()->start([this]() {
         qint64 startTime = QDateTime::currentMSecsSinceEpoch();
-        qDebug() << "[Core] >>> 开始后台异步初始化链条 (MFT 已移除) <<<";
+        qDebug() << "[Core] >>> 开始后台异步初始化链条 (混合扫描架构已就位) <<<";
         
-        // 1. 初始化数据库元数据内存镜像 (关键：消除 UI 启动后的 IO 抖动)
+        // 1. 初始化数据库元数据内存镜像 (关键：提供丝滑的 UI 首次渲染)
         setStatus("正在载入元数据缓存...", true);
         MetadataManager::instance().initFromDatabase();
-        qDebug() << "[Core] [Step 1/1] 数据库元数据缓存加载完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
+        qDebug() << "[Core] [Step 1/2] 数据库元数据缓存加载完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
 
-        // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
-        // 原有的 SyncQueue (JSON -> DB 同步) 和 SyncEngine::runIncrementalSync (扫描 JSON) 已废弃。
+        // 2. 执行全量 GLOB 扫描与物理对账 (基于稳定标识 FRN)
+        // 2026-05-24 按照用户要求：启动时执行对账，补齐程序关闭期间的文件系统变化。
+        // FSWatcher (UsnWatcher) 会在 MainWindow 启动后作为常驻后台服务运行。
+        setStatus("正在执行磁盘增量对账...", true);
+        qint64 scanStart = QDateTime::currentMSecsSinceEpoch();
+        SyncEngine::instance().runFullScan();
+        qDebug() << "[Core] [Step 2/2] GLOB 全量对账完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - scanStart) << "ms";
 
         setStatus("系统就绪", false);
-        qDebug() << "[Core] !!! 所有初始化任务已就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms，正在发射信号...";
+        qDebug() << "[Core] !!! 混合扫描架构初始化就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
         emit initializationFinished();
     });
 }

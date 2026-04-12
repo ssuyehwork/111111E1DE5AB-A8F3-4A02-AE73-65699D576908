@@ -69,6 +69,34 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
     return q.exec();
 }
 
+bool ItemRepo::saveBasicInfo(const std::wstring& volume, const std::wstring& frn, const std::wstring& path, const std::wstring& parentPath, bool isDir, double mtime, double size) {
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q(db);
+
+    // 采用 INSERT OR IGNORE 先确保记录存在，然后 UPDATE 物理属性
+    // 这样可以保护 rating, color 等用户元数据字段不被覆盖
+    q.prepare(R"sql(
+        INSERT OR IGNORE INTO items (volume, frn, path, parent_path, type)
+        VALUES (?, ?, ?, ?, ?)
+    )sql");
+    q.addBindValue(QString::fromStdWString(volume));
+    q.addBindValue(QString::fromStdWString(frn));
+    q.addBindValue(QString::fromStdWString(path));
+    q.addBindValue(QString::fromStdWString(parentPath));
+    q.addBindValue(isDir ? "folder" : "file");
+    q.exec();
+
+    QSqlQuery u(db);
+    u.prepare("UPDATE items SET path = ?, parent_path = ?, mtime = ?, deleted = 0 WHERE volume = ? AND frn = ?");
+    u.addBindValue(QString::fromStdWString(path));
+    u.addBindValue(QString::fromStdWString(parentPath));
+    u.addBindValue(mtime);
+    u.addBindValue(QString::fromStdWString(volume));
+    u.addBindValue(QString::fromStdWString(frn));
+    Q_UNUSED(size); // 扩展预留
+    return u.exec();
+}
+
 bool ItemRepo::markAsDeleted(const std::wstring& volume, const std::wstring& frn) {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
