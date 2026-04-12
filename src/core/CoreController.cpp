@@ -2,7 +2,7 @@
 #include "../db/Database.h"
 #include "../db/SyncEngine.h"
 #include "../meta/MetadataManager.h"
-#include <QtConcurrent>
+#include <QtConcurrent/QtConcurrent>
 #include <QThreadPool>
 #include <QDebug>
 

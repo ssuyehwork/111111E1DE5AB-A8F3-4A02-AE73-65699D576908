@@ -10,7 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QFileInfo>
-#include <QtConcurrent>
+#include <QtConcurrent/QtConcurrent>
 #include <QThreadPool>
 #include <QDir>
 #include <QDebug>

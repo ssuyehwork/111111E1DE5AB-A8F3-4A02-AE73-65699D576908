@@ -14,7 +14,7 @@
 #include <QStandardPaths>
 #include <QTimer>
 #include <QPointer>
-#include <QtConcurrent>
+#include <QtConcurrent/QtConcurrent>
 #include <QApplication>
 
 namespace ArcMeta {

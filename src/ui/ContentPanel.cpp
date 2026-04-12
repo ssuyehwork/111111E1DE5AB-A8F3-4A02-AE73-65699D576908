@@ -37,7 +37,7 @@
 #include <QLineEdit>
 #include <QTextBrowser>
 #include <QInputDialog>
-#include <QtConcurrent>
+#include <QtConcurrent/QtConcurrent>
 #include <QThreadPool>
 #include <QTimer>
 #include <functional>
