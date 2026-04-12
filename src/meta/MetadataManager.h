@@ -1,5 +1,7 @@
-#pragma once
+#ifndef ARCMETA_METADATA_MANAGER_H
+#define ARCMETA_METADATA_MANAGER_H
 
+#include "MetadataDefs.h"
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -7,7 +9,6 @@
 #include <unordered_map>
 #include <shared_mutex>
 #include <string>
-#include "MetadataDefs.h"
 
 namespace ArcMeta {
 
@@ -60,3 +61,5 @@ private:
 };
 
 } // namespace ArcMeta
+
+#endif // ARCMETA_METADATA_MANAGER_H

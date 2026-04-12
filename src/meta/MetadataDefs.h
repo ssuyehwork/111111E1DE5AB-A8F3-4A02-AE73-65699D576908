@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ARCMETA_METADATA_DEFS_H
+#define ARCMETA_METADATA_DEFS_H
 
 #include <string>
 #include <vector>
@@ -53,3 +54,5 @@ struct ItemMeta {
 };
 
 } // namespace ArcMeta
+
+#endif // ARCMETA_METADATA_DEFS_H
