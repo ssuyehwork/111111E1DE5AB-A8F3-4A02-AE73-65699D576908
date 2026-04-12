@@ -74,4 +74,4 @@ target_link_libraries(ArcMeta PRIVATE
 if(MSVC)
     target_link_options(ArcMeta PRIVATE "/MANIFEST:NO")
 endif()
-# Force Refresh CMake: 2026-04-12 13:25 (Trigger AUTOMOC for SearchHistoryPanel)
+# Force Refresh CMake: 2026-05-24 20:00 (Trigger Re-scan after removing JSON logic)
