@@ -109,6 +109,7 @@ private:
     QStringList  m_searchHistory;             // 最近 10 条关键词
     
     // 标题栏按钮组 (用于 frameless 时的模拟，此处作为标准按钮展示)
+    QPushButton* m_btnScan = nullptr; // 2026-04-12 按照用户要求：标题栏按需扫描按钮
     QPushButton* m_btnCreate = nullptr;
     QPushButton* m_btnPinTop = nullptr;
     QPushButton* m_btnMin = nullptr;

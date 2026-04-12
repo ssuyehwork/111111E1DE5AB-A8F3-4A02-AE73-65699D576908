@@ -116,9 +116,13 @@ void SyncEngine::scanDirInternal(const std::wstring& path, int depth, ScanContex
     }
 }
 
-void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgress) {
+void SyncEngine::runFullScan(const std::wstring& targetPath, std::function<void(int current, int total)> onProgress) {
     auto startTime = std::chrono::steady_clock::now();
-    qDebug() << "[Sync] >>> 开始增量剪枝扫描与对账 <<<";
+    if (targetPath.empty()) {
+        qDebug() << "[Sync] >>> 开始全量增量剪枝扫描 (全部驱动器) <<<";
+    } else {
+        qDebug() << "[Sync] >>> 开始局部按需扫描 (指定路径):" << QString::fromStdWString(targetPath) << " <<<";
+    }
     
     const std::vector<std::wstring> EXCLUDED_DIRS = {
         L"\\Windows", L"\\System32", L"\\SysWOW64",
@@ -139,12 +143,16 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
     };
 
     std::vector<std::wstring> drivesToScan;
-    DWORD drives = GetLogicalDrives();
-    for (int i = 0; i < 26; ++i) {
-        if (drives & (1 << i)) {
-            wchar_t drivePath[] = { (wchar_t)(L'A' + i), L':', L'\\', L'\0' };
-            if (GetDriveTypeW(drivePath) == DRIVE_FIXED) {
-                drivesToScan.push_back(drivePath);
+    if (!targetPath.empty()) {
+        drivesToScan.push_back(targetPath);
+    } else {
+        DWORD drives = GetLogicalDrives();
+        for (int i = 0; i < 26; ++i) {
+            if (drives & (1 << i)) {
+                wchar_t drivePath[] = { (wchar_t)(L'A' + i), L':', L'\\', L'\0' };
+                if (GetDriveTypeW(drivePath) == DRIVE_FIXED) {
+                    drivesToScan.push_back(drivePath);
+                }
             }
         }
     }

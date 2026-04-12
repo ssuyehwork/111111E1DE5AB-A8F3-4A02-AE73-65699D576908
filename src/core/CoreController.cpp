@@ -40,16 +40,12 @@ void CoreController::startSystem() {
             // 2. 执行全量 GLOB 扫描与物理对账 (基于稳定标识 FRN)
             // 2026-05-24 按照用户要求：启动时执行对账，补齐程序关闭期间的文件系统变化。
             // FSWatcher (UsnWatcher) 会在 MainWindow 启动后作为常驻后台服务运行。
-            QMetaObject::invokeMethod(this, [this]() {
-                setStatus("正在执行磁盘增量对账...", true);
-            }, Qt::QueuedConnection);
-            
-            qint64 scanStart = QDateTime::currentMSecsSinceEpoch();
-            SyncEngine::instance().runFullScan();
-            qDebug() << "[Core] [Step 2/2] GLOB 全量对账完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - scanStart) << "ms";
+            // 2026-04-12 按照用户要求：启动时不再执行自动 GLOB 扫描，改为手动按需触发。
+            // 数据库维持现有缓存，直到用户点击标题栏“扫描”按钮。
+            qDebug() << "[Core] [Step 2/2] 按照最新指令跳过自动 GLOB 对账流程";
 
             QMetaObject::invokeMethod(this, [this]() {
-                setStatus("系统就绪", false);
+                setStatus("系统就绪 (待扫描)", false);
             }, Qt::QueuedConnection);
             
             qDebug() << "[Core] !!! 混合扫描架构初始化就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";

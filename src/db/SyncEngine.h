@@ -21,10 +21,11 @@ public:
     void runIncrementalSync();
 
     /**
-     * @brief 启动全量扫描（由启动、热插拔或手动触发）
+     * @brief 启动全量扫描（支持按需扫描指定路径或全部驱动器）
+     * @param targetPath 若为空则扫描全部驱动器，否则仅扫描指定路径（如 "C:\"）
      * @param onProgress 进度回调
      */
-    void runFullScan(std::function<void(int current, int total)> onProgress = nullptr);
+    void runFullScan(const std::wstring& targetPath = L"", std::function<void(int current, int total)> onProgress = nullptr);
 
     /**
      * @brief 维护标签聚合表

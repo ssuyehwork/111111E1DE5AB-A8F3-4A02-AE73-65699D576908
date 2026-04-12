@@ -1010,7 +1010,48 @@ void MainWindow::setupCustomTitleBarButtons() {
     m_btnClose->setProperty("tooltipText", "关闭项目");
     m_btnClose->installEventFilter(this);
 
+    // 2026-04-12 按照用户要求：在“+”按钮左侧新增扫描按钮
+    m_btnScan = createTitleBtn("sync"); // 使用 sync (同步) 图标语意化扫描行为
+    m_btnScan->setProperty("tooltipText", "按需扫描磁盘 (GLOB)...");
+    m_btnScan->installEventFilter(this);
+
+    QMenu* scanMenu = new QMenu(m_btnScan);
+    scanMenu->setStyleSheet(
+        "QMenu { background-color: #2D2D2D; color: #EEE; border: 1px solid #444; padding: 4px; border-radius: 8px; }"
+        "QMenu::item { padding: 6px 25px 6px 10px; border-radius: 4px; font-size: 12px; }"
+        "QMenu::item:selected { background-color: #3E3E42; color: white; }"
+    );
+
+    connect(m_btnScan, &QPushButton::clicked, [this, scanMenu]() {
+        scanMenu->clear();
+
+        // 1. 全部硬盘扫描选项
+        QAction* actAll = scanMenu->addAction(UiHelper::getIcon("all_data", QColor("#EEEEEE")), "扫描全部硬盘");
+        connect(actAll, &QAction::triggered, []() {
+            (void)QtConcurrent::run([]() {
+                SyncEngine::instance().runFullScan();
+            });
+        });
+
+        scanMenu->addSeparator();
+
+        // 2. 动态列出各物理磁盘
+        const auto drives = QDir::drives();
+        for (const QFileInfo& drive : drives) {
+            QString drivePath = drive.absolutePath();
+            QAction* actDrive = scanMenu->addAction(UiHelper::getIcon("folder", QColor("#EEEEEE")), QString("扫描驱动器 %1").arg(drivePath));
+            connect(actDrive, &QAction::triggered, [drivePath]() {
+                (void)QtConcurrent::run([drivePath]() {
+                    SyncEngine::instance().runFullScan(drivePath.toStdWString());
+                });
+            });
+        }
+
+        scanMenu->popup(m_btnScan->mapToGlobal(QPoint(0, m_btnScan->height())));
+    });
+
     m_btnCreate->installEventFilter(this);
+    layout->addWidget(m_btnScan);
     layout->addWidget(m_btnCreate);
     layout->addWidget(m_btnPinTop);
     layout->addWidget(m_btnMin);
