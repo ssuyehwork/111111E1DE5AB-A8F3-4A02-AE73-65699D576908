@@ -45,8 +45,8 @@ void BatchRenamePreviewDialog::initUi() {
 void BatchRenamePreviewDialog::setPreviewData(const std::vector<std::wstring>& originalPaths, const std::vector<std::wstring>& previewNames) {
     m_table->setRowCount(static_cast<int>(originalPaths.size()));
     
-    for (size_t i = 0; i < originalPaths.size(); ++i) {
-        QFileInfo info(QString::fromStdWString(originalPaths[i]));
+    for (int i = 0; i < static_cast<int>(originalPaths.size()); ++i) {
+        QFileInfo info(QString::fromStdWString(originalPaths[static_cast<size_t>(i)]));
         
         // 当前文件名
         auto* itemOld = new QTableWidgetItem(info.fileName());
@@ -54,7 +54,7 @@ void BatchRenamePreviewDialog::setPreviewData(const std::vector<std::wstring>& o
         m_table->setItem(i, 0, itemOld);
 
         // 新文件名
-        QString newName = QString::fromStdWString(previewNames[i]);
+        QString newName = QString::fromStdWString(previewNames[static_cast<size_t>(i)]);
         auto* itemNew = new QTableWidgetItem(newName);
         itemNew->setForeground(QColor("#2ecc71")); // 绿色代表预期结果
         m_table->setItem(i, 1, itemNew);

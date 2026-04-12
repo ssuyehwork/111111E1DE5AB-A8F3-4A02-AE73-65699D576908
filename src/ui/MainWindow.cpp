@@ -278,7 +278,7 @@ void MainWindow::initUi() {
         }
         // 状态栏右侧显示已选数量
         if (m_statusRight) {
-            m_statusRight->setText(paths.isEmpty() ? "" : QString("已选 %1 个项目").arg(paths.size()));
+            m_statusRight->setText(paths.isEmpty() ? "" : QString("已选 %1 个项目").arg(static_cast<int>(paths.size())));
         }
     });
 
@@ -534,7 +534,7 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
         if (msg->wParam == DBT_DEVICEARRIVAL || msg->wParam == DBT_DEVICEREMOVECOMPLETE) {
             qDebug() << "[Main] 检测到磁盘硬件变更，触发全量 GLOB 对账对账...";
             // 异步触发扫描，防止阻塞 UI
-            QtConcurrent::run([]() {
+            (void)QtConcurrent::run([]() {
                 SyncEngine::instance().runFullScan();
             });
         }
@@ -859,7 +859,7 @@ void MainWindow::setupSplitters() {
     btnRescan->setProperty("tooltipText", "手动全量扫描与对账");
     btnRescan->installEventFilter(this);
     connect(btnRescan, &QPushButton::clicked, []() {
-        QtConcurrent::run([]() {
+        (void)QtConcurrent::run([]() {
             SyncEngine::instance().runFullScan();
         });
     });
@@ -1059,7 +1059,7 @@ void MainWindow::navigateTo(const QString& path, bool record) {
         if (record) {
             if (m_history.isEmpty() || m_history.last() != path) {
                 m_history.append(path);
-                m_historyIndex = m_history.size() - 1;
+                m_historyIndex = static_cast<int>(m_history.size()) - 1;
             }
         }
         m_pathEdit->setText("此电脑");

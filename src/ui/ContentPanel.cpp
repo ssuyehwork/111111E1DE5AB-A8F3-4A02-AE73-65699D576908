@@ -67,14 +67,12 @@ public:
 
     void updateFilter() {
         beginFilterChange();
-        invalidateFilter();
         endFilterChange();
     }
     
     void setSearchQuery(const QString& query) {
         m_searchQuery = query;
         beginFilterChange();
-        invalidateFilter();
         endFilterChange();
     }
 

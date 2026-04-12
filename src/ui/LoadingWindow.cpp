@@ -126,7 +126,7 @@ void LoadingWindow::onAnimationTimeout() {
 }
 
 void LoadingWindow::paintEvent(QPaintEvent* event) {
-    QMainWindow::paintEvent(event);
+    QWidget::paintEvent(event);
 
     if (!m_svgRenderer || !m_svgRenderer->isValid()) {
         return;
