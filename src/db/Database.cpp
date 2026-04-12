@@ -91,6 +91,12 @@ void Database::createTables() {
     q.exec("CREATE TABLE IF NOT EXISTS category_items (category_id INTEGER, item_path TEXT, added_at REAL, PRIMARY KEY (category_id, item_path))");
     q.exec("CREATE TABLE IF NOT EXISTS sync_state (key TEXT PRIMARY KEY, value TEXT)");
 
+    // 2026-04-12 按照用户要求：新增文件夹扫描缓存表，用于增量扫描剪枝
+    q.exec("CREATE TABLE IF NOT EXISTS folder_scan_cache ("
+           "path TEXT PRIMARY KEY, "
+           "mtime INTEGER NOT NULL, "
+           "scanned_at INTEGER NOT NULL)");
+
     // 紧急补丁：由于 CREATE TABLE IF NOT EXISTS 不会修改已存在的表，
     // 显式检查并添加缺失的字段，防止查询挂掉。
     q.exec("ALTER TABLE categories ADD COLUMN encrypt_hint TEXT DEFAULT ''"); 
@@ -106,6 +112,31 @@ void Database::createIndexes() {
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_path ON items(path)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_path)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_deleted ON items(deleted)");
+}
+
+qint64 Database::queryFolderCache(const std::wstring& path) {
+    QSqlDatabase db = getThreadDatabase();
+    QSqlQuery q(db);
+    q.prepare("SELECT mtime FROM folder_scan_cache WHERE path = ?");
+    q.addBindValue(QString::fromStdWString(path));
+    if (q.exec() && q.next()) {
+        return q.value(0).toLongLong();
+    }
+    return -1;
+}
+
+void Database::upsertFolderCache(const std::wstring& path, qint64 mtime) {
+    QSqlDatabase db = getThreadDatabase();
+    QSqlQuery q(db);
+    // 2026-04-12 按照用户要求：使用 INSERT ... ON CONFLICT(path) DO UPDATE 语法
+    q.prepare("INSERT INTO folder_scan_cache (path, mtime, scanned_at) VALUES (?, ?, ?) "
+              "ON CONFLICT(path) DO UPDATE SET mtime = excluded.mtime, scanned_at = excluded.scanned_at");
+    q.addBindValue(QString::fromStdWString(path));
+    q.addBindValue(mtime);
+    q.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    if (!q.exec()) {
+        qCritical() << "[Database] upsertFolderCache 失败:" << q.lastError().text();
+    }
 }
 
 } // namespace ArcMeta

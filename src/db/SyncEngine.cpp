@@ -30,10 +30,106 @@ void SyncEngine::runIncrementalSync() {
     qDebug() << "[Sync] 增量同步已由实时监控接管";
 }
 
+struct ScanContext {
+    std::wstring volSerial;
+    DWORD serialNumber;
+    int maxDepth;
+    int scanDirCount = 0;
+    int skipDirCount = 0;
+    int totalFiles = 0;
+    std::function<bool(const std::wstring&)> shouldSkip;
+};
+
+static qint64 getPathMtime(const std::filesystem::path& p) {
+    try {
+        auto ftime = std::filesystem::last_write_time(p);
+        return std::chrono::duration_cast<std::chrono::milliseconds>(ftime.time_since_epoch()).count();
+    } catch (...) {
+        return 0;
+    }
+}
+
+void SyncEngine::scanDirInternal(const std::wstring& path, int depth, ScanContext& ctx) {
+    if (depth > ctx.maxDepth || ctx.shouldSkip(path)) {
+        return;
+    }
+
+    std::filesystem::path fsPath(path);
+    qint64 diskMtime = getPathMtime(fsPath);
+    qint64 cachedMtime = Database::instance().queryFolderCache(path);
+
+    bool needsScan = (diskMtime == 0 || diskMtime != cachedMtime);
+
+    if (!needsScan) {
+        ctx.skipDirCount++;
+    } else {
+        ctx.scanDirCount++;
+    }
+
+    QSqlDatabase db = Database::instance().getThreadDatabase();
+
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(fsPath,
+                 std::filesystem::directory_options::skip_permission_denied)) {
+
+            std::wstring fullPath = entry.path().wstring();
+            bool isDir = entry.is_directory();
+
+            if (needsScan) {
+                // 执行对账：仅在 mtime 不一致时处理当前目录下的文件/文件夹
+                std::wstring parentPath = entry.path().parent_path().wstring();
+
+                ULARGE_INTEGER fileSize;
+                fileSize.QuadPart = 0;
+                qint64 stime = 0;
+
+                try {
+                    auto ftime = entry.last_write_time();
+                    stime = std::chrono::duration_cast<std::chrono::milliseconds>(ftime.time_since_epoch()).count();
+                    if (!isDir) {
+                        fileSize.QuadPart = entry.file_size();
+                    }
+                } catch (...) {}
+
+                // 生成伪 FRN（维持现有逻辑）
+                std::hash<std::wstring> hasher;
+                size_t pathHash = hasher(fullPath);
+                unsigned __int64 pseudoFrn = (static_cast<unsigned __int64>(ctx.serialNumber) << 32) |
+                                             ((pathHash & 0xFFFFFFFF) ? 0xFFFFFFFF : 1);
+                std::wstring frnStr = QString::number(pseudoFrn, 16).prepend("0x").toStdWString();
+
+                ItemRepo::saveBasicInfo(ctx.volSerial, frnStr, fullPath, parentPath, isDir, (double)stime, (double)fileSize.QuadPart);
+                ctx.totalFiles++;
+
+                // 2026-04-12 按照用户要求：回归每 1000 个条目提交一次事务的鲁棒逻辑
+                if (ctx.totalFiles % 1000 == 0) {
+                    db.commit();
+                    db.transaction();
+                    qDebug() << "[Sync] 已处理 " << ctx.totalFiles << " 個条目";
+                }
+            }
+
+            // 核心剪枝策略：mtime 不冒泡，无论父目录是否变化，必须递归检查子目录
+            if (isDir) {
+                scanDirInternal(fullPath, depth + 1, ctx);
+            }
+        }
+
+        // 扫描完成后更新缓存
+        if (needsScan) {
+            Database::instance().upsertFolderCache(path, diskMtime);
+        }
+
+    } catch (const std::exception& e) {
+        // 2026-04-12 按照用户要求：修正 wstring 直接输出到 qDebug 的错误
+        qWarning() << "[Sync] 访问目录异常:" << QString::fromStdWString(path) << " -> " << e.what();
+    }
+}
+
 void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgress) {
-    qDebug() << "[Sync] >>> 开始全量 GLOB 扫描与对账 (仅扫描本地用户数据) <<<";
+    auto startTime = std::chrono::steady_clock::now();
+    qDebug() << "[Sync] >>> 开始增量剪枝扫描与对账 <<<";
     
-    // 2026-04-12 用户优化：禁止扫描系统目录、临时、缓存，仅扫描用户常用区域
     const std::vector<std::wstring> EXCLUDED_DIRS = {
         L"\\Windows", L"\\System32", L"\\SysWOW64",
         L"\\Program Files", L"\\Program Files (x86)",
@@ -43,15 +139,11 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
     };
 
     auto shouldSkipDirectory = [&](const std::wstring& path) -> bool {
-        // 排除隐藏目录和系统目录
         if (path.find(L"\\.") != std::wstring::npos) return true;
-        // 检查是否在排除列表中
         std::wstring upperPath = path;
         std::transform(upperPath.begin(), upperPath.end(), upperPath.begin(), ::towupper);
         for (const auto& excluded : EXCLUDED_DIRS) {
-            if (upperPath.find(excluded) != std::wstring::npos) {
-                return true;
-            }
+            if (upperPath.find(excluded) != std::wstring::npos) return true;
         }
         return false;
     };
@@ -61,9 +153,7 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
     for (int i = 0; i < 26; ++i) {
         if (drives & (1 << i)) {
             wchar_t drivePath[] = { (wchar_t)(L'A' + i), L':', L'\\', L'\0' };
-            UINT driveType = GetDriveTypeW(drivePath);
-            // 2026-04-12 用户优化：仅扫描本地固定驱动器（不扫描光驱、映射网络驱动器等）
-            if (driveType == DRIVE_FIXED) {
+            if (GetDriveTypeW(drivePath) == DRIVE_FIXED) {
                 drivesToScan.push_back(drivePath);
             }
         }
@@ -71,120 +161,55 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
 
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     if (!db.isOpen()) {
-        qCritical() << "[Sync] 数据库连接失败，无法进行扫描";
+        qCritical() << "[Sync] 数据库连接失败";
         return;
     }
+
+    ScanContext ctx;
+    ctx.maxDepth = 6;
+    ctx.shouldSkip = shouldSkipDirectory;
 
     int totalDrives = (int)drivesToScan.size();
     for (int i = 0; i < totalDrives; ++i) {
         db.transaction();
-        try {
-            int count = 0;
-            std::wstring volLetter = drivesToScan[i].substr(0, 2);
-            wchar_t root[4] = { volLetter[0], L':', L'\\', L'\0' };
-            DWORD serialNumber = 0;
-            std::wstring volSerial = L"UNKNOWN";
-            if (GetVolumeInformationW(root, nullptr, 0, &serialNumber, nullptr, nullptr, nullptr, 0)) {
-                wchar_t buf[16];
-                swprintf(buf, 16, L"%08X", serialNumber);
-                volSerial = buf;
-            }
 
-            // 2026-04-12 用户优化：仅扫描深度 6 级，避免递归过深
-            int maxDepth = 6;
-
-            try {
-                for (auto it = std::filesystem::recursive_directory_iterator(
-                         drivesToScan[i],
-                         std::filesystem::directory_options::skip_permission_denied | 
-                         std::filesystem::directory_options::follow_directory_symlink);
-                     it != std::filesystem::recursive_directory_iterator();
-                     ++it) {
-                    
-                    // 检查深度限制
-                    int depth = 0;
-                    std::wstring pathStr = it->path().wstring();
-                    for (auto& c : pathStr) {
-                        if (c == L'\\' || c == L'/') depth++;
-                    }
-                    if (depth > maxDepth) {
-                        it.disable_recursion_pending();
-                        continue;
-                    }
-
-                    // 早期跳过排除目录
-                    if (shouldSkipDirectory(it->path().wstring())) {
-                        it.disable_recursion_pending();
-                        continue;
-                    }
-
-                    const auto& entry = *it;
-                    std::wstring fullPath = entry.path().wstring();
-                    std::wstring parentPath = entry.path().parent_path().wstring();
-
-                    // 2026-04-12 用户优化：避免频繁调用 CreateFileW，仅对确实需要的文件调用
-                    // 使用文件系统信息直接计算伪 FRN（减轻系统负担）
-                    ULARGE_INTEGER fileSize;
-                    fileSize.QuadPart = 0;
-                    auto ftime = std::filesystem::last_write_time(entry);
-                    auto stime = std::chrono::duration_cast<std::chrono::milliseconds>(ftime.time_since_epoch()).count();
-
-                    try {
-                        fileSize.QuadPart = std::filesystem::file_size(entry);
-                    } catch (...) {
-                        continue;  // 无法访问的文件跳过
-                    }
-
-                    // 2026-04-12 用户优化：生成稳定的伪 FRN（基于卷序列+路径 hash）
-                    // 避免每次都调用 CreateFileW
-                    std::hash<std::wstring> hasher;
-                    size_t pathHash = hasher(fullPath);
-                    unsigned __int64 pseudoFrn = (static_cast<unsigned __int64>(serialNumber) << 32) | 
-                                                 ((pathHash & 0xFFFFFFFF) ? 0xFFFFFFFF : 1);
-                    std::wstring frnStr = QString::number(pseudoFrn, 16).prepend("0x").toStdWString();
-
-                    ItemRepo::saveBasicInfo(volSerial, frnStr, fullPath, parentPath, entry.is_directory(), (double)stime, (double)fileSize.QuadPart);
-                    count++;
-
-                    // 2026-04-12 用户优化：降低事务提交频率，减少 I/O 活动
-                    if (count % 1000 == 0) {
-                        db.commit();
-                        db.transaction();
-                        qDebug() << "[Sync] 已处理 " << count << " 個文件";
-                    }
-                }
-            } catch (const std::exception& e) {
-                qWarning() << "[Sync] 扫描异常:" << e.what();
-            }
-
-            db.commit();
-            qDebug() << "[Sync] 驱动器 " << drivesToScan[i].c_str() << " 扫描完成，共 " << count << " 个条目";
-            if (onProgress) onProgress(i + 1, totalDrives);
-        } catch (...) {
-            db.commit();
+        std::wstring volLetter = drivesToScan[i].substr(0, 2);
+        wchar_t root[4] = { volLetter[0], L':', L'\\', L'\0' };
+        ctx.serialNumber = 0;
+        ctx.volSerial = L"UNKNOWN";
+        if (GetVolumeInformationW(root, nullptr, 0, &ctx.serialNumber, nullptr, nullptr, nullptr, 0)) {
+            wchar_t buf[16];
+            swprintf(buf, 16, L"%08X", ctx.serialNumber);
+            ctx.volSerial = buf;
         }
+
+        scanDirInternal(drivesToScan[i], 0, ctx);
+
+        db.commit();
+        if (onProgress) onProgress(i + 1, totalDrives);
     }
 
     rebuildTagStats();
+
+    auto endTime = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+
     qDebug() << "[Sync] >>> 全量对账完成 <<<";
+    qDebug() << "[Sync] 统计报告:";
+    qDebug() << "  - 扫描目录数:" << ctx.scanDirCount;
+    qDebug() << "  - 跳过目录数:" << ctx.skipDirCount;
+    qDebug() << "  - 处理条目总数:" << ctx.totalFiles;
+    qDebug() << "  - 总耗时:" << duration << "ms";
 }
 
 void SyncEngine::rebuildTagStats() {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
-    if (!db.isOpen()) {
-        qCritical() << "[Sync] 标签统计重建失败：数据库连接无效";
-        return;
-    }
+    if (!db.isOpen()) return;
     
-    if (!db.transaction()) {
-        qCritical() << "[Sync] 无法启动事务:" << db.lastError().text();
-        return;
-    }
+    if (!db.transaction()) return;
     
     QSqlQuery qDelete(db);
-    if (!qDelete.exec("DELETE FROM tags")) {
-        qWarning() << "[Sync] 删除旧标签失败:" << qDelete.lastError().text();
-    }
+    qDelete.exec("DELETE FROM tags");
     
     QSqlQuery query("SELECT tags FROM items WHERE tags != ''", db);
     std::map<std::string, int> tagCounts;
@@ -198,11 +223,11 @@ void SyncEngine::rebuildTagStats() {
             }
         }
     }
-    for (auto it = tagCounts.begin(); it != tagCounts.end(); ++it) {
+    for (auto const& [tag, count] : tagCounts) {
         QSqlQuery ins(db);
         ins.prepare("INSERT INTO tags (tag, item_count) VALUES (?, ?)");
-        ins.addBindValue(QString::fromStdString(it->first));
-        ins.addBindValue(it->second);
+        ins.addBindValue(QString::fromStdString(tag));
+        ins.addBindValue(count);
         ins.exec();
     }
     db.commit();

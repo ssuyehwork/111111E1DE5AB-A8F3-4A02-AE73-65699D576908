@@ -35,6 +35,9 @@ private:
     SyncEngine() = default;
     ~SyncEngine() = default;
 
+    struct ScanContext;
+    void scanDirInternal(const std::wstring& path, int depth, ScanContext& ctx);
+
     void scanDirectory(const std::filesystem::path& root, std::vector<std::wstring>& metaFiles);
 };
 

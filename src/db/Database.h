@@ -26,6 +26,16 @@ public:
      */
     QSqlDatabase getThreadDatabase();
 
+    /**
+     * @brief 2026-04-12 按照用户要求：查询文件夹扫描缓存的 mtime
+     */
+    qint64 queryFolderCache(const std::wstring& path);
+
+    /**
+     * @brief 2026-04-12 按照用户要求：更新或插入文件夹扫描缓存
+     */
+    void upsertFolderCache(const std::wstring& path, qint64 mtime);
+
 private:
     Database();
     ~Database();
