@@ -23,6 +23,9 @@ public:
 
     void setUnlockedIds(const QSet<int>& ids);
 
+    // 2026-04-12 关键修复：延迟刷新接口声明
+    void deferredRefresh();
+
 public slots:
     void refresh();
 
