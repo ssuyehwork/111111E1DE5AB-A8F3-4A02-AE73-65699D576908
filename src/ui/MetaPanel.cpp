@@ -10,7 +10,6 @@
 #include <QFileInfo>
 #include <QLabel>
 #include "UiHelper.h"
-#include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 
 namespace ArcMeta {

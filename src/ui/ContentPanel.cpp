@@ -45,7 +45,6 @@
 #include <QPersistentModelIndex>
 #include <windows.h>
 #include <shellapi.h>
-#include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 #include "../meta/BatchRenameEngine.h"
 #include "../db/CategoryRepo.h"
@@ -1118,7 +1117,7 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             };
 
             for (const QFileInfo& info : entries) {
-                if (info.fileName().startsWith(".am_meta.json")) continue;
+                if (info.fileName().startsWith('.')) continue;
 
                 // 检查后台任务存活
                 if (!panelPtr) return;
@@ -1596,7 +1595,6 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
     if (QFile::rename(oldPath, newPath)) {
         model->setData(index, value, Qt::EditRole);
         model->setData(index, newPath, PathRole);
-        AmMetaJson::renameItem(info.absolutePath(), info.fileName(), value);
         // 2026-03-xx 物理还原：重命名后同步更新内存元数据缓存
         MetadataManager::instance().renameItem(oldPath.toStdWString(), newPath.toStdWString());
     } 

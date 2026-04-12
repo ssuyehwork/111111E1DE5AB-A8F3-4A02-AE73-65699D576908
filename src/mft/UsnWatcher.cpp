@@ -139,33 +139,8 @@ void UsnWatcher::handleRecord(USN_RECORD_V2* pRecord) {
         std::wstring oldPath = ItemRepo::getPathByFrn(m_volume, frnStr);
 
         if (!newPath.empty() && oldPath != newPath) {
-            // 2. 跨目录元数据迁移事务逻辑 (两阶段提交思想)
-            if (!oldPath.empty()) {
-                std::wstring oldParentDir = oldPath.substr(0, oldPath.find_last_of(L"\\/"));
-                AmMetaJson oldMetaJson(oldParentDir);
-                
-                if (oldMetaJson.load()) {
-                    std::wstring fileNameOnly = oldPath.substr(oldPath.find_last_of(L"\\/") + 1);
-                    auto& items = oldMetaJson.items();
-                    auto it = items.find(fileNameOnly);
-                    if (it != items.end()) {
-                        ItemMeta meta = it->second;
-                        
-                        // 第二阶段：物理迁移 JSON 记录到新目录
-                        AmMetaJson newMetaJson(newParentPath);
-                        newMetaJson.load();
-                        std::wstring newFileNameOnly = newPath.substr(newPath.find_last_of(L"\\/") + 1);
-                        newMetaJson.items()[newFileNameOnly] = meta;
-                        
-                        if (newMetaJson.save()) {
-                            // 成功后删除旧位置记录并更新数据库
-                            items.erase(it);
-                            oldMetaJson.save();
-                        }
-                    }
-                }
-            }
-            // 无论 JSON 迁移与否，更新数据库路径与内存索引
+            // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
+            // 仅需更新数据库路径与内存索引，不再在磁盘上搬运 .am_meta.json 记录。
             ItemRepo::updatePath(m_volume, frnStr, newPath, newParentPath);
 
             // 更新内存 MFT 索引 (同步维护反向索引)

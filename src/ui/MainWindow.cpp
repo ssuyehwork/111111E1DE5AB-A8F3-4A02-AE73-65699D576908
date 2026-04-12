@@ -31,7 +31,6 @@
 #include "UiHelper.h"
 #include <QFileInfo>
 #include <QDir>
-#include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 
 #ifdef Q_OS_WIN
@@ -487,21 +486,16 @@ void MainWindow::initUi() {
             QString path = idx.data(ItemRole::PathRole).toString(); 
             if(path.isEmpty()) continue;
             
-            QFileInfo info(path);
-            ArcMeta::AmMetaJson meta(info.absolutePath().toStdWString());
-            meta.load();
-
             if (rating != -1) {
-                // MainWindow 拿到的 idx 是由 ContentPanel 视图通过 getSelectedIndexes() 返回的
-                // 而这些视图现在关联的是 ProxyModel，所以必须通过模型自身的 setData
+                // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
+                // 持久化由 MetadataManager 实时同步。
                 m_contentPanel->getProxyModel()->setData(idx, rating, RatingRole);
-                meta.items()[info.fileName().toStdWString()].rating = rating;
+                MetadataManager::instance().setRating(path.toStdWString(), rating);
             }
             if (color != L"__NO_CHANGE__") {
                 m_contentPanel->getProxyModel()->setData(idx, QString::fromStdWString(color), ColorRole);
-                meta.items()[info.fileName().toStdWString()].color = color;
+                MetadataManager::instance().setColor(path.toStdWString(), color);
             }
-            meta.save();
         }
     });
 

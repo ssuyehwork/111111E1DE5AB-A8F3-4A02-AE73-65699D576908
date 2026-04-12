@@ -1,7 +1,6 @@
 #include "CoreController.h"
 #include "../db/Database.h"
 #include "../db/SyncEngine.h"
-#include "../meta/SyncQueue.h"
 #include "../meta/MetadataManager.h"
 #include <QtConcurrent>
 #include <QThreadPool>
@@ -31,19 +30,10 @@ void CoreController::startSystem() {
         // 1. 初始化数据库元数据内存镜像 (关键：消除 UI 启动后的 IO 抖动)
         setStatus("正在载入元数据缓存...", true);
         MetadataManager::instance().initFromDatabase();
-        qDebug() << "[Core] [Step 1/3] 数据库元数据缓存加载完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
+        qDebug() << "[Core] [Step 1/1] 数据库元数据缓存加载完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
 
-        // 2. 启动同步队列
-        setStatus("启动同步引擎...", true);
-        qint64 syncQueueStart = QDateTime::currentMSecsSinceEpoch();
-        SyncQueue::instance().start();
-        qDebug() << "[Core] [Step 2/3] 同步引擎启动完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - syncQueueStart) << "ms";
-
-        // 3. 执行增量同步 (基于分布式 JSON 对齐元数据)
-        setStatus("正在校验增量数据...", true);
-        qint64 incrementalStart = QDateTime::currentMSecsSinceEpoch();
-        SyncEngine::instance().runIncrementalSync();
-        qDebug() << "[Core] [Step 3/3] 增量同步完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - incrementalStart) << "ms";
+        // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
+        // 原有的 SyncQueue (JSON -> DB 同步) 和 SyncEngine::runIncrementalSync (扫描 JSON) 已废弃。
 
         setStatus("系统就绪", false);
         qDebug() << "[Core] !!! 所有初始化任务已就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms，正在发射信号...";

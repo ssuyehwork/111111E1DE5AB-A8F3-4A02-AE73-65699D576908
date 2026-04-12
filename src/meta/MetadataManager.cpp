@@ -1,8 +1,8 @@
 #include "MetadataManager.h"
 #include "../db/Database.h"
 #include "../db/ItemRepo.h"
-#include "AmMetaJson.h"
-#include "SyncQueue.h"
+#include "../db/FolderRepo.h"
+#include "MetadataDefs.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -153,52 +153,11 @@ RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {
 void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
     // 2026-04-12 按照用户最新铁律：支持虚拟路径 computer://
     std::wstring nDirPath = (dirPath == L"computer://") ? dirPath : normalizePath(dirPath);
-    qDebug() << "[MetadataManager] 预加载目录元数据(访问即生成):" << QString::fromStdWString(nDirPath);
     
-    QThreadPool::globalInstance()->start([this, nDirPath]() {
-        AmMetaJson json(nDirPath);
-        
-        // 2026-04-10 按照用户铁律：访问即生成
-        // 强制调用 save()。如果文件不存在，它会创建一个初始文件。
-        json.load();
-        json.save();
-
-        {
-            std::unique_lock<std::shared_mutex> lock(m_mutex);
-            
-            // 1. 加载文件夹自身的元数据 (folder 节点)
-            RuntimeMeta fMeta;
-            fMeta.rating = json.folder().rating;
-            fMeta.color = json.folder().color;
-            fMeta.pinned = json.folder().pinned;
-            fMeta.note = json.folder().note;
-            for (const auto& t : json.folder().tags) fMeta.tags << QString::fromStdWString(t);
-            m_cache[nDirPath] = std::move(fMeta);
-
-            // 2. 加载子项元数据 (items 节点)
-            for (auto& pair : json.items()) {
-                QString fullPath;
-                if (nDirPath == L"computer://") {
-                    // 对于集中式驱动器配置，将 "C:" 还原为 "C:\" 路径作为缓存 Key
-                    fullPath = QString::fromStdWString(pair.first);
-                    if (!fullPath.endsWith('\\')) fullPath += '\\';
-                } else {
-                    fullPath = QDir(QString::fromStdWString(nDirPath)).filePath(QString::fromStdWString(pair.first));
-                }
-                std::wstring wFullPath = normalizePath(fullPath.toStdWString());
-                
-                RuntimeMeta meta;
-                meta.rating = pair.second.rating;
-                meta.color = pair.second.color;
-                meta.pinned = pair.second.pinned;
-                meta.encrypted = pair.second.encrypted;
-                meta.note = pair.second.note;
-                for (const auto& t : pair.second.tags) meta.tags << QString::fromStdWString(t);
-                
-                m_cache[wFullPath] = std::move(meta);
-            }
-        }
-    });
+    // 2026-05-24 按照用户要求：彻底移除 JSON 数据库（分布式存储）。
+    // 预加载逻辑现在仅作为占位符，因为核心元数据已在启动时通过 initFromDatabase() 全量载入。
+    // 未来可在此处加入针对特定目录的异步数据库校验逻辑。
+    qDebug() << "[MetadataManager] 预加载目录元数据(中心化模式):" << QString::fromStdWString(nDirPath);
 }
 
 void MetadataManager::setRating(const std::wstring& path, int rating) {
@@ -299,72 +258,51 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         qPath = QDir::toNativeSeparators(qPath);
         QFileInfo info(qPath);
         
-        std::wstring parentDir;
-        std::wstring fileName;
+        std::wstring volSerial = getVolumeSerialNumber(path);
 
-        // 2026-04-12 按照用户最新铁律：磁盘根目录自身元数据保存到 computer:// 对应的 .am_drive.json 中
+        // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑，直接写入 SQLite。
+        // 分别更新 folders 表和 items 表，确保中心化存储。
+
+        // 1. 如果是文件夹，更新 folders 表记录
+        if (info.isDir()) {
+            FolderMeta fMeta;
+            fMeta.rating = meta.rating;
+            fMeta.color = meta.color;
+            fMeta.pinned = meta.pinned;
+            fMeta.note = meta.note;
+            fMeta.encrypted = meta.encrypted;
+            for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
+
+            // 对于文件夹，路径存入相对路径（去掉盘符）
+            std::wstring relPath = getRelativePath(path);
+            FolderRepo::save(volSerial, relPath, fMeta);
+        }
+
+        // 2. 无论文件还是文件夹，作为父目录项更新 items 表记录
+        ItemMeta iMeta;
+        iMeta.volume = volSerial;
+        iMeta.type = info.isDir() ? L"folder" : L"file";
+        iMeta.rating = meta.rating;
+        iMeta.color = meta.color;
+        iMeta.pinned = meta.pinned;
+        iMeta.encrypted = meta.encrypted;
+        iMeta.note = meta.note;
+        for (const auto& t : meta.tags) iMeta.tags.push_back(t.toStdWString());
+
+        std::wstring parentDir = QDir::toNativeSeparators(info.absolutePath()).toStdWString();
+        std::wstring fileName = info.fileName().toStdWString();
+
+        // 特殊处理根目录或 computer://
         if (info.isRoot() || (qPath.length() <= 3 && qPath.endsWith(":\\"))) {
             parentDir = L"computer://";
-            // 移除末尾的反斜杠，例如 G:\ -> G:
             QString driveName = qPath;
             if (driveName.endsWith('\\')) driveName.chop(1);
             fileName = driveName.toStdWString();
-        } else {
-            parentDir = QDir::toNativeSeparators(info.absolutePath()).toStdWString();
-            fileName = info.fileName().toStdWString();
         }
 
-        std::wstring volSerial = getVolumeSerialNumber(path);
+        ItemRepo::save(parentDir, fileName, iMeta);
 
-        AmMetaJson json(parentDir);
-        json.load();
-
-        if (info.isDir() && !fileName.empty()) {
-            AmMetaJson selfJson(path);
-            selfJson.load();
-            auto& fMeta = selfJson.folder();
-            fMeta.rating = meta.rating;
-            fMeta.color = meta.color;
-            fMeta.pinned = meta.pinned;
-            fMeta.note = meta.note;
-            fMeta.encrypted = meta.encrypted;
-            fMeta.tags.clear();
-            for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
-            selfJson.save();
-            SyncQueue::instance().enqueue(path);
-        }
-
-        if (fileName.empty()) {
-            auto& fMeta = json.folder();
-            fMeta.rating = meta.rating;
-            fMeta.color = meta.color;
-            fMeta.pinned = meta.pinned;
-            fMeta.note = meta.note;
-            fMeta.encrypted = meta.encrypted;
-            fMeta.tags.clear();
-            for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
-            json.save();
-            SyncQueue::instance().enqueue(parentDir);
-            return;
-        }
-
-        auto& itemMeta = json.items()[fileName];
-        itemMeta.volume = volSerial; 
-        if (info.isDir()) {
-            itemMeta.type = L"folder";
-        } else {
-            itemMeta.type = L"file";
-        }
-        itemMeta.rating = meta.rating;
-        itemMeta.color = meta.color;
-        itemMeta.pinned = meta.pinned;
-        itemMeta.encrypted = meta.encrypted;
-        itemMeta.note = meta.note;
-        itemMeta.tags.clear();
-        for (const auto& t : meta.tags) itemMeta.tags.push_back(t.toStdWString());
-        json.save();
-
-        SyncQueue::instance().enqueue(parentDir);
+        qDebug() << "[MetadataManager] 已完成异步数据库持久化:" << QString::fromStdWString(path);
     });
 }
 

@@ -1,6 +1,5 @@
 #include "SyncEngine.h"
 #include "Database.h"
-#include "../meta/SyncQueue.h"
 #include <windows.h>
 #include <QDateTime>
 #include <QThread>
@@ -22,91 +21,24 @@ SyncEngine& SyncEngine::instance() {
 }
 
 /**
- * @brief 增量同步：只处理 mtime > last_sync_time 的 .am_meta.json
+ * @brief 增量同步
  */
 void SyncEngine::runIncrementalSync() {
-    double lastSyncTime = 0;
-    
-    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，消除异步任务中的跨线程数据库警告。
-    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
-    if (!db.isOpen()) return;
-
-    // 获取上次同步时间
-    QSqlQuery st(db);
-    st.exec("SELECT value FROM sync_state WHERE key = 'last_sync_time'");
-    if (st.next()) {
-        lastSyncTime = st.value(0).toDouble();
-    }
-
-    // 执行全表增量扫描逻辑
-    QSqlQuery query(db);
-    query.exec("SELECT path FROM folders");
-    
-    int count = 0;
-    while (query.next()) {
-        std::wstring path = query.value(0).toString().toStdWString();
-        std::wstring jsonPath = path + L"\\.am_meta.json";
-        
-        QFileInfo info(QString::fromStdWString(jsonPath));
-        if (info.exists() && info.lastModified().toMSecsSinceEpoch() > lastSyncTime) {
-            SyncQueue::instance().enqueue(path);
-            count++;
-            
-            // 2026-03-xx 物理防御：增量同步批处理限流
-            // 每处理 50 个文件夹强制挂起 10ms，防止瞬间撑爆同步队列导致 IO 风暴或 CPU 抢占
-            if (count % 50 == 0) {
-                QThread::msleep(10);
-            }
-        }
-    }
-    qDebug() << "[Sync] 增量扫描完成，共识别出" << count << "个变动文件夹";
+    // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。
+    // 在中心化数据库模式下，增量同步不再依赖 .am_meta.json 的 mtime。
+    // 该功能目前已在 MetadataManager 的实时持久化中完成。
+    qDebug() << "[Sync] 增量扫描已跳过（中心化模式无需扫描 JSON）";
 }
 
 /**
- * @brief 全量扫描：递归所有盘符搜集元数据
- * 2026-03-xx 物理修复：后台全量扫描必须使用独立线程连接，防止 UI 挂起。
+ * @brief 全量扫描
+ * 2026-05-24 按照用户要求：彻底移除基于 JSON 的扫描逻辑。
  */
 void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgress) {
-    std::vector<std::wstring> metaFiles;
-    
-    // 枚举所有固定驱动器
-    DWORD drives = GetLogicalDrives();
-    for (int i = 0; i < 26; ++i) {
-        if (drives & (1 << i)) {
-            wchar_t drivePath[] = { (wchar_t)(L'A' + i), L':', L'\\', L'\0' };
-            if (GetDriveTypeW(drivePath) == DRIVE_FIXED) {
-                scanDirectory(std::filesystem::path(drivePath), metaFiles);
-            }
-        }
-    }
-
-    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
-    if (!db.isOpen()) return;
-
-    // 清理并重建核心表
-    QSqlQuery q(db);
-    q.exec("DELETE FROM folders");
-    q.exec("DELETE FROM items");
-    q.exec("DELETE FROM tags");
-
-    int total = (int)metaFiles.size();
-    for (int i = 0; i < total; ++i) {
-        // 提取父目录并加入队列进行解析同步
-        std::wstring parentDir = std::filesystem::path(metaFiles[i]).parent_path().wstring();
-        SyncQueue::instance().enqueue(parentDir);
-        
-        if (onProgress) onProgress(i + 1, total);
-    }
-    
-    // 强制刷空队列
-    SyncQueue::instance().flush();
-    // 更新同步时间
-    QSqlQuery updateSync(db);
-    updateSync.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('last_sync_time', ?)");
-    updateSync.addBindValue((double)QDateTime::currentMSecsSinceEpoch());
-    updateSync.exec();
-    
-    rebuildTagStats();
+    // 在纯中心化模式下，全量扫描逻辑需要重构为“同步文件索引”。
+    // 考虑到移除 JSON 的首要目标，此处先行禁用原有的 JSON 搜集逻辑。
+    qDebug() << "[Sync] 全量扫描已跳过（中心化模式不再搜集 JSON 文件）";
+    if (onProgress) onProgress(100, 100);
 }
 
 /**
@@ -148,18 +80,12 @@ void SyncEngine::rebuildTagStats() {
 }
 
 /**
- * @brief 递归扫描目录（排除系统隐藏文件夹）
+ * @brief 递归扫描目录
  */
 void SyncEngine::scanDirectory(const std::filesystem::path& root, std::vector<std::wstring>& metaFiles) {
-    try {
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(root, std::filesystem::directory_options::skip_permission_denied)) {
-            if (entry.is_regular_file() && entry.path().filename() == ".am_meta.json") {
-                metaFiles.push_back(entry.path().wstring());
-            }
-        }
-    } catch (...) {
-        // 无权限访问目录
-    }
+    // 已废弃
+    Q_UNUSED(root);
+    Q_UNUSED(metaFiles);
 }
 
 } // namespace ArcMeta
