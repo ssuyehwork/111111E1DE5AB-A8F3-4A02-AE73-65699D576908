@@ -81,7 +81,5 @@ int main(int argc, char *argv[]) {
 
     int ret = a.exec();
 
-    // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。不再需要 SyncQueue 优雅退出逻辑。
-
     return ret;
 }

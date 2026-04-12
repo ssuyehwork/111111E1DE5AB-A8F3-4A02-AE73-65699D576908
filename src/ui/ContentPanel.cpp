@@ -1117,8 +1117,6 @@ void ContentPanel::loadDirectory(const QString& path, bool recursive) {
             };
 
             for (const QFileInfo& info : entries) {
-                if (info.fileName().startsWith(".am_meta.json")) continue;
-
                 // 检查后台任务存活
                 if (!panelPtr) return;
 
