@@ -126,26 +126,51 @@ void NavPanel::initUi() {
     computerItem->setData("computer://", Qt::UserRole + 1);
     m_model->appendRow(computerItem);
 
-    // 3. 磁盘列表 (逻辑异步预备：先填充基础文字路径)
-    const auto drives = QDir::drives();
-    for (const QFileInfo& drive : drives) {
-        QString driveName = drive.absolutePath();
-        QStandardItem* driveItem = new QStandardItem(driveName);
-        driveItem->setData(driveName, Qt::UserRole + 1);
-        driveItem->appendRow(new QStandardItem("Loading..."));
-        m_model->appendRow(driveItem);
-    }
+    // 2026-04-12 关键修复：禁止在主线程同步执行 QDir::drives()，防止断开的网络盘导致 30s 假死。
+    // 采用异步加载方案：
+    QPointer<NavPanel> panelPtr(this);
+    (void)QtConcurrent::run([panelPtr]() {
+        // 在子线程枚举磁盘（此处可能发生 30s 阻塞，但不卡 UI）
+        const auto drives = QDir::drives();
 
-    // 2026-03-xx 线程安全修复：图标提取必须在主线程执行。
-    // 虽然 shell 接口可能缓慢，但 Qt 禁止在子线程操作 GUI 相关对象 (QIcon/QPixmap)。
-    // 为了平衡性能与安全，图标提取在主线程分批次（Idle 状态）补全。
-    QTimer::singleShot(0, [this, drives]() {
-        QFileIconProvider iconProvider;
-        m_model->item(1)->setIcon(iconProvider.icon(QFileIconProvider::Computer));
-        for (int i = 0; i < drives.size(); ++i) {
-            if (i + 2 < m_model->rowCount())
-                m_model->item(i + 2)->setIcon(iconProvider.icon(drives[i]));
+        // 2026-04-12 评审优化：在后台线程预先探测子目录，防止在主线程调用 entryList 产生二次卡顿
+        struct DriveInfo {
+            QFileInfo info;
+            bool hasSubDirs;
+        };
+        QList<DriveInfo> driveList;
+        for (const QFileInfo& drive : drives) {
+            bool hasSub = false;
+            QDir subDir(drive.absolutePath());
+            // entryList 在离线网络盘上也会触发超时，必须在后台执行
+            if (!subDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty()) {
+                hasSub = true;
+            }
+            driveList.append({drive, hasSub});
         }
+
+        // 调度回主线程更新 UI (此时主线程仅执行纯粹的 UI 赋值，实现零阻塞)
+        QMetaObject::invokeMethod(qApp, [panelPtr, driveList]() {
+            if (!panelPtr || !panelPtr->m_model) return;
+
+            QFileIconProvider iconProvider;
+            // 补全“此电脑”图标
+            if (panelPtr->m_model->rowCount() > 1) {
+                panelPtr->m_model->item(1)->setIcon(iconProvider.icon(QFileIconProvider::Computer));
+            }
+
+            // 填充磁盘项
+            for (const auto& drive : driveList) {
+                QString driveName = drive.info.absolutePath();
+                QStandardItem* driveItem = new QStandardItem(iconProvider.icon(drive.info), driveName);
+                driveItem->setData(driveName, Qt::UserRole + 1);
+
+                if (drive.hasSubDirs) {
+                    driveItem->appendRow(new QStandardItem("Loading..."));
+                }
+                panelPtr->m_model->appendRow(driveItem);
+            }
+        }, Qt::QueuedConnection);
     });
 
     m_treeView->setModel(m_model);

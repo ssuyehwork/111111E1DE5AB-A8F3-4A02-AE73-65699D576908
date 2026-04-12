@@ -555,19 +555,18 @@ void MainWindow::showEvent(QShowEvent* event) {
         });
     }
     
-    // 2026-04-11 按照用户要求：此处是执行 ToolTipOverlay 真实 GPU 预热的唯一合法时机。
-    // 只有当 MainWindow 的原生窗口句柄（HWND）被 Windows 完整创建后，ToolTipOverlay 的
-    // show() + hide() 序列才能真正触发 DWM 桌面合成器分配 GPU 内存驻留资源。
-    // 在构造函数中执行该操作毫无意义，因为此时 MainWindow 本身尚未拥有有效句柄。
-    // 使用 singleShot(0) 延迟到下一个事件循环帧，确保当前帧窗口绘制不受打扰。
+    // 2026-04-12 深度优化：将 GPU 预热延迟至 1000ms 以后。
+    // 确保 MainWindow 的首帧渲染消息（WM_PAINT）拥有最高优先级，避免在启动瞬间
+    // 因为多个窗口（MainWindow + ToolTipOverlay）并发创建句柄而导致的 DWM 合成器竞争。
     static bool s_warmedUp = false;
     if (!s_warmedUp) {
         s_warmedUp = true;
-        QTimer::singleShot(0, []() {
+        QTimer::singleShot(1000, []() {
             auto* tip = ToolTipOverlay::instance();
-            // 闪烁显示再立即隐藏，令 DWM 将其纹理资源常驻 GPU 显存
+            // 此时主界面已稳定显示，执行静默预热
             tip->show();
             tip->hide();
+            qDebug() << "[Main] ToolTipOverlay GPU 预热完成";
         });
     }
 }
