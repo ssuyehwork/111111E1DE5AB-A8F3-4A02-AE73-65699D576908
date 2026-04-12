@@ -1,11 +1,16 @@
 #pragma once
 
-#include "Database.h"
 #include <string>
 #include <vector>
+#include <QMap>
+#include <QString>
 
 namespace ArcMeta {
 
+/**
+ * @brief 2026-05-22 按照用户要求：废除数据库。
+ * 提供最小化的 Stub 数据结构，以解决 UI 层的编译依赖。
+ */
 struct Category {
     int id = 0;
     int parentId = 0;
@@ -18,26 +23,26 @@ struct Category {
     std::wstring encryptHint;
 };
 
-/**
- * @brief 分类持久层
- */
 class CategoryRepo {
 public:
-    static bool add(Category& cat);
-    static bool update(const Category& cat);
-    static bool remove(int id);
-    static bool reorder(int parentId, bool ascending);
-    static bool reorderAll(bool ascending);
-    static std::vector<Category> getAll();
-    static std::vector<std::pair<int, int>> getCounts();
-    static int getUniqueItemCount();
-    static int getUncategorizedItemCount();
-    static QMap<QString, int> getSystemCounts();
+    static bool add(Category&) { return false; }
+    static bool update(const Category&) { return false; }
+    static bool remove(int) { return false; }
+    static bool reorder(int, bool) { return false; }
+    static bool reorderAll(bool) { return false; }
+    static std::vector<Category> getAll() { return {}; }
+    static std::vector<std::pair<int, int>> getCounts() { return {}; }
+    static int getUniqueItemCount() { return 0; }
+    static int getUncategorizedItemCount() { return 0; }
+    static QMap<QString, int> getSystemCounts() { return {}; }
+    static std::vector<std::wstring> getItemPathsInCategory(int) { return {}; }
+    static bool addItemToCategory(int, const std::wstring&) { return false; }
+    static bool removeItemFromCategory(int, const std::wstring&) { return false; }
+};
 
-    // 条目关联逻辑
-    static bool addItemToCategory(int categoryId, const std::wstring& itemPath);
-    static bool removeItemFromCategory(int categoryId, const std::wstring& itemPath);
-    static std::vector<std::wstring> getItemPathsInCategory(int categoryId);
+class ItemRepo {
+public:
+    static QStringList searchByKeyword(const QString&, const QString&) { return {}; }
 };
 
 } // namespace ArcMeta

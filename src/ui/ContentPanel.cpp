@@ -48,7 +48,6 @@
 #include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 #include "../meta/BatchRenameEngine.h"
-#include "../db/CategoryRepo.h"
 #include "../crypto/EncryptionManager.h"
 #include "CategoryLockDialog.h"
 #include "BatchRenameDialog.h"
@@ -719,17 +718,9 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
     QAction* actNewTxt    = newMenu->addAction(UiHelper::getIcon("text", QColor("#EEEEEE")), "创建纯文本文件 (txt)");
     menu.addSeparator();
     
-    // 2026-03-xx 按照用户要求：补全“归类到...”逻辑，对接 CategoryRepo
+    // 2026-05-22 按照用户要求：废除数据库。此处归类功能由于强依赖 CategoryRepo，暂时冻结显示。
     QMenu* categorizeMenu = menu.addMenu("归类到...");
-    auto categories = CategoryRepo::getAll();
-    if (categories.empty()) {
-        categorizeMenu->addAction("（暂无分类）")->setEnabled(false);
-    } else {
-        for (const auto& cat : categories) {
-            QAction* act = categorizeMenu->addAction(QString::fromStdWString(cat.name));
-            act->setData(cat.id);
-        }
-    }
+    categorizeMenu->addAction("（功能维护中，数据库已废除）")->setEnabled(false);
     
     menu.addSeparator();
     
@@ -802,14 +793,8 @@ void ContentPanel::onCustomContextMenuRequested(const QPoint& pos) {
         args << "/select," << QDir::toNativeSeparators(path);
         QProcess::startDetached("explorer", args);
     } else if (qobject_cast<QMenu*>(selectedAction->parent()) == categorizeMenu) {
-        int catId = selectedAction->data().toInt();
-        auto indexes = view->selectionModel()->selectedIndexes();
-        for (const auto& idx : indexes) {
-            if (idx.column() == 0) {
-                CategoryRepo::addItemToCategory(catId, idx.data(PathRole).toString().toStdWString());
-            }
-        }
-        ToolTipOverlay::instance()->showText(QCursor::pos(), "已成功归类", 1500, QColor("#2ecc71"));
+        // 2026-05-22 按照用户要求：废除数据库。此处逻辑已失效。
+        ToolTipOverlay::instance()->showText(QCursor::pos(), "该功能由于数据库废除暂时失效", 1500, QColor("#E81123"));
     } else if (selectedAction == actEncrypt) {
         bool ok;
         QString pwd = QInputDialog::getText(this, "加密保护", "设置加密密码:", QLineEdit::Password, "", &ok);

@@ -9,8 +9,6 @@
 #include "FilterPanel.h"
 #include "QuickLookWindow.h"
 #include "ToolTipOverlay.h"
-#include "../db/CategoryRepo.h"
-#include "../db/ItemRepo.h"
 #include "SearchHistoryPanel.h"
 #include "../../SvgIcons.h"
 
@@ -219,13 +217,8 @@ void MainWindow::initUi() {
         m_pathEdit->setText("分类: " + name);
         
         if (id > 0) {
-            // 从数据库拉取分类下的物理路径
-            std::vector<std::wstring> wpaths = CategoryRepo::getItemPathsInCategory(id);
-            QStringList paths;
-            for (const auto& wp : wpaths) paths << QString::fromStdWString(wp);
-            
-            // 联动 ContentPanel 展示这些文件
-            m_contentPanel->loadPaths(paths);
+            // 2026-05-22 按照用户要求：废除数据库。分类路径展示暂时留空，等待 JSON 分类重构。
+            m_contentPanel->loadPaths({});
         } else {
             // 系统内置分类（如收藏、全部数据等）逻辑维持原样或按需扩展
             m_contentPanel->search(name); 
@@ -419,9 +412,8 @@ void MainWindow::initUi() {
             // 局部手工关键词过滤
             m_contentPanel->search(keyword);
         } else {
-            // 全局数据库匹配加载
-            QStringList paths = ItemRepo::searchByKeyword(keyword, "");
-            m_contentPanel->loadPaths(paths);
+            // 2026-05-22 按照用户要求：废除数据库。全局搜索逻辑需后续重构为全文件系统 JSON 扫描，此处暂不返回。
+            m_contentPanel->loadPaths({});
         }
     };
 

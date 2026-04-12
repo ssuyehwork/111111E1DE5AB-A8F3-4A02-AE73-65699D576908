@@ -1,7 +1,6 @@
 #include "CategoryModel.h"
-#include "../db/CategoryRepo.h"
-#include "../db/ItemRepo.h"
 #include "UiHelper.h"
+#include "../db/CategoryRepo.h"
 #include <QMimeData>
 #include <QFileInfo>
 #include <QFont>

@@ -1,12 +1,6 @@
 #include "MetadataManager.h"
-#include "../db/Database.h"
-#include "../db/ItemRepo.h"
 #include "AmMetaJson.h"
 #include "SyncQueue.h"
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QSqlRecord>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QFileInfo>
@@ -37,34 +31,6 @@ static std::wstring getVolumeSerialNumber(const std::wstring& path) {
 }
 
 /**
- * @brief 内部辅助：建立卷序列号到当前盘符的映射
- */
-static std::unordered_map<std::wstring, std::wstring> getVolumeToDriveMap() {
-    std::unordered_map<std::wstring, std::wstring> map;
-    DWORD drives = GetLogicalDrives();
-    for (int i = 0; i < 26; i++) {
-        if (drives & (1 << i)) {
-            std::wstring drive = std::wstring(1, L'A' + i) + L":\\";
-            std::wstring serial = getVolumeSerialNumber(drive);
-            if (serial != L"UNKNOWN") {
-                map[serial] = drive;
-            }
-        }
-    }
-    return map;
-}
-
-/**
- * @brief 内部辅助：获取相对路径（如 G:\Folder -> \Folder）
- */
-static std::wstring getRelativePath(const std::wstring& fullPath) {
-    if (fullPath.length() >= 3 && fullPath[1] == L':' && fullPath[2] == L'\\') {
-        return fullPath.substr(2);
-    }
-    return fullPath;
-}
-
-/**
  * @brief 内部辅助：标准化路径，确保 G: 统一为 G:\，并处理斜杠一致性
  */
 static std::wstring normalizePath(const std::wstring& path) {
@@ -83,62 +49,12 @@ MetadataManager& MetadataManager::instance() {
 MetadataManager::MetadataManager(QObject* parent) : QObject(parent) {}
 
 void MetadataManager::initFromDatabase() {
-    qDebug() << "[MetadataManager] 开始从数据库加载内存镜像(硬件卷映射模式)...";
-    std::unordered_map<std::wstring, RuntimeMeta> tempCache;
-    auto volToDriveMap = getVolumeToDriveMap();
-
-    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
-    if (!db.isOpen()) {
-        qCritical() << "[MetadataManager] 数据库未打开，加载失败";
-        return;
-    }
-
-    auto loadTable = [&](const char* sql, int& count) {
-        QSqlQuery query(db);
-        if (!query.exec(sql)) {
-            qCritical() << "[MetadataManager] 执行查询失败:" << query.lastError().text();
-            return;
-        }
-        while (query.next()) {
-            std::wstring dbVol = query.value(0).toString().toStdWString();
-            std::wstring dbPath = query.value(1).toString().toStdWString();
-            
-            std::wstring finalPath = dbPath;
-            if (volToDriveMap.count(dbVol)) {
-                QString base = QString::fromStdWString(volToDriveMap[dbVol]);
-                if (base.endsWith('\\')) base.chop(1);
-                finalPath = (base + QString::fromStdWString(getRelativePath(dbPath))).toStdWString();
-            }
-
-            RuntimeMeta meta;
-            meta.rating = query.value(2).toInt();
-            meta.color = query.value(3).toString().toStdWString();
-            QJsonDocument doc = QJsonDocument::fromJson(query.value(4).toByteArray());
-            if (doc.isArray()) {
-                for (const auto& v : doc.array()) meta.tags << v.toString();
-            }
-            meta.pinned = query.value(5).toInt() != 0;
-            meta.encrypted = query.value(6).toInt() != 0;
-            meta.note = query.value(7).toString().toStdWString();
-            tempCache[finalPath] = std::move(meta);
-            count++;
-        }
-    };
-
-    int itemCount = 0;
-    loadTable("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''", itemCount);
-    qDebug() << "[MetadataManager] 已从 items 表加载" << itemCount << "条记录";
-
-    int folderCount = 0;
-    loadTable("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM folders WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''", folderCount);
-    qDebug() << "[MetadataManager] 已从 folders 表加载" << folderCount << "条记录";
-
+    // 2026-05-22 按照用户要求：彻底废除数据库，此函数现在仅打印日志并重置缓存
+    qDebug() << "[MetadataManager] 数据库已废除，跳过初始化。";
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
-        m_cache = std::move(tempCache);
+        m_cache.clear();
     }
-    qDebug() << "[MetadataManager] 内存镜像初始化完成";
-    
     emit metaChanged(L"__RELOAD_ALL__");
 }
 
@@ -153,13 +69,12 @@ RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {
 void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
     // 2026-04-12 按照用户最新铁律：支持虚拟路径 computer://
     std::wstring nDirPath = (dirPath == L"computer://") ? dirPath : normalizePath(dirPath);
-    qDebug() << "[MetadataManager] 预加载目录元数据(访问即生成):" << QString::fromStdWString(nDirPath);
+    qDebug() << "[MetadataManager] 预加载目录元数据(纯 JSON 模式):" << QString::fromStdWString(nDirPath);
     
     QThreadPool::globalInstance()->start([this, nDirPath]() {
         AmMetaJson json(nDirPath);
         
         // 2026-04-10 按照用户铁律：访问即生成
-        // 强制调用 save()。如果文件不存在，它会创建一个初始文件。
         json.load();
         json.save();
 
@@ -179,7 +94,6 @@ void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
             for (auto& pair : json.items()) {
                 QString fullPath;
                 if (nDirPath == L"computer://") {
-                    // 对于集中式驱动器配置，将 "C:" 还原为 "C:\" 路径作为缓存 Key
                     fullPath = QString::fromStdWString(pair.first);
                     if (!fullPath.endsWith('\\')) fullPath += '\\';
                 } else {
@@ -262,7 +176,6 @@ void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
 }
 
 void MetadataManager::debouncePersist(const std::wstring& nPath) {
-    // 2026-05-20 性能优化：引入 2 秒防抖延迟持久化，合并频繁修改
     QMetaObject::invokeMethod(this, [this, nPath]() {
         if (!m_debounceTimers.count(nPath)) {
             QTimer* t = new QTimer(this);
@@ -302,10 +215,8 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         std::wstring parentDir;
         std::wstring fileName;
 
-        // 2026-04-12 按照用户最新铁律：磁盘根目录自身元数据保存到 computer:// 对应的 .am_drive.json 中
         if (info.isRoot() || (qPath.length() <= 3 && qPath.endsWith(":\\"))) {
             parentDir = L"computer://";
-            // 移除末尾的反斜杠，例如 G:\ -> G:
             QString driveName = qPath;
             if (driveName.endsWith('\\')) driveName.chop(1);
             fileName = driveName.toStdWString();
@@ -331,7 +242,7 @@ void MetadataManager::persistAsync(const std::wstring& path) {
             fMeta.tags.clear();
             for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
             selfJson.save();
-            SyncQueue::instance().enqueue(path);
+            // 2026-05-22 按照用户要求：废除数据库，无需向 SyncQueue 入队（SyncQueue 目前也已去数据库化）
         }
 
         if (fileName.empty()) {
@@ -344,7 +255,6 @@ void MetadataManager::persistAsync(const std::wstring& path) {
             fMeta.tags.clear();
             for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
             json.save();
-            SyncQueue::instance().enqueue(parentDir);
             return;
         }
 
@@ -363,8 +273,6 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         itemMeta.tags.clear();
         for (const auto& t : meta.tags) itemMeta.tags.push_back(t.toStdWString());
         json.save();
-
-        SyncQueue::instance().enqueue(parentDir);
     });
 }
 

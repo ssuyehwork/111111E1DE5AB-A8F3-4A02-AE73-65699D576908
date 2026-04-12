@@ -1,6 +1,4 @@
 #include "CoreController.h"
-#include "../db/Database.h"
-#include "../db/SyncEngine.h"
 #include "../meta/SyncQueue.h"
 #include "../meta/MetadataManager.h"
 #include <QtConcurrent>
@@ -26,24 +24,18 @@ void CoreController::startSystem() {
     // 异步链式初始化
     QThreadPool::globalInstance()->start([this]() {
         qint64 startTime = QDateTime::currentMSecsSinceEpoch();
-        qDebug() << "[Core] >>> 开始后台异步初始化链条 (MFT 已移除) <<<";
+        qDebug() << "[Core] >>> 开始后台异步初始化链条 (纯 JSON 模式) <<<";
         
-        // 1. 初始化数据库元数据内存镜像 (关键：消除 UI 启动后的 IO 抖动)
-        setStatus("正在载入元数据缓存...", true);
+        // 1. 初始化元数据内存镜像 (2026-05-22 数据库已废除)
+        setStatus("正在准备元数据服务...", true);
         MetadataManager::instance().initFromDatabase();
-        qDebug() << "[Core] [Step 1/3] 数据库元数据缓存加载完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
+        qDebug() << "[Core] [Step 1/2] 元数据服务准备完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
 
-        // 2. 启动同步队列
-        setStatus("启动同步引擎...", true);
+        // 2. 启动同步队列 (仅保留异步 IO 管理功能)
+        setStatus("启动异步服务...", true);
         qint64 syncQueueStart = QDateTime::currentMSecsSinceEpoch();
         SyncQueue::instance().start();
-        qDebug() << "[Core] [Step 2/3] 同步引擎启动完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - syncQueueStart) << "ms";
-
-        // 3. 执行增量同步 (基于分布式 JSON 对齐元数据)
-        setStatus("正在校验增量数据...", true);
-        qint64 incrementalStart = QDateTime::currentMSecsSinceEpoch();
-        SyncEngine::instance().runIncrementalSync();
-        qDebug() << "[Core] [Step 3/3] 增量同步完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - incrementalStart) << "ms";
+        qDebug() << "[Core] [Step 2/2] 异步服务启动完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - syncQueueStart) << "ms";
 
         setStatus("系统就绪", false);
         qDebug() << "[Core] !!! 所有初始化任务已就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms，正在发射信号...";

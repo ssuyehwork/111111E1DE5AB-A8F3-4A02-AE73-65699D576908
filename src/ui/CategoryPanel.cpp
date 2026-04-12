@@ -10,7 +10,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QRegularExpression>
-#include "../db/CategoryRepo.h"
 #include "../meta/MetadataManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -25,8 +24,10 @@
 #include <QColorDialog>
 #include <QSettings>
 #include "Logger.h"
+#include "../db/CategoryRepo.h"
 
 namespace ArcMeta {
+
 
 /**
  * @brief 物理还原：获取高饱和度随机分类颜色，杜绝单一蓝色脑补

@@ -8,8 +8,6 @@
 #include <objbase.h>
 #include <shellapi.h>
 #include "ui/MainWindow.h"
-#include "db/Database.h"
-#include "db/SyncEngine.h"
 #include "meta/SyncQueue.h"
 #include "core/CoreController.h"
 
@@ -57,13 +55,6 @@ int main(int argc, char *argv[]) {
 
     a.setApplicationName("ArcMeta");
     a.setOrganizationName("ArcMetaTeam");
-
-    // 2. 初始化数据库 (仅核心表结构，必须同步完成)
-    std::wstring dbPath = L"arcmeta.db";
-    if (!ArcMeta::Database::instance().init(dbPath)) {
-        QMessageBox::critical(nullptr, "错误", "无法初始化数据库，程序即将退出。");
-        return -1;
-    }
 
     // 3. 建立“延迟构造”联动逻辑：
     // 2026-03-xx 物理修复：为了彻底杜绝启动期间的死锁与“未响应”，改为在初始化彻底完成后再构造 MainWindow。

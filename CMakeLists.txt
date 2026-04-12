@@ -17,7 +17,7 @@ if(MSVC)
 endif()
 
 # Qt 6 基础组件
-find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Sql Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Concurrent)
 
 # 2026-03-xx 按照用户要求：禁用 Vulkan 探测以消除日志报错，并清理构建路径矛盾
 set(QT_NO_VULKAN ON)
@@ -58,11 +58,10 @@ list(APPEND SOURCES
 # 修复：移除直接引用的 "ArcMeta.manifest"，改由 ArcMeta.rc 引入以杜绝 mt.exe 冲突
 add_executable(ArcMeta WIN32 ${SOURCES})
 
-# 链接库 (文档红线列表: ntdll, ole32, bcrypt + QtSql)
+# 链接库 (文档红线列表: ntdll, ole32, bcrypt)
 target_link_libraries(ArcMeta PRIVATE
     Qt6::Widgets
     Qt6::Svg
-    Qt6::Sql
     Qt6::Concurrent
     ntdll
     ole32
