@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Database.h"
-#include "../meta/AmMetaJson.h"
+#include "../meta/MetadataDefs.h"
 #include <string>
 #include <vector>
 
