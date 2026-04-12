@@ -89,6 +89,13 @@ bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, c
     return q.exec();
 }
 
+int ItemRepo::count() {
+    QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
+    QSqlQuery q("SELECT COUNT(*) FROM items", db);
+    if (q.exec() && q.next()) return q.value(0).toInt();
+    return 0;
+}
+
 QStringList ItemRepo::searchByKeyword(const QString& keyword, const QString& parentPath) {
     if (keyword.isEmpty()) return {};
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();

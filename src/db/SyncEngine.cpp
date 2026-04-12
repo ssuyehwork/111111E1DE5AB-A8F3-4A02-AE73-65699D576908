@@ -56,10 +56,23 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
                 swprintf(buf, 16, L"%08X", serialNumber);
                 volSerial = buf;
             }
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(drivesToScan[i], std::filesystem::directory_options::skip_permission_denied)) {
+            for (auto it = std::filesystem::recursive_directory_iterator(drivesToScan[i], std::filesystem::directory_options::skip_permission_denied);
+                 it != std::filesystem::recursive_directory_iterator(); ++it) {
+                const auto& entry = *it;
                 std::wstring fullPath = entry.path().wstring();
                 std::wstring parentPath = entry.path().parent_path().wstring();
-                if (fullPath.find(L"\\.") != std::wstring::npos || fullPath.find(L"$RECYCLE.BIN") != std::wstring::npos) continue;
+
+                // 性能优化：跳过系统无关、大型垃圾目录，减少无效 FRN 请求
+                // 使用 disable_recursion_pending() 确保不会深入子目录，且不终止同级目录扫描
+                if (fullPath.find(L"$RECYCLE.BIN") != std::wstring::npos ||
+                    fullPath.find(L"\\System Volume Information") != std::wstring::npos ||
+                    fullPath.find(L"\\Windows") != std::wstring::npos ||
+                    fullPath.find(L"\\AppData\\Local\\Temp") != std::wstring::npos) {
+                    if (entry.is_directory()) {
+                        it.disable_recursion_pending();
+                    }
+                    continue;
+                }
                 HANDLE hFile = CreateFileW(fullPath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
                 std::wstring frnStr = L"";
                 if (hFile != INVALID_HANDLE_VALUE) {

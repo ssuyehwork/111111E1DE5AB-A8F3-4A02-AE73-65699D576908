@@ -33,6 +33,11 @@ public:
     static bool updatePath(const std::wstring& volume, const std::wstring& frn, const std::wstring& newPath, const std::wstring& newParentPath);
 
     /**
+     * @brief 获取当前数据库中的总记录数
+     */
+    static int count();
+
+    /**
      * @brief 2026-04-12 按照用户要求：基于数据库的文件名关键词搜索
      * @param keyword 搜索关键词
      * @param parentPath 局部搜索时指定父路径，为空则全局搜索

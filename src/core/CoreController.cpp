@@ -1,6 +1,7 @@
 #include "CoreController.h"
 #include "../db/Database.h"
 #include "../db/SyncEngine.h"
+#include "../db/ItemRepo.h"
 #include "../meta/MetadataManager.h"
 #include <QtConcurrent>
 #include <QThreadPool>
@@ -32,13 +33,19 @@ void CoreController::startSystem() {
         MetadataManager::instance().initFromDatabase();
         qDebug() << "[Core] [Step 1/2] 数据库元数据缓存加载完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
 
-        // 2. 执行全量 GLOB 扫描与物理对账 (基于稳定标识 FRN)
-        // 2026-05-24 按照用户要求：启动时执行对账，补齐程序关闭期间的文件系统变化。
-        // FSWatcher (UsnWatcher) 会在 MainWindow 启动后作为常驻后台服务运行。
-        setStatus("正在执行磁盘增量对账...", true);
-        qint64 scanStart = QDateTime::currentMSecsSinceEpoch();
-        SyncEngine::instance().runFullScan();
-        qDebug() << "[Core] [Step 2/2] GLOB 全量对账完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - scanStart) << "ms";
+        // 2. 执行离线变更追平对账 (基于稳定标识 FRN)
+        // 2026-05-24 按照用户要求：实现秒级启动对账逻辑。
+        // 如果数据库非空，则禁止执行耗时的全量扫描，改为由 UsnWatcher 在后台追平离线变更。
+        if (ItemRepo::count() > 0) {
+            setStatus("正在追平离线变更...", true);
+            qDebug() << "[Core] [Step 2/2] 数据库非空，已跳过全量扫描，转为后台增量监听模式。";
+            // 此处无需阻塞调用 runFullScan，UsnWatcher 会在 MainWindow 构造后自动处理追平
+        } else {
+            setStatus("首次启动，正在建立索引...", true);
+            qint64 scanStart = QDateTime::currentMSecsSinceEpoch();
+            SyncEngine::instance().runFullScan();
+            qDebug() << "[Core] [Step 2/2] 首次全量对账完成，耗时:" << (QDateTime::currentMSecsSinceEpoch() - scanStart) << "ms";
+        }
 
         setStatus("系统就绪", false);
         qDebug() << "[Core] !!! 混合扫描架构初始化就绪，总耗时:" << (QDateTime::currentMSecsSinceEpoch() - startTime) << "ms";
