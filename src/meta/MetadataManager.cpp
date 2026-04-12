@@ -14,6 +14,7 @@
 #include <QThreadPool>
 #include <QDir>
 #include <QDebug>
+#include <QTimer>
 #include <mutex>
 #include <shared_mutex>
 #include <cwchar>
@@ -55,7 +56,7 @@ static std::unordered_map<std::wstring, std::wstring> getVolumeToDriveMap() {
 }
 
 /**
- * @brief 内部辅助：获取相对路径（如 G:\Folder -> \Folder）
+ * @brief 内部辅助：获取相对路径
  */
 static std::wstring getRelativePath(const std::wstring& fullPath) {
     if (fullPath.length() >= 3 && fullPath[1] == L':' && fullPath[2] == L'\\') {
@@ -65,7 +66,7 @@ static std::wstring getRelativePath(const std::wstring& fullPath) {
 }
 
 /**
- * @brief 内部辅助：标准化路径，确保 G: 统一为 G:\，并处理斜杠一致性
+ * @brief 内部辅助：标准化路径
  */
 static std::wstring normalizePath(const std::wstring& path) {
     QString qp = QDir::toNativeSeparators(QDir::cleanPath(QString::fromStdWString(path)));
@@ -83,7 +84,7 @@ MetadataManager& MetadataManager::instance() {
 MetadataManager::MetadataManager(QObject* parent) : QObject(parent) {}
 
 void MetadataManager::initFromDatabase() {
-    qDebug() << "[MetadataManager] 开始从数据库加载内存镜像(硬件卷映射模式)...";
+    qDebug() << "[MetadataManager] 开始从数据库加载内存镜像...";
     std::unordered_map<std::wstring, RuntimeMeta> tempCache;
     auto volToDriveMap = getVolumeToDriveMap();
 
@@ -127,18 +128,14 @@ void MetadataManager::initFromDatabase() {
 
     int itemCount = 0;
     loadTable("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM items WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''", itemCount);
-    qDebug() << "[MetadataManager] 已从 items 表加载" << itemCount << "条记录";
-
     int folderCount = 0;
     loadTable("SELECT volume, path, rating, color, tags, pinned, encrypted, note FROM folders WHERE rating > 0 OR color != '' OR tags != '' OR pinned = 1 OR encrypted = 1 OR note != ''", folderCount);
-    qDebug() << "[MetadataManager] 已从 folders 表加载" << folderCount << "条记录";
 
     {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
         m_cache = std::move(tempCache);
     }
     qDebug() << "[MetadataManager] 内存镜像初始化完成";
-    
     emit metaChanged(L"__RELOAD_ALL__");
 }
 
@@ -147,15 +144,11 @@ RuntimeMeta MetadataManager::getMeta(const std::wstring& path) {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
     auto it = m_cache.find(nPath);
     if (it != m_cache.end()) return it->second;
-    return RuntimeMeta(); // 返回默认空元数据
+    return RuntimeMeta();
 }
 
 void MetadataManager::prefetchDirectory(const std::wstring& dirPath) {
-    // 2026-04-12 按照用户最新铁律：支持虚拟路径 computer://
     std::wstring nDirPath = (dirPath == L"computer://") ? dirPath : normalizePath(dirPath);
-    
-    // 2026-05-24 按照用户要求：彻底移除 JSON 数据库（分布式存储）。
-    // 预加载逻辑现在仅作为占位符，因为核心元数据已在启动时通过 initFromDatabase() 全量载入。
     qDebug() << "[MetadataManager] 预加载目录元数据(中心化模式):" << QString::fromStdWString(nDirPath);
 }
 
@@ -220,7 +213,6 @@ void MetadataManager::setEncrypted(const std::wstring& path, bool encrypted) {
 }
 
 void MetadataManager::debouncePersist(const std::wstring& nPath) {
-    // 2026-05-20 性能优化：引入 2 秒防抖延迟持久化，合并频繁修改
     QMetaObject::invokeMethod(this, [this, nPath]() {
         if (!m_debounceTimers.count(nPath)) {
             QTimer* t = new QTimer(this);
@@ -252,16 +244,11 @@ void MetadataManager::renameItem(const std::wstring& oldPath, const std::wstring
 void MetadataManager::persistAsync(const std::wstring& path) {
     QThreadPool::globalInstance()->start([this, path]() {
         RuntimeMeta meta = getMeta(path);
-        
         QString qPath = QDir::cleanPath(QString::fromStdWString(path));
         qPath = QDir::toNativeSeparators(qPath);
         QFileInfo info(qPath);
-        
         std::wstring volSerial = getVolumeSerialNumber(path);
 
-        // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑，直接写入 SQLite。
-
-        // 1. 如果是文件夹，更新 folders 表记录
         if (info.isDir()) {
             FolderMeta fMeta;
             fMeta.rating = meta.rating;
@@ -270,12 +257,9 @@ void MetadataManager::persistAsync(const std::wstring& path) {
             fMeta.note = meta.note;
             fMeta.encrypted = meta.encrypted;
             for (const auto& t : meta.tags) fMeta.tags.push_back(t.toStdWString());
-
-            std::wstring relPath = getRelativePath(path);
-            FolderRepo::save(volSerial, relPath, fMeta);
+            FolderRepo::save(volSerial, getRelativePath(path), fMeta);
         }
 
-        // 2. 无论文件还是文件夹，作为父目录项更新 items 表记录
         ItemMeta iMeta;
         iMeta.volume = volSerial;
         iMeta.type = info.isDir() ? L"folder" : L"file";
@@ -297,8 +281,6 @@ void MetadataManager::persistAsync(const std::wstring& path) {
         }
 
         ItemRepo::save(parentDir, fileName, iMeta);
-
-        qDebug() << "[MetadataManager] 已完成异步数据库持久化:" << QString::fromStdWString(path);
     });
 }
 

@@ -6,11 +6,11 @@
 #include <QJsonArray>
 #include <QCryptographicHash>
 #include <QStringList>
+#include "../meta/MetadataDefs.h"
 
 namespace ArcMeta {
 
 bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, const ItemMeta& meta) {
-    // 2026-03-xx 修复：通过 getThreadDatabase 获取当前线程专属连接，确保在 SyncQueue 等后台线程中正常保存数据。
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     
     std::wstring fullPath = parentPath;
@@ -20,8 +20,6 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
     std::wstring volume = meta.volume;
     std::wstring frn = meta.frn;
 
-    // 2026-04-10 关键修复：如果 JSON 中主键为空（常发生于非 MFT 扫描结果），尝试根据路径反查原有主键
-    // 2026-04-10 深度优化：优先使用 路径+卷序列号 匹配，确保跨盘符时的唯一性
     if (volume.empty() || frn.empty()) {
         QSqlQuery check(db);
         check.prepare("SELECT volume, frn FROM items WHERE path = ?");
@@ -32,7 +30,6 @@ bool ItemRepo::save(const std::wstring& parentPath, const std::wstring& name, co
         }
     }
 
-    // 如果仍然为空（新条目），则使用路径 MD5 生成一个伪 FRN 以保证主键唯一性
     if (volume.empty() || frn.empty()) {
         volume = L"VIRTUAL";
         frn = QString(QCryptographicHash::hash(QString::fromStdWString(fullPath).toUtf8(), QCryptographicHash::Md5).toHex()).toStdWString();
@@ -73,8 +70,6 @@ bool ItemRepo::saveBasicInfo(const std::wstring& volume, const std::wstring& frn
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
 
-    // 采用 INSERT OR IGNORE 先确保记录存在，然后 UPDATE 物理属性
-    // 这样可以保护 rating, color 等用户元数据字段不被覆盖
     q.prepare(R"sql(
         INSERT OR IGNORE INTO items (volume, frn, path, parent_path, type)
         VALUES (?, ?, ?, ?, ?)
@@ -93,7 +88,7 @@ bool ItemRepo::saveBasicInfo(const std::wstring& volume, const std::wstring& frn
     u.addBindValue(mtime);
     u.addBindValue(QString::fromStdWString(volume));
     u.addBindValue(QString::fromStdWString(frn));
-    Q_UNUSED(size); // 扩展预留
+    Q_UNUSED(size);
     return u.exec();
 }
 
@@ -138,19 +133,15 @@ bool ItemRepo::updatePath(const std::wstring& volume, const std::wstring& frn, c
     return q.exec();
 }
 
-// 2026-04-12 按照用户要求：基于数据库搜索，支持局部（指定父路径）和全局（不限路径）两种模式
 QStringList ItemRepo::searchByKeyword(const QString& keyword, const QString& parentPath) {
     if (keyword.isEmpty()) return {};
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
     QSqlQuery q(db);
 
     if (parentPath.isEmpty()) {
-        // 全局搜索：在所有 items 中按文件名包含分匹配
         q.prepare("SELECT path FROM items WHERE path LIKE ? AND deleted = 0 LIMIT 300");
         q.addBindValue("%" + keyword + "%");
     } else {
-        // 局部搜索：仅在指定父路径下的直接子条目中搜索
-        // 同时匹配 parent_path = ? 且 path LIKE % keyword %
         q.prepare("SELECT path FROM items WHERE parent_path = ? AND path LIKE ? AND deleted = 0 LIMIT 300");
         q.addBindValue(parentPath);
         q.addBindValue("%" + keyword + "%");

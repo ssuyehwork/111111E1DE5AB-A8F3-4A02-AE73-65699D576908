@@ -3,6 +3,9 @@
 #include "ItemRepo.h"
 #include <windows.h>
 #include <QDateTime>
+#include <QDebug>
+#include <QJsonDocument>
+#include <QJsonArray>
 #include <QThread>
 #include <QFileInfo>
 #include <QDir>
@@ -92,7 +95,7 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
                 if (frnStr.empty()) continue;
 
                 auto ftime = std::filesystem::last_write_time(entry);
-                auto stime = std::chrono::time_point_cast<std::chrono::milliseconds>(ftime).time_since_epoch().count();
+                auto stime = std::chrono::duration_cast<std::chrono::milliseconds>(ftime.time_since_epoch()).count();
 
                 ItemRepo::saveBasicInfo(volSerial, frnStr, fullPath, parentPath, entry.is_directory(), (double)stime, (double)entry.file_size());
 
@@ -120,7 +123,6 @@ void SyncEngine::runFullScan(std::function<void(int current, int total)> onProgr
 
 /**
  * @brief 标签聚合统计逻辑
- * 2026-03-xx 物理修复：聚合任务属于重度 IO 操作，强制要求在后台线程独立连接中运行事务。
  */
 void SyncEngine::rebuildTagStats() {
     QSqlDatabase db = ArcMeta::Database::instance().getThreadDatabase();
@@ -145,11 +147,11 @@ void SyncEngine::rebuildTagStats() {
         }
     }
 
-    for (const auto& [tag, count] : tagCounts) {
+    for (auto it = tagCounts.begin(); it != tagCounts.end(); ++it) {
         QSqlQuery ins(db);
         ins.prepare("INSERT INTO tags (tag, item_count) VALUES (?, ?)");
-        ins.addBindValue(QString::fromStdString(tag));
-        ins.addBindValue(count);
+        ins.addBindValue(QString::fromStdString(it->first));
+        ins.addBindValue(it->second);
         ins.exec();
     }
 

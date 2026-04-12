@@ -130,7 +130,7 @@ public:
                     // 2026-04-11 按照用户要求：引入分离适配机制，对取自缓存的缩略图单独进行翻转扶正
                     QImage img = QImage::fromHBITMAP(hBitmap);
                     if (forceMirror) {
-                        img = img.mirrored(false, true);
+                        img = img.flipped(Qt::Vertical);
                     }
                     QPixmap pix = QPixmap::fromImage(img);
                     DeleteObject(hBitmap);

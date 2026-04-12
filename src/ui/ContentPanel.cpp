@@ -45,7 +45,6 @@
 #include <QPersistentModelIndex>
 #include <windows.h>
 #include <shellapi.h>
-#include "../meta/AmMetaJson.h"
 #include "../meta/MetadataManager.h"
 #include "../meta/BatchRenameEngine.h"
 #include "../db/CategoryRepo.h"
@@ -1596,8 +1595,7 @@ void GridItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, 
     if (QFile::rename(oldPath, newPath)) {
         model->setData(index, value, Qt::EditRole);
         model->setData(index, newPath, PathRole);
-        AmMetaJson::renameItem(info.absolutePath(), info.fileName(), value);
-        // 2026-03-xx 物理还原：重命名后同步更新内存元数据缓存
+        // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑，重命名后仅需同步更新内存与数据库索引
         MetadataManager::instance().renameItem(oldPath.toStdWString(), newPath.toStdWString());
     } 
 }

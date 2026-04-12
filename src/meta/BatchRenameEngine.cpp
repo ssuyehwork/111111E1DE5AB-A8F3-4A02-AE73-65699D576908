@@ -1,6 +1,5 @@
 #include "BatchRenameEngine.h"
 #include "MetadataManager.h"
-#include "AmMetaJson.h"
 #include <QFileInfo>
 #include <QDateTime>
 #include <filesystem>
@@ -20,9 +19,6 @@ std::vector<std::wstring> BatchRenameEngine::preview(const std::vector<std::wstr
     return results;
 }
 
-/**
- * @brief 管道模式处理单个文件名
- */
 QString BatchRenameEngine::processOne(const std::wstring& path, int index, const std::vector<RenameRule>& rules) {
     QFileInfo info(QString::fromStdWString(path));
     QString newName = "";
@@ -44,40 +40,27 @@ QString BatchRenameEngine::processOne(const std::wstring& path, int index, const
                 newName += info.baseName();
                 break;
             case RenameComponentType::Metadata:
-                // 注入 ArcMeta 元数据标记（如评级星级）
                 newName += "[ArcMeta]"; 
                 break;
         }
     }
 
-    // 保留原始后缀
     QString ext = info.suffix();
     if (!ext.isEmpty()) newName += "." + ext;
-
     return newName;
 }
 
-/**
- * @brief 执行物理重命名（红线：重命名成功后必须迁移元数据）
- */
 bool BatchRenameEngine::execute(const std::vector<std::wstring>& originalPaths, const std::vector<RenameRule>& rules) {
     auto newNames = preview(originalPaths, rules);
-    
     for (size_t i = 0; i < originalPaths.size(); ++i) {
         std::filesystem::path oldP(originalPaths[i]);
         std::filesystem::path newP = oldP.parent_path() / newNames[i];
-        
         try {
             std::filesystem::rename(oldP, newP);
-            // 2026-03-xx 按照用户要求：物理重命名成功后，必须同步更新 .am_meta.json 中的键值
-            QString folderPath = QString::fromStdWString(oldP.parent_path().wstring());
-            QString oldName = QString::fromStdWString(oldP.filename().wstring());
-            QString newName = QString::fromStdWString(newP.filename().wstring());
-            AmMetaJson::renameItem(folderPath, oldName, newName);
-            // 同步更新内存缓存
+            // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑，仅需更新数据库路径索引
             MetadataManager::instance().renameItem(oldP.wstring(), newP.wstring());
         } catch (...) {
-            return false; // 任一失败则中断（实际生产应支持回滚）
+            return false;
         }
     }
     return true;

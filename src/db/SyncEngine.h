@@ -24,7 +24,7 @@ public:
      * @brief 启动全量扫描（由用户手动触发）
      * @param onProgress 进度回调
      */
-    void runFullScan(std::function<void(int current, int total)> onProgress);
+    void runFullScan(std::function<void(int current, int total)> onProgress = nullptr);
 
     /**
      * @brief 维护标签聚合表 (tags 表)

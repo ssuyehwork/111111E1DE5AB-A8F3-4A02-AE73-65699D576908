@@ -10,7 +10,6 @@
 #include "ui/MainWindow.h"
 #include "db/Database.h"
 #include "db/SyncEngine.h"
-#include "meta/SyncQueue.h"
 #include "core/CoreController.h"
 
 /**
@@ -82,8 +81,7 @@ int main(int argc, char *argv[]) {
 
     int ret = a.exec();
 
-    // 6. 优雅退出：刷空队列并停止线程
-    ArcMeta::SyncQueue::instance().stop();
+    // 2026-05-24 按照用户要求：彻底移除 JSON 逻辑。不再需要 SyncQueue 优雅退出逻辑。
 
     return ret;
 }
